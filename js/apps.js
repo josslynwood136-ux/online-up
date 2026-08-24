@@ -218,12 +218,17 @@ function syncTtsChannel() {
   var pr = TTS_PRESETS[p];
   var key = (s.ttsKeys && s.ttsKeys[p]) || '';
   var url = (s.ttsUrls && s.ttsUrls[p]) || pr.url;
+  var group = (s.ttsGroups && s.ttsGroups[p]) || '';
   var html = '';
   html += '<div style="border-top:1px solid #f0ede8;padding-top:10px">';
   html += '<div style="font-size:12px;color:#4a3f35;margin-bottom:4px">' + pr.name + ' 密钥</div>';
   html += '<input class="field" type="password" id="ttsKey_' + p + '" value="' + escapeHTML(key) + '" onchange="setTtsKey(\'' + p + '\', this.value)">';
   html += '<div style="font-size:11px;color:#b8a99a;margin-top:8px;margin-bottom:3px">接口地址（用中转可改）</div>';
   html += '<input class="field" id="ttsUrl_' + p + '" value="' + escapeHTML(url) + '" onchange="setTtsUrl(\'' + p + '\', this.value)">';
+  if (p === 'minimax') {
+    html += '<div style="font-size:11px;color:#b8a99a;margin-top:8px;margin-bottom:3px">GroupId（中国站 platform.minimaxi.com 必填；国际站 api.minimax.io 留空）</div>';
+    html += '<input class="field" id="ttsGroup_' + p + '" value="' + escapeHTML(group) + '" onchange="setTtsGroupId(\'' + p + '\', this.value)">';
+  }
   var models = pr.models || [pr.model];
   var curModel = (s.ttsModels && s.ttsModels[p]) || pr.model;
   var mhtml = '';

@@ -12,7 +12,7 @@ const defaultState = {
   api: { key: '', url: 'https://api.openai.com/v1', model: 'gpt-4.1-mini', preset: '', temp: 0.85, topP: 0.9, maxTokens: 800, presencePenalty: 0.6, frequencyPenalty: 0.4 },
   apiProfiles: [],
   activeApiProfile: '',
-  settings: { ai: true, pinned: false, bubbleStyle: 'default', musicMode: 'loop', translateProvider: 'google', deeplKey: '', autoVoice: false, ttsProvider: 'minimax', ttsUrls: {}, ttsKeys: {}, ttsModels: {}, ttsVoices: {} },
+  settings: { ai: true, pinned: false, bubbleStyle: 'default', musicMode: 'loop', translateProvider: 'google', deeplKey: '', autoVoice: false, ttsProvider: 'minimax', ttsUrls: {}, ttsKeys: {}, ttsModels: {}, ttsVoices: {}, ttsGroups: {} },
   activeRoleId: 'role-default',
   roles: [
     {
@@ -364,7 +364,7 @@ function ensureStateShape(next, saved) {
   next.willow.date = typeof next.willow.date === 'string' ? next.willow.date : '';
   next.willow.text = typeof next.willow.text === 'string' ? next.willow.text : '';
   next.willow.rule = typeof next.willow.rule === 'string' ? next.willow.rule : '';
-  next.settings = Object.assign({ ai: true, pinned: false, bubbleStyle: 'default', musicMode: 'loop', translateProvider: 'google', deeplKey: '', autoVoice: false, ttsProvider: 'minimax', ttsUrls: {}, ttsKeys: {}, ttsModels: {}, ttsVoices: {} }, next.settings || {});
+  next.settings = Object.assign({ ai: true, pinned: false, bubbleStyle: 'default', musicMode: 'loop', translateProvider: 'google', deeplKey: '', autoVoice: false, ttsProvider: 'minimax', ttsUrls: {}, ttsKeys: {}, ttsModels: {}, ttsVoices: {}, ttsGroups: {} }, next.settings || {});
   if (['minimax', 'mimo', 'elevenlabs'].indexOf(next.settings.ttsProvider) < 0) next.settings.ttsProvider = 'minimax';
   next.settings.relayUrl = typeof next.settings.relayUrl === 'string' ? next.settings.relayUrl : '';
   return next;

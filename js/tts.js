@@ -73,10 +73,12 @@ function _ttsCfg(p) {
   var s = state.settings || {};
   var urls = s.ttsUrls || {};
   var keys = s.ttsKeys || {};
+  var groups = s.ttsGroups || {};
   var preset = _ttsPreset(p);
   return {
     url: (urls[p] && String(urls[p]).trim()) || preset.url,
-    key: (keys[p] && String(keys[p]).trim()) || ''
+    key: (keys[p] && String(keys[p]).trim()) || '',
+    group: (groups[p] && String(groups[p]).trim()) || ''
   };
 }
 
@@ -185,16 +187,23 @@ async function _ttsFetch(url, opts) {
   return aiRequest(url, opts); // 有中继服务器时自动走代理规避跨域，否则直连
 }
 
-// ---- 平台一：MiniMax 海螺 t2a_v2（响应里 data.audio 为 hex 编码的 mp3）----
-async function minimaxSpeak(text, btn, cancelled) {
-  var p = _ttsCharProvider();
-  var cfg = _ttsCfg(p);
-  if (!cfg.key) throw new Error('MiniMax 还没填密钥（主设置-角色语音里）');
+// MiniMax 地址：中国站需在 URL 上带 ?GroupId=，国际站 api.minimax.io 不需要
+function _minimaxUrl(cfg) {
   var u = cfg.url;
   if (!/t2a_v2$/i.test(u)) {
     if (!/\/v1$/i.test(u)) u += '/v1';
     u += '/t2a_v2';
   }
+  if (cfg.group) u += (u.indexOf('?') >= 0 ? '&' : '?') + 'GroupId=' + encodeURIComponent(cfg.group);
+  return u;
+}
+
+// ---- 平台一：MiniMax 海螺 t2a_v2（响应里 data.audio 为 hex 编码的 mp3）----
+async function minimaxSpeak(text, btn, cancelled) {
+  var p = _ttsCharProvider();
+  var cfg = _ttsCfg(p);
+  if (!cfg.key) throw new Error('MiniMax 还没填密钥（主设置-角色语音里）');
+  var u = _minimaxUrl(cfg);
   _ttsAbort = new AbortController();
   var res = await _ttsFetch(u, {
     method: 'POST',
@@ -376,6 +385,12 @@ function setTtsKey(p, val) {
   state.settings.ttsKeys[p] = String(val || '').trim();
   saveState();
 }
+function setTtsGroupId(p, val) {
+  if (!state.settings) state.settings = {};
+  if (!state.settings.ttsGroups) state.settings.ttsGroups = {};
+  state.settings.ttsGroups[p] = String(val || '').trim();
+  saveState();
+}
 function setTtsModel(p, val) {
   if (!state.settings) state.settings = {};
   if (!state.settings.ttsModels) state.settings.ttsModels = {};
@@ -420,8 +435,7 @@ async function testTtsConnection() {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       show('连接成功 ✓', true);
     } else if (p === 'minimax') {
-      var u2 = cfg.url;
-      if (!/t2a_v2$/i.test(u2)) { if (!/\/v1$/i.test(u2)) u2 += '/v1'; u2 += '/t2a_v2'; }
+      var u2 = _minimaxUrl(cfg);
       var r2 = await aiRequest(u2, {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.key },
         body: JSON.stringify({ model: _ttsGlobalModel(p), text: '连接测试', stream: false, output_format: 'hex', language_boost: 'auto', voice_setting: { voice_id: _ttsCharVoice(), speed: 1, vol: 1, pitch: 0 }, audio_setting: { sample_rate: 32000, bitrate: 128000, format: 'mp3', channel: 1 } })
