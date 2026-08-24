@@ -3034,7 +3034,7 @@ async function openQqLogin() {
     <div class="ncm-login-box">
       <b>登录QQ音乐</b>
       <div class="ncm-qr" id="qqQr">正在获取二维码…</div>
-      <p class="ncm-qr-status" id="qqQrStatus">用手机 QQ 或 QQ音乐 App 扫码确认</p>
+      <p class="ncm-qr-status" id="qqQrStatus">请用<strong>手机 QQ</strong> 扫（不要用 QQ音乐 App / 微信 / 相机，否则会跳到下载页）</p>
       <button class="music-tab" onclick="closeQqLogin()">关闭</button>
     </div>`;
   phone.appendChild(mask);

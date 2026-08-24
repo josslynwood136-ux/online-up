@@ -2280,7 +2280,7 @@ function startCall(type) {
   overlay.className = 'call-overlay' + (type === 'video' ? ' call-video-overlay' : '');
   const avatar = char.avatar || 'https://img.facfox.com/imgs/2026/07/19/ea51598f7d0459ee.jpg';
   const label = type === 'video' ? '📹 视频呼叫' : '📞 语音呼叫';
-  const actionsHtml = '<button class="call-btn call-btn-mute" id="callMuteBtn" onclick="toggleMute()">🔇</button><button class="call-btn call-btn-end" id="callEndBtn" onclick="endCall()">✕</button><button class="call-btn" id="callSpeakerBtn" onclick="toggleSpeaker()">🔊</button>';
+  const actionsHtml = '<button class="call-btn call-btn-mute" id="callMuteBtn" onclick="toggleMute()">🔇</button><button class="call-btn call-btn-end" id="callEndBtn" onclick="endCall()">✕</button><button class="call-btn" id="callVoiceBtn" onclick="toggleCallVoice()">🎤</button><button class="call-btn" id="callSpeakerBtn" onclick="toggleSpeaker()">🔊</button>';
   const selfVideo = '<video id="callSelfVideo" autoplay playsinline muted style="display:none"></video>';
   const tail = `<div class="call-mic-badge" id="callMicBadge" style="display:none">🎙 通话中</div><div class="call-caption" id="callCaption"></div><div class="call-actions">${actionsHtml}</div><div class="call-input-row"><input id="callInput" class="call-input" placeholder="说点什么…" onkeydown="if(event.key==='Enter')callSend()"><button class="call-send" onclick="callSend()">发送</button></div>`;
   if (type === 'video') {
@@ -2440,6 +2440,12 @@ function endCall(reason) {
 function toggleMute() {
   if (!state.call) state.call = {};
   state.call.muted = !state.call.muted;
+  // 真正禁用/启用麦克风轨道
+  if (state.call.stream) {
+    state.call.stream.getAudioTracks().forEach(function(t) { t.enabled = !state.call.muted; });
+  }
+  // 静音时停止通话中的语音识别（角色就听不到你说话了）
+  if (state.call.muted && _callRec) { try { _callRec.stop(); } catch(e) {} _callRec = null; }
   const btn = document.getElementById('callMuteBtn');
   if (btn) { btn.classList.toggle('active'); btn.textContent = state.call.muted ? '🔇' : '🎤'; }
   if (btn) btn.style.borderColor = state.call.muted ? 'var(--ink)' : '';
@@ -2451,6 +2457,31 @@ function toggleSpeaker() {
   const btn = document.getElementById('callSpeakerBtn');
   if (btn) { btn.classList.toggle('active'); btn.textContent = state.call.speaker ? '🔊' : '🔈'; }
   if (btn) btn.style.borderColor = state.call.speaker ? 'var(--ink)' : '';
+}
+
+// ===== 通话中用户语音输入：按住/点击🎤说话，识别成文字自动发给角色 =====
+var _callRec = null;
+function toggleCallVoice() {
+  var R = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!R) { showCallCaption('（此浏览器不支持语音识别，iOS Safari 不支持，建议用 Chrome / 安卓）'); return; }
+  if (state.call && state.call.muted) { showCallCaption('（已静音，先取消静音再说话）'); return; }
+  if (_callRec) { try { _callRec.stop(); } catch(e) {} _callRec = null; return; }
+  var input = document.getElementById('callInput');
+  if (input) input.value = '';
+  var started = '';
+  var recognition = new R();
+  recognition.lang = 'zh-CN';
+  recognition.continuous = false;
+  recognition.onresult = function(e) {
+    for (var i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) started += e.results[i][0].transcript;
+    }
+    if (input) input.value = started;
+  };
+  recognition.onend = function() { _callRec = null; if (started.trim()) callSend(); };
+  recognition.onerror = function() { _callRec = null; };
+  try { recognition.start(); _callRec = recognition; showCallCaption('🎙 听你说…（说完自动发送）'); }
+  catch (e) { showCallCaption('（语音启动失败）'); }
 }
 
 var _voiceRec = null;
@@ -2534,14 +2565,47 @@ function stopVoiceRecord() {
   if (input) input.placeholder = '发消息...';
 }
 
+// 底部麦克风按钮：录音进行中=停止并发送；否则走原「点按转文字」逻辑
+function onVoiceBtnClick() {
+  if (window._voiceWasHold) { window._voiceWasHold = false; return; }
+  if (_voiceMediaRecorder) { stopVoiceRecord(); return; }
+  toggleVoice();
+}
+
+// more-panel「语音消息」按钮：开始/停止录音（开关）
+function sendVoiceMsg() {
+  var p = document.getElementById('morePanel');
+  if (p) p.style.display = 'none';
+  if (_voiceMediaRecorder) { stopVoiceRecord(); return; }
+  startVoiceRecord();
+}
+
 function sendVoiceMessage(blob) {
   var reader = new FileReader();
   reader.onload = function(ev) {
     var dataUrl = ev.target.result;
     appendBubble('user', '[语音消息]', { type: 'audio', src: dataUrl });
     saveState();
+    respondToVoiceMessage();
   };
   reader.readAsDataURL(blob);
+}
+
+// 用户发来语音消息后，让角色用语音回应一句（真·语音识别后续可接 ASR；先以占位触发自然回应）
+function respondToVoiceMessage() {
+  var char = activeCharacter();
+  if (!char) return;
+  if (!state.api || !state.api.key || !state.api.url || !state.api.model) {
+    appendBubble('system', '（对方收到了你的语音，但还没连 AI，去设置里连接一下吧）');
+    return;
+  }
+  _manualAICall = true;
+  setChatTyping(true);
+  callAI('（我给你发了一段语音消息，你听得到吗？）', false, false).then(async function(reply) {
+    await deliverReply(reply || '听到啦～你想说什么我都听着呢');
+  }).catch(function() {
+    appendBubble('system', '（对方好像没听清你的语音）');
+  }).finally(function() { setChatTyping(false); });
 }
 
 // ===== ① 空闲主动找话 =====
