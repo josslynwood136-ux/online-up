@@ -676,7 +676,70 @@ function _mediaElementDecode(file) {
     }).catch(function() { fail(new Error('手机端自动播放被拦截（请先点一下页面任意位置，再选文件）')); });
   });
 }
-async function _fileToWavDataUrl(file) {
+
+// ===== 兜底解码：ffmpeg.wasm（自带全套解码器，能解出浏览器媒体引擎解不了的 mp4 音轨）=====
+// 单线程版无需 SharedArrayBuffer / COOP-COEP，普通手机浏览器也能跑；首次用到时按需从 CDN 拉取。
+var _ffmpegPromise = null;
+var _ffmpegFF = null;
+function _loadScript(src) {
+  return new Promise(function (resolve, reject) {
+    var s = document.createElement('script');
+    s.src = src;
+    s.onload = function () { resolve(); };
+    s.onerror = function () { reject(new Error('脚本加载失败：' + src)); };
+    document.head.appendChild(s);
+  });
+}
+function _getFFmpeg(onLog) {
+  if (_ffmpegPromise) return _ffmpegPromise;
+  _ffmpegPromise = (async function () {
+    var FF = (typeof FFmpeg !== 'undefined' && FFmpeg.createFFmpeg) ? FFmpeg : null;
+    if (!FF) {
+      if (onLog) onLog('正在加载解码器（首次稍慢）…');
+      await _loadScript('https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js');
+      FF = (typeof FFmpeg !== 'undefined' && FFmpeg.createFFmpeg) ? FFmpeg
+         : (typeof createFFmpeg !== 'undefined') ? { createFFmpeg: createFFmpeg, fetchFile: (typeof fetchFile !== 'undefined' ? fetchFile : null) }
+         : null;
+    }
+    if (!FF || !FF.createFFmpeg) throw new Error('ffmpeg 脚本加载失败，无法用兜底方式转换');
+    if (!FF.fetchFile) throw new Error('ffmpeg 脚本不完整，无法用兜底方式转换');
+    var fe = FF.createFFmpeg({
+      log: false,
+      corePath: 'https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js',
+      locateFile: function (file) { return 'https://unpkg.com/@ffmpeg/core@0.11.0/dist/' + file; }
+    });
+    if (onLog) onLog('正在初始化解码器…');
+    await fe.load();
+    _ffmpegFF = FF;
+    return fe;
+  })();
+  return _ffmpegPromise;
+}
+async function _fileToWavViaFfmpeg(file, onLog) {
+  var fe = await _getFFmpeg(onLog);
+  var ext = 'mp4';
+  var m = (file.name || '').match(/\.([a-z0-9]+)$/i);
+  if (m) ext = m[1].toLowerCase();
+  var inName = 'src_' + Date.now() + '.' + ext;
+  fe.FS('writeFile', inName, await _ffmpegFF.fetchFile(file));
+  if (onLog) onLog('正在用 ffmpeg 提取音轨并转 wav…');
+  try {
+    await fe.run('-i', inName, '-vn', '-ac', '1', '-ar', '24000', '-f', 'wav', 'out.wav');
+  } catch (e) {
+    throw new Error('ffmpeg 转码失败（文件音轨可能损坏或格式不支持）');
+  }
+  var data = fe.FS('readFile', 'out.wav');
+  try { fe.FS('unlink', inName); } catch (e) {}
+  try { fe.FS('unlink', 'out.wav'); } catch (e) {}
+  if (!data || !data.length) throw new Error('ffmpeg 没有解出音频数据');
+  var bin = '', CH = 0x8000;
+  for (var k = 0; k < data.length; k += CH) {
+    bin += String.fromCharCode.apply(null, data.subarray(k, Math.min(data.length, k + CH)));
+  }
+  return 'data:audio/wav;base64,' + btoa(bin);
+}
+
+async function _fileToWavDataUrl(file, onLog) {
   var ab = await _readAb(file);
   var AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) throw new Error('该浏览器不支持音频解码，请改传 mp3/wav');
@@ -689,7 +752,12 @@ async function _fileToWavDataUrl(file) {
     catch (e) { lastErr = e; }
     try { ctx.close(); } catch (e) {}
   }
-  // 手机等严格环境下直接解码可能失败，改走 <video> 播放 + 录制重编码
+  // 兜底方案 1：ffmpeg.wasm（自带解码器，支持 HE-AAC / 各种 mp4 音轨，跨平台最稳）
+  if (!audio) {
+    try { return await _fileToWavViaFfmpeg(file, onLog); }
+    catch (e) { console.warn('[TTS] ffmpeg 兜底失败：', e); lastErr = e; }
+  }
+  // 兜底方案 2：手机等严格环境下走 <video> 播放 + 录制重编码
   if (!audio) {
     try { audio = await _mediaElementDecode(file); }
     catch (e) { lastErr = e; }
@@ -768,8 +836,8 @@ function uploadCloneVoice(e) {
     r.onerror = function() { fail('读取文件失败，请换一个音频'); };
     r.readAsDataURL(f);
   } else {
-    busy('正在提取音轨并转换为 wav…（' + Math.round(f.size / 1048576 * 10) / 10 + 'MB · ' + (f.type || '未知类型') + '）');
-    _fileToWavDataUrl(f).then(function(dataUrl) {
+    busy('正在提取音轨并转换为 wav…（' + Math.round(f.size / 1048576 * 10) / 10 + 'MB · ' + (f.type || '未知类型') + '，首次需下载解码器）');
+    _fileToWavDataUrl(f, busy).then(function(dataUrl) {
       finish(dataUrl, (f.name || 'video'), f.size);
     }).catch(function(err) {
       // 自带完整病历：错误原文 + 出错位置 + 文件信息，截图发来即可定位
