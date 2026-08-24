@@ -592,6 +592,74 @@ function _cloneDbDel(charId) {
   }).catch(function() { return false; });
 }
 
+// ===== 音频转换：mp4/webm/m4a 等容器的音轨 → 克隆可用的 wav（纯前端，不经服务器） =====
+function _readAb(file) {
+  return new Promise(function(resolve, reject) {
+    var r = new FileReader();
+    r.onload = function() { resolve(r.result); };
+    r.onerror = function() { reject(new Error('读取文件失败')); };
+    r.readAsArrayBuffer(file);
+  });
+}
+// Float32 PCM → 16bit 单声道 WAV 的 ArrayBuffer
+function _encodeWav(samples, sampleRate) {
+  var buf = new ArrayBuffer(44 + samples.length * 2);
+  var v = new DataView(buf);
+  function ws(o, s) { for (var i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); }
+  ws(0, 'RIFF'); v.setUint32(4, 36 + samples.length * 2, true); ws(8, 'WAVE');
+  ws(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sampleRate, true); v.setUint32(28, sampleRate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  ws(36, 'data'); v.setUint32(40, samples.length * 2, true);
+  for (var i = 0; i < samples.length; i++) {
+    var s = Math.max(-1, Math.min(1, samples[i]));
+    v.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+  }
+  return buf;
+}
+async function _fileToWavDataUrl(file) {
+  var ab = await _readAb(file);
+  var AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) throw new Error('该浏览器不支持音频解码，请改传 mp3/wav');
+  var ctx = new AC();
+  var audio;
+  try {
+    audio = await new Promise(function(resolve, reject) {
+      var done = false;
+      function ok(v) { if (!done) { done = true; resolve(v); } }
+      function bad() { if (!done) { done = true; reject(new Error('解不出这个文件的音轨（编码可能不支持）')); } }
+      try {
+        var p = ctx.decodeAudioData(ab, ok, bad);
+        if (p && typeof p.then === 'function') p.then(ok, bad);
+      } catch (e) { bad(); }
+    });
+  } finally { try { ctx.close(); } catch (e) {} }
+  if (!audio || !audio.length) throw new Error('文件里没有解出音轨');
+  var SR_SRC = audio.sampleRate;
+  var SR_DST = Math.min(24000, SR_SRC);       // 人声克隆 24k 足够
+  var MAX_SEC = 120;                          // 最长取前 120 秒
+  var nUse = Math.min(audio.length, Math.floor(MAX_SEC * SR_SRC));
+  var nCh = audio.numberOfChannels;
+  var mono = new Float32Array(nUse);          // 混成单声道
+  if (nCh === 1) mono.set(audio.getChannelData(0).subarray(0, nUse));
+  else {
+    var a0 = audio.getChannelData(0), a1 = audio.getChannelData(Math.min(1, nCh - 1));
+    for (var i = 0; i < nUse; i++) mono[i] = (a0[i] + a1[i]) * 0.5;
+  }
+  var ratio = SR_SRC / SR_DST;                // 线性插值重采样
+  var nOut = Math.max(1, Math.floor(nUse / ratio));
+  var out = new Float32Array(nOut);
+  for (var j = 0; j < nOut; j++) {
+    var pos = j * ratio, i0 = Math.floor(pos);
+    if (i0 >= nUse - 1) { out[j] = mono[nUse - 1]; continue; }
+    var fr = pos - i0;
+    out[j] = mono[i0] * (1 - fr) + mono[i0 + 1] * fr;
+  }
+  var bytes = new Uint8Array(_encodeWav(out, SR_DST));
+  var bin = '', CH = 0x8000;
+  for (var k = 0; k < bytes.length; k += CH) bin += String.fromCharCode.apply(null, bytes.subarray(k, Math.min(bytes.length, k + CH)));
+  return 'data:audio/wav;base64,' + btoa(bin);
+}
+
 // 上传一段录音，作为该角色 MiMo 的克隆音色。
 // 官方约束：样本仅支持 mp3 / wav，base64 后 ≤10MB；MIME 必须与真实格式一致。
 // 音频本体存 IndexedDB，角色里只记 {name,size} 标记，不再挤占 localStorage 配额。
@@ -605,30 +673,46 @@ function uploadCloneVoice(e) {
   function fail(msg) {
     if (st) { st.textContent = msg; st.style.color = '#c0392b'; setTimeout(function() { if (st) st.style.color = ''; }, 6000); }
   }
+  function busy(msg) { if (st) { st.textContent = msg; st.style.color = ''; } }
   var isWav = (/wav/i.test(f.type)) || (/\.wav$/i.test(f.name || ''));
   var isMp3 = (/mpeg|mp3/i.test(f.type)) || (/\.mp3$/i.test(f.name || ''));
-  if (!isWav && !isMp3) { fail('仅支持 mp3 或 wav 录音，当前文件类型：' + (f.type || '未知')); return; }
-  if (f.size > 9 * 1024 * 1024) { fail('文件太大（约 ' + Math.round(f.size / 1024 / 1024 * 10) / 10 + 'MB）。请用 10~30 秒的清晰录音（建议 mp3）'); return; }
-  var r = new FileReader();
-  r.onload = function() {
-    var dataUrl = String(r.result || '');
-    if (dataUrl.indexOf('data:') !== 0) { fail('读取文件失败，请换一个音频'); return; }
-    // 统一 MIME：MiMo 只认 audio/wav 与 audio/mpeg
-    dataUrl = dataUrl.replace(/^data:[^,]*,/, isWav ? 'data:audio/wav;base64,' : 'data:audio/mpeg;base64,');
+  var direct = isWav || isMp3; // 其余类型（mp4/webm/m4a…）走前端转 wav
+  if (direct && f.size > 9 * 1024 * 1024) { fail('文件太大（约 ' + Math.round(f.size / 1024 / 1024 * 10) / 10 + 'MB）。请用 10~30 秒的清晰录音（建议 mp3）'); return; }
+  if (!direct && f.size > 200 * 1024 * 1024) { fail('文件太大（约 ' + Math.round(f.size / 1024 / 1024) + 'MB），请先剪出有人声的一小段再上传'); return; }
+
+  function finish(dataUrl, dispName, sizeBytes) {
     _cloneDbSet(c.id, dataUrl).then(function() {
-      c.ttsClone = { name: f.name || 'sample', size: f.size }; // 轻量标记（不含音频本体）
+      c.ttsClone = { name: dispName, size: sizeBytes }; // 轻量标记（不含音频本体）
       if (!c.ttsVoices) c.ttsVoices = {};
       c.ttsVoices.mimo = ''; // 清掉旧的普通 MiMo 音色，避免它盖过克隆
       c.ttsProvider = 'mimo'; // 克隆是 MiMo 专属，上传即自动切到 MiMo
       if (!saveState()) { c.ttsClone = null; _cloneDbDel(c.id); fail('保存失败：本机存储空间不足，请先清理聊天图片/表情包再试'); return; }
       if (typeof syncCharTts === 'function') syncCharTts();
-      if (st) st.textContent = '已保存克隆音色：' + (f.name || '') + '（' + Math.round(f.size / 1024) + 'KB，已启用复刻声线；点“清除克隆”可还原）';
+      if (st) st.textContent = '已保存克隆音色：' + dispName + '（' + Math.round(sizeBytes / 1024) + 'KB，已启用复刻声线；点“清除”可还原）';
     }).catch(function(err) {
       fail('克隆样本写入本地数据库失败：' + ((err && err.message) || err) + '（无痕/隐私模式下 IndexedDB 可能不可用）');
     });
-  };
-  r.onerror = function() { fail('读取文件失败，请换一个音频'); };
-  r.readAsDataURL(f);
+  }
+
+  if (direct) {
+    var r = new FileReader();
+    r.onload = function() {
+      var dataUrl = String(r.result || '');
+      if (dataUrl.indexOf('data:') !== 0) { fail('读取文件失败，请换一个音频'); return; }
+      // 统一 MIME：MiMo 只认 audio/wav 与 audio/mpeg
+      dataUrl = dataUrl.replace(/^data:[^,]*,/, isWav ? 'data:audio/wav;base64,' : 'data:audio/mpeg;base64,');
+      finish(dataUrl, f.name || 'sample', f.size);
+    };
+    r.onerror = function() { fail('读取文件失败，请换一个音频'); };
+    r.readAsDataURL(f);
+  } else {
+    busy('正在提取音轨并转换为 wav…（视频越长越久，请稍等）');
+    _fileToWavDataUrl(f).then(function(dataUrl) {
+      finish(dataUrl, (f.name || 'video'), f.size);
+    }).catch(function(err) {
+      fail('转换失败：' + ((err && err.message) || err) + '。也可以先用剪映等工具导出 mp3 再上传');
+    });
+  }
 }
 // 清除该角色 MiMo 克隆音色，回到普通音色
 function clearCloneVoice() {
