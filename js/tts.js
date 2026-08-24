@@ -638,11 +638,12 @@ async function _fileToWavDataUrl(file) {
   var ab = await _readAb(file);
   var AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) throw new Error('该浏览器不支持音频解码，请改传 mp3/wav');
-  // 尝试两次：个别引擎第一次会莫名失败；第二次传副本（老实现会“消费掉”传入的缓冲）
+  // 关键：decodeAudioData 会“接管并掏空”传入的缓冲（detached），
+  // 所以每次尝试都必须传一份全新副本，原始 ab 绝不直接交给浏览器
   var audio = null, lastErr = null;
   for (var attempt = 0; attempt < 2 && !audio; attempt++) {
     var ctx = new AC();
-    try { audio = await _decodeOnce(ctx, attempt ? ab.slice(0) : ab); }
+    try { audio = await _decodeOnce(ctx, ab.slice(0)); }
     catch (e) { lastErr = e; }
     try { ctx.close(); } catch (e) {}
   }
@@ -720,11 +721,15 @@ function uploadCloneVoice(e) {
     r.onerror = function() { fail('读取文件失败，请换一个音频'); };
     r.readAsDataURL(f);
   } else {
-    busy('正在提取音轨并转换为 wav…（视频越长越久，请稍等）');
+    busy('正在提取音轨并转换为 wav…（' + Math.round(f.size / 1048576 * 10) / 10 + 'MB · ' + (f.type || '未知类型') + '）');
     _fileToWavDataUrl(f).then(function(dataUrl) {
       finish(dataUrl, (f.name || 'video'), f.size);
     }).catch(function(err) {
-      fail('转换失败：' + ((err && err.message) || err) + '。也可以先用剪映等工具导出 mp3 再上传');
+      // 自带完整病历：错误原文 + 出错位置 + 文件信息，截图发来即可定位
+      var d = (err && err.message) ? err.message : String(err);
+      var stk = (err && err.stack) ? String(err.stack).replace(/\s+/g, ' ').split('at ').filter(Boolean)[1] : '';
+      stk = stk ? String(stk).slice(0, 120) : '';
+      fail('转换失败｜' + d + (stk ? ' ｜位置:' + stk : '') + ' ｜文件:' + (f.name || '') + '/' + (f.type || '?') + '/' + Math.round(f.size / 1024) + 'KB');
     });
   }
 }
