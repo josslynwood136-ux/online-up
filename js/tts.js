@@ -75,10 +75,11 @@ function _ttsCfg(p) {
   var keys = s.ttsKeys || {};
   var groups = s.ttsGroups || {};
   var preset = _ttsPreset(p);
+  function _clean(v) { return String(v == null ? '' : v).replace(/[^\x20-\x7E]/g, '').trim(); }
   return {
-    url: (urls[p] && String(urls[p]).trim()) || preset.url,
-    key: (keys[p] && String(keys[p]).trim()) || '',
-    group: (groups[p] && String(groups[p]).trim()) || ''
+    url: _clean(urls[p]) || preset.url,
+    key: _clean(keys[p]),
+    group: _clean(groups[p])
   };
 }
 
@@ -382,13 +383,13 @@ function setTtsUrl(p, val) {
 function setTtsKey(p, val) {
   if (!state.settings) state.settings = {};
   if (!state.settings.ttsKeys) state.settings.ttsKeys = {};
-  state.settings.ttsKeys[p] = String(val || '').trim();
+  state.settings.ttsKeys[p] = String(val == null ? '' : val).replace(/[^\x20-\x7E]/g, '').trim();
   saveState();
 }
 function setTtsGroupId(p, val) {
   if (!state.settings) state.settings = {};
   if (!state.settings.ttsGroups) state.settings.ttsGroups = {};
-  state.settings.ttsGroups[p] = String(val || '').trim();
+  state.settings.ttsGroups[p] = String(val == null ? '' : val).replace(/[^\x20-\x7E]/g, '').trim();
   saveState();
 }
 function setTtsModel(p, val) {
@@ -441,8 +442,8 @@ async function testTtsConnection() {
         body: JSON.stringify({ model: _ttsGlobalModel(p), text: '连接测试', stream: false, output_format: 'hex', language_boost: 'auto', voice_setting: { voice_id: _ttsCharVoice(), speed: 1, vol: 1, pitch: 0 }, audio_setting: { sample_rate: 32000, bitrate: 128000, format: 'mp3', channel: 1 } })
       });
       var d2 = await r2.json().catch(function() { return {}; });
-      if (d2.base_resp && d2.base_resp.status_code !== 0) throw new Error(d2.base_resp.status_msg || ('code ' + d2.base_resp.status_code));
-      if (!r2.ok) throw new Error('HTTP ' + r2.status);
+      if (d2.base_resp && d2.base_resp.status_code !== 0) throw new Error(d2.base_resp.status_msg + ' (code ' + d2.base_resp.status_code + ')');
+      if (!r2.ok) throw new Error('HTTP ' + r2.status + ' ' + JSON.stringify(d2).slice(0, 240));
       show('连接成功 ✓', true);
     } else {
       var u3 = cfg.url;
@@ -452,7 +453,7 @@ async function testTtsConnection() {
         body: JSON.stringify({ model: _ttsGlobalModel(p), messages: [{ role: 'assistant', content: '连接测试' }], audio: { format: 'mp3', voice: _ttsCharVoice() } })
       });
       var d3 = await r3.json().catch(function() { return {}; });
-      if (!r3.ok) throw new Error((d3.error && d3.error.message) || ('HTTP ' + r3.status));
+      if (!r3.ok) throw new Error('HTTP ' + r3.status + ' ' + ((d3.error && d3.error.message) || JSON.stringify(d3).slice(0, 240)));
       show('连接成功 ✓', true);
     }
   } catch (e) { show('连接失败：' + (e && e.message ? e.message : e), false); }
