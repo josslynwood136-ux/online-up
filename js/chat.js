@@ -722,38 +722,51 @@ async function deliverReply(reply) {
   }
   const txt = reply || '……';
   const _c2 = activeCharacter();
-  var trans = null;
-  if (_c2.translate && _c2.lang && _c2.lang !== '中文') {
-    var cleanText = txt.replace(/[（(][^）)]*[）)]/g, '').trim();
-    if (cleanText) trans = await translateText(cleanText, _c2.lang).catch(function() { return null; });
-  }
   setChatTyping(false);
   flushThinkBubble(activeCharacter());
-  // 翻译开启时保持整条（翻译不好逐句对应）；否则按换行/句末标点拆成多条气泡，模拟真人连发短信
-  if (trans) {
-    appendBubble('assistant', txt, null, trans);
+  // 无论是否翻译，都先拆成多条气泡（模拟真人连发短信）；翻译模式下逐条各自翻译
+  var _parts = splitReply(txt);
+  if (_parts.length <= 1) {
+    var _t0 = null;
+    if (_c2.translate && _c2.lang && _c2.lang !== '中文') {
+      var _clean0 = txt.replace(/[（(][^）)]*[）)]/g, '').trim();
+      if (_clean0) _t0 = await translateText(_clean0, _c2.lang).catch(function() { return null; });
+    }
+    appendBubble('assistant', txt, null, _t0);
   } else {
-    var _parts = splitReply(txt);
-    if (_parts.length <= 1) {
-      appendBubble('assistant', txt, null, null);
-    } else {
-      for (var _k = 0; _k < _parts.length; _k++) {
-        appendBubble('assistant', _parts[_k], null, null);
-        if (_k < _parts.length - 1) { await sleep(500 + Math.random() * 700); }
+    for (var _k = 0; _k < _parts.length; _k++) {
+      var _t = null;
+      if (_c2.translate && _c2.lang && _c2.lang !== '中文') {
+        var _clean = _parts[_k].replace(/[（(][^）)]*[）)]/g, '').trim();
+        if (_clean) _t = await translateText(_clean, _c2.lang).catch(function() { return null; });
       }
+      appendBubble('assistant', _parts[_k], null, _t);
+      if (_k < _parts.length - 1) { await sleep(500 + Math.random() * 700); }
     }
   }
   try { if (typeof autoSpeakReply === 'function') autoSpeakReply(txt); } catch (e) {}
 }
 
 function splitReply(txt) {
-  // 先按换行拆（模型听话时最自然，像连发几条）
+  if (!txt) return [txt];
+  // 1. 换行（模型听话时最自然，像连发几条）
   var byLine = txt.split('\n').map(function(s){ return s.trim(); }).filter(function(s){ return s.length; });
   if (byLine.length > 1) return byLine;
-  // 兜底：按句末标点切（保留标点），即使模型不换行也能拆成多条短气泡
+  // 2. 句末标点（中英文）切
   var bySentence = txt.match(/[^。！？!?]+[。！？!?]?/g) || [txt];
   bySentence = bySentence.map(function(s){ return s.trim(); }).filter(function(s){ return s.length; });
-  return bySentence.length > 1 ? bySentence : [txt];
+  if (bySentence.length > 1) return bySentence;
+  // 3. 逗号 / 分号 / 省略号 切（制造连发感）
+  var byComma = txt.match(/[^，；;…]+[，；;…]?/g) || [txt];
+  byComma = byComma.map(function(s){ return s.trim(); }).filter(function(s){ return s.length; });
+  if (byComma.length > 1) return byComma;
+  // 4. 仍是一整段且偏长 → 按字数硬切成多条短气泡
+  if (txt.length > 20) {
+    var chunks = [];
+    for (var i = 0; i < txt.length; i += 20) chunks.push(txt.slice(i, i + 20));
+    return chunks;
+  }
+  return [txt];
 }
 
 function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
