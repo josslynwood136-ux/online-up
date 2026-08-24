@@ -168,6 +168,63 @@ app.use('/relay', function (req, res) {
   req.pipe(proxy)
 })
 
+// ============================================================
+// 音频/视频 → WAV 转码（用于语音克隆样本）
+// 手机浏览器解不出某些 mp4/webm 音轨，改由服务端 ffmpeg 抽音轨 → 单声道 24kHz WAV → 返回 dataURL
+// ============================================================
+const cp = require('child_process')
+const os = require('os')
+const ffmpegStatic = (function () { try { return require('ffmpeg-static') } catch (e) { return null } })()
+function getFfmpeg() {
+  if (ffmpegStatic) return ffmpegStatic
+  try { cp.execSync('which ffmpeg'); return 'ffmpeg' } catch (e) { return null }
+}
+// 前端探测：服务端是否具备转码能力
+app.get('/api/convert-audio', function (req, res) {
+  res.json({ ok: true, supported: !!getFfmpeg() })
+})
+app.post('/api/convert-audio', function (req, res) {
+  const ff = getFfmpeg()
+  if (!ff) return res.status(500).json({ error: '服务器未安装 ffmpeg（请 npm i ffmpeg-static，或在系统安装 ffmpeg）' })
+  const chunks = []
+  let aborted = false
+  req.on('data', function (c) {
+    if (aborted) return
+    chunks.push(c)
+    const len = chunks.reduce(function (s, x) { return s + x.length }, 0)
+    if (len > 220 * 1024 * 1024) { // 上限约 220MB，防撑爆内存
+      aborted = true
+      res.status(413).json({ error: '文件过大（上限约 220MB）' })
+      req.destroy()
+    }
+  })
+  req.on('error', function () { aborted = true })
+  req.on('end', function () {
+    if (aborted) return
+    const buf = Buffer.concat(chunks)
+    if (!buf.length) return res.status(400).json({ error: '空文件' })
+    const ext = String(req.headers['x-file-ext'] || (req.headers['content-type'] || '').split('/')[1] || 'mp4').replace(/[^a-z0-9]/gi, '').slice(0, 5) || 'mp4'
+    const tmpIn = path.join(os.tmpdir(), 'cv_in_' + Date.now() + '.' + ext)
+    const tmpOut = path.join(os.tmpdir(), 'cv_out_' + Date.now() + '.wav')
+    fs.writeFile(tmpIn, buf, function (werr) {
+      if (werr) return res.status(500).json({ error: '写入临时文件失败' })
+      cp.execFile(ff, ['-i', tmpIn, '-vn', '-ac', '1', '-ar', '24000', '-f', 'wav', tmpOut],
+        { timeout: 180000, maxBuffer: 50 * 1024 * 1024 }, function (e) {
+          fs.unlink(tmpIn, function () {})
+          if (e) {
+            fs.unlink(tmpOut, function () {})
+            return res.status(422).json({ error: '转码失败：' + (e.stderr ? String(e.stderr).slice(0, 200) : (e.message || e)) })
+          }
+          fs.readFile(tmpOut, function (rerr, data) {
+            fs.unlink(tmpOut, function () {})
+            if (rerr || !data) return res.status(500).json({ error: '读取转换结果失败' })
+            res.json({ dataUrl: 'data:audio/wav;base64,' + data.toString('base64') })
+          })
+        })
+    })
+  })
+})
+
 // 静态托管整个项目（应用网页在本文件上一级目录）
 const APP_ROOT = process.env.APP_ROOT || path.join(__dirname, '..')
 app.use(function (req, res, next) {

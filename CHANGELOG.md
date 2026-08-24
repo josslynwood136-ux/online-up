@@ -44,7 +44,7 @@
 ### 七、待办 / 未决
 - **后台推送 + 手环（荣耀）**：规划 Capacitor 打包 APK + 前台服务 + WebSocket，服务器侧加「角色代笔」定时任务（替角色调 LLM 生成主动消息并推送）
 -  blockers：① 需一台 7×24 常驻服务器（VPS / 旧电脑）② 需 GitHub 账号走 Actions 自动打包 ③ 主动消息触发策略未定
-- **MP4 转换已取消**：经实测手机端转换不可靠，已移除 mp4/webm/m4a 上传与全部转码兜底代码，克隆音色仅接受 mp3 / wav 音频（见第八节）
+- **MP4 转换（客户端）已取消**：经实测手机端转换不可靠，已移除 mp4/webm/m4a 上传与全部前端转码兜底代码，克隆音色仅接受 mp3 / wav 音频（见第八节）；后改为**服务端 ffmpeg 转码**重新支持（见第九节）
 
 ### 八、回退：克隆恢复为纯音频（mp3 / wav）
 - 删除所有「视频 / 容器 → 音频」转码代码：移除 `_readAb`、`_encodeWav`、`_decodeOnce`、`_mediaElementDecode`、`_fileToWavDataUrl` 及 ffmpeg.wasm 兜底（`_getFFmpeg` / `_fileToWavViaFfmpeg` / `_loadScript`）
@@ -52,3 +52,11 @@
 - `index.html` 克隆上传框 `accept` 收敛为 `audio/*,.mp3,.wav,.m4a`，按钮文案改为「🎙 上传录音 · 仅支持 mp3 / wav」
 - 原因：mp4 等容器在部分（尤其手机）浏览器音轨解码不稳定，转换失败率高，性价比低；克隆走 MiMo 官方要求的 mp3 / wav 最稳
 - 本期文件版本：`js/tts.js` → `?v=20260824m`
+
+### 九、MP4/WebM 经服务端转码重新支持克隆
+- 把"视频转克隆样本"改走**服务端 ffmpeg 转码**：新增 `sever/server.js` 的 `POST /api/convert-audio`（原始文件 → ffmpeg 抽音轨 → 单声道 24kHz WAV → `data:audio/wav;base64` 返回），依赖 `ffmpeg-static`（`package.json` 新增，随 `npm install` 装静态二进制）；`GET /api/convert-audio` 供前端探测能力
+- 前端 `uploadCloneVoice`：mp3/wav 走原直传；视频/其它容器上传到 `/api/convert-audio` 取回 wav 后照常存 IndexedDB；失败给明确提示（改用 mp3/wav 或确认后端已部署）
+- `index.html`：`accept` 重新放开视频类型，按钮文案改回「🎙 上传录音或视频 · mp3 / wav / mp4 均可」
+- 说明：视频转码需部署后端（`sever/server.js`）；纯静态打开（无后端）时视频上传会提示改用 mp3/wav，不影响音频直传
+- 之所以能成：之前失败是手机浏览器解码 mp4 音轨不稳，现在解码/转码全在服务端，与客户端无关
+- 本期文件版本：`js/tts.js` → `?v=20260824n`（server 端变更需重新部署 `sever/server.js`）

@@ -28,10 +28,18 @@
 - **界面**：小米密钥框改为仅当存在启用克隆的角色时才显示；克隆上传重做为「虚线上传框 + 试听/清除胶囊」，稳定度滑杆换暖色系
 - **（当日回退）音视频转克隆样本**：原本新增 MP4/WebM/M4A → 提取音轨 → 单声道 → 24kHz 重采样 → WAV 的纯前端转换（含 `<video>+MediaRecorder` 兜底，后又加 ffmpeg.wasm 兜底）。实测手机端转换不稳定、失败率高（部分 mp4 音轨浏览器解不出 / 转码失败），已整体移除，克隆恢复为仅接受 mp3 / wav 音频
 
+### 2026-08-24（补充）：mp4/webm 经服务端转码重新支持
+**本期范围（这一版 = 做了什么）**：把"视频转克隆样本"改走**服务端 ffmpeg 转码**，彻底绕开手机浏览器解码不稳定的问题，mp4/webm/m4a/mov 重新可用。
+
+- **后端新增 `/api/convert-audio`**（`sever/server.js`）：前端把原始视频/音频 POST 上来，服务端用 ffmpeg 抽音轨 → 单声道 24kHz WAV → 返回 `data:audio/wav;base64`；依赖 `ffmpeg-static`（随 `npm install` 自动装静态二进制）。另提供 `GET /api/convert-audio` 供前端探测服务端是否支持
+- **前端 `uploadCloneVoice`**：mp3/wav 仍走原"直传"快路径；视频/其它容器改为上传到 `/api/convert-audio`，拿到 wav 后照常存 IndexedDB；失败给出明确提示（建议改用 mp3/wav 或确认后端已部署）
+- **UI**：克隆上传框 `accept` 重新放开视频类型，按钮文案改回「🎙 上传录音或视频 · mp3 / wav / mp4 均可」
+- **说明**：视频转码需要后端（部署 `sever/server.js`）；若以纯静态方式打开网页（无后端），视频上传会提示改用 mp3/wav，不影响音频直传
+
 ## ✨ 功能
 
 - **多平台 AI 语音播报**：MiniMax 海螺 / 小米 MiMo / ElevenLabs，按角色独立设置平台与音色
-- **MiMo 声音克隆**：上传 10~30 秒清晰录音（mp3 / wav）复刻角色声线；样本存 IndexedDB，不挤占 localStorage
+- **MiMo 声音克隆**：上传 10~30 秒清晰录音（mp3 / wav），或视频/音频片段（mp4 / webm / m4a 等，由服务端 ffmpeg 转成 wav）复刻角色声线；样本存 IndexedDB，不挤占 localStorage
 - **声音风格 & 稳定度**：一句话导演语气 + 稳定度滑杆（联动 temperature/top_p）
 - **语种跟随**：跟随聊天设置里的输出语种，非中文自动要求模型用该语言发音
 - **网页推送**：内置 Web Push（VAPID），可推送角色消息到手机通知
@@ -62,7 +70,7 @@ node sever/server.js
 
 ## ⚠️ 已知问题
 
-- **克隆仅支持音频**：MiMo 克隆样本仅接受 mp3 / wav；视频（mp4 等）请先用工具导出音频再上传
+- **克隆视频需后端转码**：mp4/webm 等视频由服务端 ffmpeg 转成 wav（需部署 `sever/server.js`）；纯静态打开（无后端）时视频上传会提示改用 mp3/wav
 - **推送依赖常驻服务器**：服务器休眠则角色无法主动发消息
 
 ## 🗺️ 路线图

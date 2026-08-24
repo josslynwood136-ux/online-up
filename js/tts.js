@@ -610,8 +610,12 @@ function uploadCloneVoice(e) {
   function busy(msg) { if (st) { st.textContent = msg; st.style.color = ''; } }
   var isWav = (/wav/i.test(f.type)) || (/\.wav$/i.test(f.name || ''));
   var isMp3 = (/mpeg|mp3/i.test(f.type)) || (/\.mp3$/i.test(f.name || ''));
-  if (!(isWav || isMp3)) { fail('仅支持 mp3 / wav 音频，暂不支持视频（mp4 等）'); return; }
-  if (f.size > 9 * 1024 * 1024) { fail('文件太大（约 ' + Math.round(f.size / 1024 / 1024 * 10) / 10 + 'MB）。请用 10~30 秒的清晰录音（建议 mp3）'); return; }
+  var isDirect = isWav || isMp3; // 音频直传；视频/其它容器（mp4/webm/m4a/mov…）走服务端 ffmpeg 转 wav
+  if (isDirect) {
+    if (f.size > 9 * 1024 * 1024) { fail('文件太大（约 ' + Math.round(f.size / 1024 / 1024 * 10) / 10 + 'MB）。请用 10~30 秒的清晰录音（建议 mp3）'); return; }
+  } else if (f.size > 220 * 1024 * 1024) {
+    fail('文件太大（约 ' + Math.round(f.size / 1048576) + 'MB），请先剪出有人声的一小段再上传'); return;
+  }
 
   function finish(dataUrl, dispName, sizeBytes) {
     _cloneDbSet(c.id, dataUrl).then(function() {
@@ -627,16 +631,31 @@ function uploadCloneVoice(e) {
     });
   }
 
-  var r = new FileReader();
-  r.onload = function() {
-    var dataUrl = String(r.result || '');
-    if (dataUrl.indexOf('data:') !== 0) { fail('读取文件失败，请换一个音频'); return; }
-    // 统一 MIME：MiMo 只认 audio/wav 与 audio/mpeg
-    dataUrl = dataUrl.replace(/^data:[^,]*,/, isWav ? 'data:audio/wav;base64,' : 'data:audio/mpeg;base64,');
-    finish(dataUrl, f.name || 'sample', f.size);
-  };
-  r.onerror = function() { fail('读取文件失败，请换一个音频'); };
-  r.readAsDataURL(f);
+  if (isDirect) {
+    var r = new FileReader();
+    r.onload = function() {
+      var dataUrl = String(r.result || '');
+      if (dataUrl.indexOf('data:') !== 0) { fail('读取文件失败，请换一个音频'); return; }
+      // 统一 MIME：MiMo 只认 audio/wav 与 audio/mpeg
+      dataUrl = dataUrl.replace(/^data:[^,]*,/, isWav ? 'data:audio/wav;base64,' : 'data:audio/mpeg;base64,');
+      finish(dataUrl, f.name || 'sample', f.size);
+    };
+    r.onerror = function() { fail('读取文件失败，请换一个音频'); };
+    r.readAsDataURL(f);
+  } else {
+    // 视频/其它容器：上传到服务端，由 ffmpeg 抽音轨转 wav 后返回
+    busy('正在上传到服务器转码（视频/音频 → wav，首次可能稍慢）…');
+    var ext = (f.name || 'file').split('.').pop() || 'mp4';
+    fetch('/api/convert-audio', { method: 'POST', body: f, headers: { 'x-file-ext': ext } })
+      .then(function(resp) { return resp.json().then(function(j) { return { ok: resp.ok, j: j }; }); })
+      .then(function(o) {
+        if (!o.ok || !o.j.dataUrl) { fail('服务器转码失败：' + (o.j.error || '未知错误') + '（可先转成 mp3 / wav 再上传）'); return; }
+        finish(o.j.dataUrl, f.name || 'video', f.size);
+      })
+      .catch(function(err) {
+        fail('转码请求失败：' + ((err && err.message) || err) + '（请确认已部署带 /api/convert-audio 的后端，或先转成 mp3 / wav）');
+      });
+  }
 }
 // 清除该角色 MiMo 克隆音色，回到普通音色
 function clearCloneVoice() {
