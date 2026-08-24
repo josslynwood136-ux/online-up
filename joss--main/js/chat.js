@@ -68,7 +68,6 @@ function closeChat() {
   pendingReply = false;
   _manualAICall = false;
   exitMultiSelect();
-  if (typeof stopSpeak === 'function') stopSpeak();
   $('sendBtn').style.display = '';
   var ob = $('aiBtn');
   if (ob) ob.remove();
@@ -418,9 +417,8 @@ function renderChat() {
     }
     const quoteHtml = quoteBlock(msg.quote);
     const tick = isUser ? `<div class="read-tick">${msg.status === 'read' ? '已读' : '已发送'}</div>` : '';
-    const voiceBtnHtml = (!isUser && msg.content && typeof toggleMsgVoice === 'function') ? `<button class="voice-play-btn" title="播放/停止" onclick="event.stopPropagation();toggleMsgVoice(this,${i})">🔈</button>` : '';
     const avHtml = !isUser ? `<div class="avatar voice-avatar" onclick="event.stopPropagation();showInnerVoice('${char.id}')">${renderAvatar(av, nm)}</div>` : `<div class="avatar">${renderAvatar(av, nm)}</div>`;
-    return `${divider}<div class="msg ${isUser ? 'right' : 'left'}${multiCls(i)}" data-idx="${i}" oncontextmenu="return false;" ontouchstart="onMsgDown(event,${i})" onmousedown="onMsgDown(event,${i})" onclick="onMsgTap(event,${i})">${msgCheck(isUser, i)}${avCol(avHtml)}<div class="bubble ${isUser ? 'right' : 'left'}">${quoteHtml}${textHtml}${mediaHtml}${transHtml}${voiceBtnHtml}</div>${tick}</div>`;
+    return `${divider}<div class="msg ${isUser ? 'right' : 'left'}${multiCls(i)}" data-idx="${i}" oncontextmenu="return false;" ontouchstart="onMsgDown(event,${i})" onmousedown="onMsgDown(event,${i})" onclick="onMsgTap(event,${i})">${msgCheck(isUser, i)}${avCol(avHtml)}<div class="bubble ${isUser ? 'right' : 'left'}">${quoteHtml}${textHtml}${mediaHtml}${transHtml}</div>${tick}</div>`;
   }).join('') + typing;
   if (!_multiSelect) $('chatBody').scrollTop = $('chatBody').scrollHeight;
   applyBubbleStyle();
@@ -743,7 +741,6 @@ async function deliverReply(reply) {
       }
     }
   }
-  try { if (typeof autoSpeakReply === 'function') autoSpeakReply(txt); } catch (e) {}
 }
 
 function splitReply(txt) {
@@ -1747,8 +1744,6 @@ function openSettings() {
     if (czs) czs.value = char.charZone || '';
   }
   applyBubbleStyle();
-  if (typeof syncTtsOptions === 'function') syncTtsOptions();
-  if (typeof syncCharTts === 'function') syncCharTts();
   renderSettingsMemories();
 }
 function closeSettings() { $('chatSettings').classList.remove('open'); }

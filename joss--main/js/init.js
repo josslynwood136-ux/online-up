@@ -182,7 +182,6 @@ _w.renderWillow = renderWillow; _w.makeWish = makeWish; _w.clearWishToday = clea
 _w.currentWillowWish = currentWillowWish; _w.currentWillowRule = currentWillowRule; _w.willowContextText = willowContextText; _w.willowBlocksProactive = willowBlocksProactive; _w.willowBlocksReplyFor = willowBlocksReplyFor; _w.willowBreaksRelation = willowBreaksRelation; _w.willowParseRule = willowParseRule;
 _w.startIdleProactive = startIdleProactive; _w.setIdleParams = setIdleParams;
 _w.showInnerVoice = showInnerVoice; _w.closeInnerVoice = closeInnerVoice;
-_w.toggleAutoVoice = toggleAutoVoice; _w.setTtsProvider = setTtsProvider; _w.setTtsUrl = setTtsUrl; _w.setTtsKey = setTtsKey; _w.setTtsModel = setTtsModel; _w.setCharTtsProvider = setCharTtsProvider; _w.setCharTtsVoice = setCharTtsVoice; _w.testTtsConnection = testTtsConnection; _w.toggleMsgVoice = toggleMsgVoice; _w.stopSpeak = stopSpeak; _w.speakText = speakText;
 
 // 离开时保存
 window.addEventListener('beforeunload', saveState);

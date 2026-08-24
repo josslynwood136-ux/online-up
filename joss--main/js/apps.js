@@ -176,20 +176,6 @@ function renderApiSettings() {
   h += '<div style="font-size:11px;color:#c0b0a0;line-height:1.5">提示：iOS 需把本页「添加到主屏幕」安装成 App（系统 16.4+）才能后台收推送；安卓 Chrome 直接支持。</div>';
   h += '</div>';
 
-  // 角色语音（全局：开关 + 默认平台 + 三平台独立密钥）
-  var _ttsS = (state.settings || {});
-  var _ttsP = ['minimax', 'mimo', 'elevenlabs'].indexOf(_ttsS.ttsProvider) >= 0 ? _ttsS.ttsProvider : 'minimax';
-  h += '<div style="background:#fff;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px">';
-  h += '<div style="font-size:13px;font-weight:600;color:#4a3f35;padding-bottom:2px;border-bottom:1px solid #f0ede8">角色语音</div>';
-  h += '<div style="display:flex;align-items:center;gap:10px">';
-  h += '<div style="flex:1;min-width:0"><div style="font-size:12px;color:#4a3f35">自动朗读回复</div><div style="font-size:11px;color:#b8a99a;margin-top:2px;line-height:1.4">开启后 TA 的消息会自动读出来，点聊天里消息旁的 🔈 可重听</div></div>';
-  h += '<div class="switch" id="autoVoiceSwitch" onclick="toggleAutoVoice()"></div></div>';
-  h += '<div id="ttsBody" style="display:flex;flex-direction:column;gap:12px">';
-  h += '<div><div style="font-size:11px;color:#b8a99a;margin-bottom:4px">默认发音平台（单个角色可在「聊天设置」里覆盖）</div><select class="field" id="ttsProviderSelect" onchange="setTtsProvider(this.value)"><option value="minimax"' + (_ttsP === 'minimax' ? ' selected' : '') + '>MiniMax 海螺</option><option value="mimo"' + (_ttsP === 'mimo' ? ' selected' : '') + '>小米 MiMo</option><option value="elevenlabs"' + (_ttsP === 'elevenlabs' ? ' selected' : '') + '>ElevenLabs</option></select></div>';
-  h += '<div id="ttsChannelBox"></div>';
-  h += '<div style="font-size:11px;color:#c0b0a0;line-height:1.5">切换上面的平台即可分别填写各渠道密钥。音色在「聊天设置」里按角色单独设（不同角色不同声音）。</div>';
-  h += '</div></div>';
-
   h += '<div style="background:#fff;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px">';
   h += '<div style="font-size:13px;font-weight:600;color:#4a3f35;padding-bottom:2px;border-bottom:1px solid #f0ede8">数据</div>';
   h += '<div style="font-size:11px;color:#b8a99a">导出备份包含全部角色、聊天记录和 API 配置</div>';
@@ -206,36 +192,6 @@ function renderApiSettings() {
   c().innerHTML = h;
   initApiSettings();
   if (typeof refreshPushUI === 'function') refreshPushUI();
-  if (typeof syncTtsOptions === 'function') syncTtsOptions();
-}
-
-// 只显示当前默认平台那家的密钥/地址，切换平台即切换显示（三家密钥分别保存在 state.settings.ttsKeys）
-function syncTtsChannel() {
-  var box = $('ttsChannelBox');
-  if (!box) return;
-  var s = state.settings || {};
-  var p = TTS_PRESETS[s.ttsProvider] ? s.ttsProvider : 'minimax';
-  var pr = TTS_PRESETS[p];
-  var key = (s.ttsKeys && s.ttsKeys[p]) || '';
-  var url = (s.ttsUrls && s.ttsUrls[p]) || pr.url;
-  var html = '';
-  html += '<div style="border-top:1px solid #f0ede8;padding-top:10px">';
-  html += '<div style="font-size:12px;color:#4a3f35;margin-bottom:4px">' + pr.name + ' 密钥</div>';
-  html += '<input class="field" type="password" id="ttsKey_' + p + '" value="' + escapeHTML(key) + '" onchange="setTtsKey(\'' + p + '\', this.value)">';
-  html += '<div style="font-size:11px;color:#b8a99a;margin-top:8px;margin-bottom:3px">接口地址（用中转可改）</div>';
-  html += '<input class="field" id="ttsUrl_' + p + '" value="' + escapeHTML(url) + '" onchange="setTtsUrl(\'' + p + '\', this.value)">';
-  var models = pr.models || [pr.model];
-  var curModel = (s.ttsModels && s.ttsModels[p]) || pr.model;
-  var mhtml = '';
-  models.forEach(function(m) { mhtml += '<option value="' + escapeHTML(m) + '"' + (m === curModel ? ' selected' : '') + '>' + escapeHTML(m) + '</option>'; });
-  html += '<div style="font-size:11px;color:#b8a99a;margin-top:8px;margin-bottom:3px">模型</div>';
-  html += '<div style="display:flex;gap:8px;align-items:center">';
-  html += '<select class="field" id="ttsModel_' + p + '" onchange="setTtsModel(\'' + p + '\', this.value)" style="flex:1">' + mhtml + '</select>';
-  html += '<button class="ghost-btn" onclick="testTtsConnection()" style="white-space:nowrap;flex:0 0 auto">测试连接</button>';
-  html += '</div>';
-  html += '<div id="ttsTestResult" style="font-size:12px;min-height:14px;margin-top:6px;color:#b8a99a"></div>';
-  html += '</div>';
-  box.innerHTML = html;
 }
 
 function saveApiConfig() {

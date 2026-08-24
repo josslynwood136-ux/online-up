@@ -12,7 +12,7 @@ const defaultState = {
   api: { key: '', url: 'https://api.openai.com/v1', model: 'gpt-4.1-mini', preset: '', temp: 0.85, topP: 0.9, maxTokens: 800, presencePenalty: 0.6, frequencyPenalty: 0.4 },
   apiProfiles: [],
   activeApiProfile: '',
-  settings: { ai: true, pinned: false, bubbleStyle: 'default', musicMode: 'loop', translateProvider: 'google', deeplKey: '', autoVoice: false, ttsProvider: 'minimax', ttsUrls: {}, ttsKeys: {}, ttsModels: {}, ttsVoices: {} },
+  settings: { ai: true, pinned: false, bubbleStyle: 'default', musicMode: 'loop', translateProvider: 'google', deeplKey: '' },
   activeRoleId: 'role-default',
   roles: [
     {
@@ -34,9 +34,7 @@ const defaultState = {
       translate: false,
       timeAware: false,
       myZone: '',
-      charZone: '',
-      ttsProvider: '',
-      ttsVoice: ''
+      charZone: ''
     }
   ],
   moments: [],
@@ -228,12 +226,10 @@ function ensureStateShape(next, saved) {
     autoMemLen: parseInt(role.autoMemLen) > 1 ? parseInt(role.autoMemLen) : 8,
     autoMemEvery: parseInt(role.autoMemEvery) > 0 ? parseInt(role.autoMemEvery) : 1,
     memPending: parseInt(role.memPending) || 0,
-      timeAware: role.timeAware === true,
-      myZone: role.myZone || '',
-      charZone: role.charZone || '',
-      ttsProvider: role.ttsProvider || '',
-      ttsVoice: role.ttsVoice || ''
-    }));
+    timeAware: role.timeAware === true,
+    myZone: role.myZone || '',
+    charZone: role.charZone || ''
+  }));
   if (!next.activeRoleId || !next.roles.some(role => role.id === next.activeRoleId)) {
     next.activeRoleId = next.roles[0].id;
   }
@@ -364,8 +360,7 @@ function ensureStateShape(next, saved) {
   next.willow.date = typeof next.willow.date === 'string' ? next.willow.date : '';
   next.willow.text = typeof next.willow.text === 'string' ? next.willow.text : '';
   next.willow.rule = typeof next.willow.rule === 'string' ? next.willow.rule : '';
-  next.settings = Object.assign({ ai: true, pinned: false, bubbleStyle: 'default', musicMode: 'loop', translateProvider: 'google', deeplKey: '', autoVoice: false, ttsProvider: 'minimax', ttsUrls: {}, ttsKeys: {}, ttsModels: {}, ttsVoices: {} }, next.settings || {});
-  if (['minimax', 'mimo', 'elevenlabs'].indexOf(next.settings.ttsProvider) < 0) next.settings.ttsProvider = 'minimax';
+  next.settings = Object.assign({ ai: true, pinned: false, bubbleStyle: 'default', musicMode: 'loop', translateProvider: 'google', deeplKey: '' }, next.settings || {});
   next.settings.relayUrl = typeof next.settings.relayUrl === 'string' ? next.settings.relayUrl : '';
   return next;
 }

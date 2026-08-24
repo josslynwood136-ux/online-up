@@ -1,4 +1,4 @@
-@import url('https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css');
+﻿@import url('https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css');
 *, *::before, *::after {
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
@@ -3506,9 +3506,3 @@ button { border: 0; cursor: pointer; }
   filter:drop-shadow(0 14px 22px rgba(150,50,40,.34));
 }
 .wp-text { position:relative; z-index:4; margin-top:16px; font-size:13px; letter-spacing:6px; color:#7a3a28; opacity:0; text-shadow:0 1px 0 rgba(255,255,255,.5); }
-
-/* ===== voice play button ===== */
-.voice-play-btn { border: none; background: rgba(0,0,0,.06); color: #8a7a6a; border-radius: 50%; width: 22px; height: 22px; font-size: 11px; line-height: 1; cursor: pointer; margin-top: 5px; padding: 0; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
-.voice-play-btn:hover { background: rgba(0,0,0,.1); }
-.voice-play-btn.speaking { background: #ffe9c9; color: #c77b1f; animation: pulseVoice 1s ease infinite; }
-@keyframes pulseVoice { 0%,100% { transform: scale(1); } 50% { transform: scale(1.15); } }

@@ -1,0 +1,16 @@
+{
+  "name": "ncm-helper",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=16"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "NeteaseCloudMusicApi": "^4.32.0",
+    "web-push": "^3.6.7"
+  }
+}

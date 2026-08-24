@@ -223,33 +223,6 @@
           </select>
         </div>
       </div>
-      <div class="cs-group-title">语音</div>
-      <div class="cs-section">
-        <div class="cs-row">
-          <div class="cs-row-left">
-            <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M10 3v14M6 7v6M14 7v6M2.5 9v2M17.5 9v2"/></svg>
-            <div>
-              <span>发音平台</span>
-              <div class="cs-hint">这个角色用哪个平台发声</div>
-            </div>
-          </div>
-          <select id="charTtsProvider" onchange="setCharTtsProvider(this.value)" style="border:none;background:transparent;color:#b8a99a;font-size:13px;outline:none;padding:2px 0">
-            <option value="">默认（继承全局）</option>
-            <option value="minimax">MiniMax 海螺</option>
-            <option value="mimo">小米 MiMo</option>
-            <option value="elevenlabs">ElevenLabs</option>
-          </select>
-        </div>
-        <div class="cs-row" style="flex-direction:column;align-items:stretch;gap:8px;border-bottom:none;">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="10" cy="10" r="7"/><path d="M8 7l5 3-5 3z"/></svg>
-            <span>音色 ID</span>
-          </div>
-          <input id="charTtsVoice" list="charTtsVoiceList" placeholder="选或粘贴该平台的音色 ID" onchange="setCharTtsVoice(this.value)" style="border:none;background:#f7f5f2;border-radius:8px;padding:8px 10px;font-size:13px;outline:none;">
-          <datalist id="charTtsVoiceList"></datalist>
-          <div class="cs-hint">不同角色设不同音色。先在主设置里填好对应平台密钥；留空则用平台默认音色。</div>
-        </div>
-      </div>
       <div class="cs-group-title">时间</div>
       <div class="cs-section">
         <div class="cs-row">
@@ -495,10 +468,9 @@
   }
   </script>
   <script src="js/ui.js?v=20260812e"></script>
-  <script src="js/state.js?v=20260824a"></script>
-  <script src="js/chat.js?v=20260824a"></script>
-  <script src="js/tts.js?v=20260824a"></script>
-  <script src="js/apps.js?v=20260824a"></script>
+  <script src="js/state.js?v=20260821b"></script>
+  <script src="js/chat.js?v=20260821i"></script>
+  <script src="js/apps.js?v=20260812e"></script>
   <script src="js/profile-ig.js?v=20260812e"></script>
   <script src="js/push.js?v=20260822a"></script>
   <script src="js/init.js?v=20260812e"></script>
