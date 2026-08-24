@@ -619,6 +619,7 @@ function _encodeWav(samples, sampleRate) {
 // 单次解码尝试：带超时保护，防止坏文件让流程永远卡在“正在提取…”
 function _decodeOnce(ctx, ab) {
   return new Promise(function(resolve, reject) {
+    if (ctx.resume && ctx.state === 'suspended') { try { ctx.resume(); } catch (e) {} }
     var done = false;
     var timer = setTimeout(function() { fin(new Error('解码超时（90 秒），文件可能损坏或太大')); }, 90000);
     function ok(v) { fin(v, null); }
@@ -634,6 +635,47 @@ function _decodeOnce(ctx, ab) {
     } catch (e) { bad(e); }
   });
 }
+// 移动端严格解码器兜底：用 <video> 播放 + MediaRecorder 把音轨重编码成浏览器可解的格式
+function _mediaElementDecode(file) {
+  return new Promise(function(resolve, reject) {
+    var url = URL.createObjectURL(file);
+    var v = document.createElement('video');
+    v.preload = 'auto'; v.muted = true; v.playsInline = true; v.src = url;
+    var done = false;
+    function cleanup() { try { URL.revokeObjectURL(url); } catch (e) {} try { v.removeAttribute('src'); v.load(); } catch (e) {} }
+    function fail(e) { if (done) return; done = true; cleanup(); reject(e || new Error('手机端无法处理该视频音轨')); }
+    v.addEventListener('error', function() { fail(new Error('手机端无法播放该视频（音轨编码可能不支持）')); });
+    if (typeof MediaRecorder === 'undefined') return fail(new Error('该浏览器不支持录制重编码，请改用 Chrome 打开'));
+    v.play().then(function() {
+      try {
+        var cs = v.captureStream ? v.captureStream() : (v.mozCaptureStream ? v.mozCaptureStream() : null);
+        if (!cs) return fail(new Error('该浏览器不支持捕获视频音轨'));
+        var atracks = cs.getAudioTracks();
+        if (!atracks.length) return fail(new Error('没抓到音轨（视频可能无声）'));
+        var rec = new MediaRecorder(new MediaStream(atracks));
+        var chunks = [];
+        rec.ondataavailable = function(e) { if (e.data && e.data.size) chunks.push(e.data); };
+        rec.onstop = function() {
+          cleanup();
+          if (!chunks.length) return reject(new Error('重编码未产出数据'));
+          var blob = new Blob(chunks, { type: (chunks[0] && chunks[0].type) || 'audio/webm' });
+          var r = new FileReader();
+          r.onerror = function() { reject(new Error('重编码后读取失败')); };
+          r.onload = function() {
+            var AC = window.AudioContext || window.webkitAudioContext;
+            var ac = new AC();
+            ac.decodeAudioData(r.result.slice(0), function(a) { resolve(a); }, function() { reject(new Error('重编码后的音频仍解不出')); });
+          };
+          r.readAsArrayBuffer(blob);
+        };
+        rec.start();
+        var dur = (isFinite(v.duration) && v.duration > 0) ? Math.min(v.duration, 120) : 30;
+        setTimeout(function() { try { rec.stop(); } catch (e) {} }, dur * 1000 + 2000);
+        v.onended = function() { setTimeout(function() { try { rec.stop(); } catch (e) {} }, 400); };
+      } catch (e) { fail(e); }
+    }).catch(function() { fail(new Error('手机端自动播放被拦截（请先点一下页面任意位置，再选文件）')); });
+  });
+}
 async function _fileToWavDataUrl(file) {
   var ab = await _readAb(file);
   var AC = window.AudioContext || window.webkitAudioContext;
@@ -646,6 +688,11 @@ async function _fileToWavDataUrl(file) {
     try { audio = await _decodeOnce(ctx, ab.slice(0)); }
     catch (e) { lastErr = e; }
     try { ctx.close(); } catch (e) {}
+  }
+  // 手机等严格环境下直接解码可能失败，改走 <video> 播放 + 录制重编码
+  if (!audio) {
+    try { audio = await _mediaElementDecode(file); }
+    catch (e) { lastErr = e; }
   }
   if (!audio) throw (lastErr || new Error('解码失败'));
   if (!audio.length) throw new Error('文件里没有解出音轨');
