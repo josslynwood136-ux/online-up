@@ -233,18 +233,35 @@ async function minimaxSpeak(text, btn, cancelled) {
 }
 
 // ---- 平台二：小米 MiMo（OpenAI 兼容 chat/completions，音频为 message.audio.data base64）----
+// 官方约束（platform.xiaomimimo.com 文档）：
+//   1) messages 固定顺序：user 在前（可为空字符串）、assistant 在后承载待合成文本；
+//   2) audio.format 仅支持 "wav" / "pcm16"，不支持 mp3 输出；
+//   3) 克隆时 audio.voice 为 data URI 参考音频，MIME 必须是 audio/wav 或 audio/mpeg 且与样本真实格式一致；
+//   4) 鉴权用 Authorization: Bearer <key>（api-key 一并带上兼容旧写法）。
 async function mimoSpeak(text, btn, cancelled) {
   var p = _ttsCharProvider();
   var cfg = _ttsCfg(p);
   if (!cfg.key) throw new Error('MiMo 还没填密钥（主设置-角色语音里）');
   var voice = _ttsCharVoice();
   var hasCloneSample = (typeof voice === 'string' && voice.indexOf('data:') === 0);
+  // 新版：角色里只有 {name,size} 标记，样本本体从 IndexedDB 取；旧版直接存 data URL 的也兼容
+  if (!hasCloneSample && p === 'mimo' && _activeChar() && _activeChar().ttsClone && typeof _activeChar().ttsClone === 'object') {
+    var _sample = await _cloneDbGet(_activeChar().id);
+    if (!_sample) throw new Error('克隆样本已丢失（换设备或清理浏览器数据会清掉），请重新上传');
+    voice = _sample;
+    hasCloneSample = true;
+  }
   var baseModel = _ttsGlobalModel(p);
-  var model = baseModel;
-  if (baseModel === 'mimo-v2.5-tts' && hasCloneSample) model = 'mimo-v2.5-tts-voiceclone'; // 上传样本自动克隆
-  var isClone = (model === 'mimo-v2.5-tts-voiceclone');
-  if (isClone && !hasCloneSample) throw new Error('克隆模型需要先上传克隆音色样本（在该角色聊天设置里上传录音）');
-  var reqFormat = (isClone && hasCloneSample && String(voice).indexOf('audio/wav') >= 0) ? 'wav' : 'mp3';
+  // 上传了克隆样本 → 自动切克隆模型；选了克隆/设计模型但没样本 → 明确报错
+  var model = hasCloneSample ? 'mimo-v2.5-tts-voiceclone' : baseModel;
+  if (model === 'mimo-v2.5-tts-voiceclone' && !hasCloneSample) throw new Error('克隆模型需要先上传克隆音色样本（在该角色聊天设置里上传录音）');
+  if (model === 'mimo-v2.5-tts-voicedesign' && !hasCloneSample) throw new Error('音色设计模型请在主设置里改回 mimo-v2.5-tts，或给该角色上传克隆样本');
+  // 基础模型下：音色 ID 不是已知 ID → 退回默认音色，避免 MiMo 因非法 voice 报错
+  if (model === 'mimo-v2.5-tts') {
+    var _ids = (_ttsPreset('mimo').voices || []).map(function(v) { return v[0]; });
+    if (voice && _ids.indexOf(voice) < 0) voice = _ttsPreset('mimo').voice;
+  }
+  var outFormat = 'wav'; // 官方只支持 wav / pcm16
   var u = cfg.url;
   if (/\/chat\/completions$/i.test(u)) {
     // 已是完整地址
@@ -254,22 +271,26 @@ async function mimoSpeak(text, btn, cancelled) {
     u += '/v1/chat/completions';
   }
   _ttsAbort = new AbortController();
-  console.log('[TTS] MiMo model=', model, 'isClone=', isClone, 'voiceHead=', String(voice).slice(0, 18));
+  console.log('[TTS] MiMo model=', model, 'isClone=', (model === 'mimo-v2.5-tts-voiceclone'), 'voiceHead=', String(voice).slice(0, 18));
   var res = await _ttsFetch(u, {
     method: 'POST',
     signal: _ttsAbort.signal,
-    headers: { 'Content-Type': 'application/json', 'api-key': cfg.key },
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.key, 'api-key': cfg.key },
     body: JSON.stringify({
       model: model,
-      messages: [{ role: 'assistant', content: text.slice(0, 4000) }],
-      audio: { format: reqFormat, voice: voice }
+      messages: [{ role: 'user', content: '' }, { role: 'assistant', content: text.slice(0, 4000) }],
+      audio: { format: outFormat, voice: voice }
     })
   });
   var data = await res.json().catch(function() { return {}; });
-  if (!res.ok) throw new Error((data.error && data.error.message) || ('HTTP ' + res.status));
+  if (!res.ok) {
+    var emsg = (data.error && data.error.message) || JSON.stringify(data).slice(0, 160) || ('HTTP ' + res.status);
+    if (res.status === 401 || res.status === 403) emsg = '密钥无效或未授权：' + emsg;
+    throw new Error(emsg);
+  }
   var b64 = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.audio && data.choices[0].message.audio.data;
   if (!b64) throw new Error('没有返回音频');
-  await _playBlob(_b64ToBlob(b64, reqFormat === 'wav' ? 'audio/wav' : 'audio/mpeg'), btn, cancelled);
+  await _playBlob(_b64ToBlob(b64, 'audio/wav'), btn, cancelled);
 }
 
 // ---- 平台三：ElevenLabs text-to-speech（直接返回 mp3 二进制）----
@@ -461,9 +482,12 @@ async function testTtsConnection() {
     } else {
       var u3 = cfg.url;
       if (!/\/chat\/completions$/i.test(u3)) { if (/\/v1$/i.test(u3)) u3 += '/chat/completions'; else u3 += '/v1/chat/completions'; }
+      // 连通性测试固定用默认音色（克隆样本太大不适合做测试）；若全局模型选了克隆则临时退回基础模型
+      var tm = _ttsGlobalModel(p);
+      if (tm === 'mimo-v2.5-tts-voiceclone' || tm === 'mimo-v2.5-tts-voicedesign') tm = 'mimo-v2.5-tts';
       var r3 = await aiRequest(u3, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'api-key': cfg.key },
-        body: JSON.stringify({ model: _ttsGlobalModel(p), messages: [{ role: 'assistant', content: '连接测试' }], audio: { format: 'mp3', voice: _ttsCharVoice() } })
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.key, 'api-key': cfg.key },
+        body: JSON.stringify({ model: tm, messages: [{ role: 'user', content: '' }, { role: 'assistant', content: '连接测试' }], audio: { format: 'wav', voice: _ttsPreset(p).voice } })
       });
       var d3 = await r3.json().catch(function() { return {}; });
       if (!r3.ok) throw new Error('HTTP ' + r3.status + ' ' + ((d3.error && d3.error.message) || JSON.stringify(d3).slice(0, 240)));
@@ -488,28 +512,83 @@ function setCharTtsVoice(val) {
   c.ttsVoices[p] = String(val || '').trim();
   saveState();
 }
-// 上传一段录音，作为该角色 MiMo 的克隆音色（存为 data URL，朗读时自动切 voiceclone 模型）
+// ===== 克隆样本存储（IndexedDB）=====
+// 样本可达数 MB，localStorage（整个 state 共享约 5MB 配额）根本放不下；
+// 角色数据里只存轻量标记 {name,size}，音频本体放 IndexedDB（配额几百 MB 起）。
+var _CLONE_DB = 'meilidi-tts', _CLONE_STORE = 'cloneSamples';
+function _cloneDb() {
+  return new Promise(function(resolve, reject) {
+    try {
+      var req = indexedDB.open(_CLONE_DB, 1);
+      req.onupgradeneeded = function() { try { req.result.createObjectStore(_CLONE_STORE); } catch (e) {} };
+      req.onsuccess = function() { resolve(req.result); };
+      req.onerror = function() { reject(req.error || new Error('IndexedDB 打开失败')); };
+    } catch (e) { reject(e); }
+  });
+}
+function _cloneDbSet(charId, dataUrl) {
+  return _cloneDb().then(function(db) {
+    return new Promise(function(resolve, reject) {
+      var tx = db.transaction(_CLONE_STORE, 'readwrite');
+      tx.objectStore(_CLONE_STORE).put(dataUrl, String(charId));
+      tx.oncomplete = function() { resolve(true); };
+      tx.onerror = function() { reject(tx.error || new Error('样本写入失败')); };
+      tx.onabort = function() { reject(tx.error || new Error('样本写入被中止')); };
+    });
+  });
+}
+function _cloneDbGet(charId) {
+  return new Promise(function(resolve) {
+    _cloneDb().then(function(db) {
+      var rq = db.transaction(_CLONE_STORE, 'readonly').objectStore(_CLONE_STORE).get(String(charId));
+      rq.onsuccess = function() { resolve(rq.result ? String(rq.result) : null); };
+      rq.onerror = function() { resolve(null); };
+    }).catch(function() { resolve(null); });
+  });
+}
+function _cloneDbDel(charId) {
+  return _cloneDb().then(function(db) {
+    db.transaction(_CLONE_STORE, 'readwrite').objectStore(_CLONE_STORE)['delete'](String(charId));
+    return true;
+  }).catch(function() { return false; });
+}
+
+// 上传一段录音，作为该角色 MiMo 的克隆音色。
+// 官方约束：样本仅支持 mp3 / wav，base64 后 ≤10MB；MIME 必须与真实格式一致。
+// 音频本体存 IndexedDB，角色里只记 {name,size} 标记，不再挤占 localStorage 配额。
 function uploadCloneVoice(e) {
   var c = activeCharacter();
   if (!c) return;
   var f = e && e.target && e.target.files && e.target.files[0];
+  if (e && e.target) e.target.value = ''; // 允许重复选择同一个文件
   if (!f) return;
+  var st = $('cloneStatus');
+  function fail(msg) {
+    if (st) { st.textContent = msg; st.style.color = '#c0392b'; setTimeout(function() { if (st) st.style.color = ''; }, 6000); }
+  }
+  var isWav = (/wav/i.test(f.type)) || (/\.wav$/i.test(f.name || ''));
+  var isMp3 = (/mpeg|mp3/i.test(f.type)) || (/\.mp3$/i.test(f.name || ''));
+  if (!isWav && !isMp3) { fail('仅支持 mp3 或 wav 录音，当前文件类型：' + (f.type || '未知')); return; }
+  if (f.size > 9 * 1024 * 1024) { fail('文件太大（约 ' + Math.round(f.size / 1024 / 1024 * 10) / 10 + 'MB）。请用 10~30 秒的清晰录音（建议 mp3）'); return; }
   var r = new FileReader();
   r.onload = function() {
-    var dataUrl = r.result;
-    c.ttsClone = dataUrl; // 克隆样本单独存
-    if (!c.ttsVoices) c.ttsVoices = {};
-    c.ttsVoices.mimo = ''; // 上传克隆即清掉旧的普通 MiMo 音色，避免它盖过克隆
-    c.ttsProvider = 'mimo'; // 克隆是 MiMo 专属，上传即自动切到 MiMo
-    saveState();
-    if (typeof syncCharTts === 'function') syncCharTts();
-    var st = $('cloneStatus');
-    if (st) st.textContent = '已保存克隆音色：' + (f.name || '') + '（已启用复刻声线；点“清除克隆”可还原）';
+    var dataUrl = String(r.result || '');
+    if (dataUrl.indexOf('data:') !== 0) { fail('读取文件失败，请换一个音频'); return; }
+    // 统一 MIME：MiMo 只认 audio/wav 与 audio/mpeg
+    dataUrl = dataUrl.replace(/^data:[^,]*,/, isWav ? 'data:audio/wav;base64,' : 'data:audio/mpeg;base64,');
+    _cloneDbSet(c.id, dataUrl).then(function() {
+      c.ttsClone = { name: f.name || 'sample', size: f.size }; // 轻量标记（不含音频本体）
+      if (!c.ttsVoices) c.ttsVoices = {};
+      c.ttsVoices.mimo = ''; // 清掉旧的普通 MiMo 音色，避免它盖过克隆
+      c.ttsProvider = 'mimo'; // 克隆是 MiMo 专属，上传即自动切到 MiMo
+      if (!saveState()) { c.ttsClone = null; _cloneDbDel(c.id); fail('保存失败：本机存储空间不足，请先清理聊天图片/表情包再试'); return; }
+      if (typeof syncCharTts === 'function') syncCharTts();
+      if (st) st.textContent = '已保存克隆音色：' + (f.name || '') + '（' + Math.round(f.size / 1024) + 'KB，已启用复刻声线；点“清除克隆”可还原）';
+    }).catch(function(err) {
+      fail('克隆样本写入本地数据库失败：' + ((err && err.message) || err) + '（无痕/隐私模式下 IndexedDB 可能不可用）');
+    });
   };
-  r.onerror = function() {
-    var st = $('cloneStatus');
-    if (st) st.textContent = '读取文件失败，请换一个音频';
-  };
+  r.onerror = function() { fail('读取文件失败，请换一个音频'); };
   r.readAsDataURL(f);
 }
 // 清除该角色 MiMo 克隆音色，回到普通音色
@@ -518,16 +597,19 @@ function clearCloneVoice() {
   if (!c) return;
   c.ttsClone = null;
   saveState();
+  _cloneDbDel(c.id);
   if (typeof syncCharTts === 'function') syncCharTts();
   var st = $('cloneStatus');
   if (st) st.textContent = '已清除克隆音色，回到普通音色';
 }
 // 直接试听克隆音色（朗读一句样例），不经过 AI 回复
-function previewCloneVoice() {
+async function previewCloneVoice() {
   var c = activeCharacter();
   if (!c) return;
-  if (!c.ttsClone || String(c.ttsClone).indexOf('data:') !== 0) {
-    var st = $('cloneStatus');
+  var st = $('cloneStatus');
+  var has = !!(c.ttsClone && ((typeof c.ttsClone === 'object') || (typeof c.ttsClone === 'string' && c.ttsClone.indexOf('data:') === 0)));
+  if (has && typeof c.ttsClone === 'object') has = !!(await _cloneDbGet(c.id)); // 确认样本真的还在
+  if (!has) {
     if (st) st.textContent = '请先上传克隆音色样本';
     return;
   }
@@ -546,10 +628,12 @@ function syncCharTts() {
   if (inp) inp.value = (c.ttsVoices && c.ttsVoices[p]) || c.ttsVoice || '';
   var cs = $('cloneStatus');
   if (cs) {
-    if (c.ttsClone && String(c.ttsClone).indexOf('data:') === 0) cs.textContent = '已启用克隆音色（MiMo）';
-    else cs.textContent = '';
+    if (c.ttsClone) {
+      var _label = (c.ttsClone && typeof c.ttsClone === 'object' && c.ttsClone.name) ? '（' + c.ttsClone.name + '）' : '';
+      cs.textContent = '已启用克隆音色（MiMo）' + _label;
+    } else {
+      cs.textContent = '';
+    }
   }
-  var mk = $('charMimoKey');
-  if (mk) mk.value = ((state.settings.ttsKeys && state.settings.ttsKeys.mimo) || '');
   _fillDatalist('charTtsVoiceList', (_ttsPreset(p).voices) || []);
 }

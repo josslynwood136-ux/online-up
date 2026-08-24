@@ -240,6 +240,14 @@ function syncTtsChannel() {
   html += '</div>';
   html += '<div id="ttsTestResult" style="font-size:12px;min-height:14px;margin-top:6px;color:#b8a99a"></div>';
   html += '</div>';
+  // 克隆/模仿走 MiMo：默认平台不是 MiMo 时，额外常显 MiMo 密钥框，避免无处填写
+  if (p !== 'mimo') {
+    var mkey = (s.ttsKeys && s.ttsKeys.mimo) || '';
+    html += '<div style="border-top:1px solid #f0ede8;padding-top:10px">';
+    html += '<div style="font-size:12px;color:#4a3f35;margin-bottom:4px">小米 MiMo 密钥（克隆/模仿音色必填）</div>';
+    html += '<input class="field" type="password" id="ttsKey_mimo" value="' + escapeHTML(mkey) + '" onchange="setTtsKey(\'mimo\', this.value)">';
+    html += '</div>';
+  }
   box.innerHTML = html;
 }
 
