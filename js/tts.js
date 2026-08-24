@@ -592,203 +592,7 @@ function _cloneDbDel(charId) {
   }).catch(function() { return false; });
 }
 
-// ===== 音频转换：mp4/webm/m4a 等容器的音轨 → 克隆可用的 wav（纯前端，不经服务器） =====
-function _readAb(file) {
-  return new Promise(function(resolve, reject) {
-    var r = new FileReader();
-    r.onload = function() { resolve(r.result); };
-    r.onerror = function() { reject(new Error('读取文件失败')); };
-    r.readAsArrayBuffer(file);
-  });
-}
-// Float32 PCM → 16bit 单声道 WAV 的 ArrayBuffer
-function _encodeWav(samples, sampleRate) {
-  var buf = new ArrayBuffer(44 + samples.length * 2);
-  var v = new DataView(buf);
-  function ws(o, s) { for (var i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); }
-  ws(0, 'RIFF'); v.setUint32(4, 36 + samples.length * 2, true); ws(8, 'WAVE');
-  ws(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
-  v.setUint32(24, sampleRate, true); v.setUint32(28, sampleRate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
-  ws(36, 'data'); v.setUint32(40, samples.length * 2, true);
-  for (var i = 0; i < samples.length; i++) {
-    var s = Math.max(-1, Math.min(1, samples[i]));
-    v.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
-  }
-  return buf;
-}
-// 单次解码尝试：带超时保护，防止坏文件让流程永远卡在“正在提取…”
-function _decodeOnce(ctx, ab) {
-  return new Promise(function(resolve, reject) {
-    if (ctx.resume && ctx.state === 'suspended') { try { ctx.resume(); } catch (e) {} }
-    var done = false;
-    var timer = setTimeout(function() { fin(new Error('解码超时（90 秒），文件可能损坏或太大')); }, 90000);
-    function ok(v) { fin(v, null); }
-    function bad(e) { fin(null, e || new Error('解不出这个文件的音轨（编码可能不支持）')); }
-    function fin(v, err) {
-      if (done) return;
-      done = true; clearTimeout(timer);
-      if (err) reject(err); else resolve(v);
-    }
-    try {
-      var p = ctx.decodeAudioData(ab, ok, function() { bad(); });
-      if (p && typeof p.then === 'function') p.then(ok, function() { bad(); });
-    } catch (e) { bad(e); }
-  });
-}
-// 移动端严格解码器兜底：用 <video> 播放 + MediaRecorder 把音轨重编码成浏览器可解的格式
-function _mediaElementDecode(file) {
-  return new Promise(function(resolve, reject) {
-    var url = URL.createObjectURL(file);
-    var v = document.createElement('video');
-    v.preload = 'auto'; v.muted = true; v.playsInline = true; v.src = url;
-    var done = false;
-    function cleanup() { try { URL.revokeObjectURL(url); } catch (e) {} try { v.removeAttribute('src'); v.load(); } catch (e) {} }
-    function fail(e) { if (done) return; done = true; cleanup(); reject(e || new Error('手机端无法处理该视频音轨')); }
-    v.addEventListener('error', function() { fail(new Error('手机端无法播放该视频（音轨编码可能不支持）')); });
-    if (typeof MediaRecorder === 'undefined') return fail(new Error('该浏览器不支持录制重编码，请改用 Chrome 打开'));
-    v.play().then(function() {
-      try {
-        var cs = v.captureStream ? v.captureStream() : (v.mozCaptureStream ? v.mozCaptureStream() : null);
-        if (!cs) return fail(new Error('该浏览器不支持捕获视频音轨'));
-        var atracks = cs.getAudioTracks();
-        if (!atracks.length) return fail(new Error('没抓到音轨（视频可能无声）'));
-        var rec = new MediaRecorder(new MediaStream(atracks));
-        var chunks = [];
-        rec.ondataavailable = function(e) { if (e.data && e.data.size) chunks.push(e.data); };
-        rec.onstop = function() {
-          cleanup();
-          if (!chunks.length) return reject(new Error('重编码未产出数据'));
-          var blob = new Blob(chunks, { type: (chunks[0] && chunks[0].type) || 'audio/webm' });
-          var r = new FileReader();
-          r.onerror = function() { reject(new Error('重编码后读取失败')); };
-          r.onload = function() {
-            var AC = window.AudioContext || window.webkitAudioContext;
-            var ac = new AC();
-            ac.decodeAudioData(r.result.slice(0), function(a) { resolve(a); }, function() { reject(new Error('重编码后的音频仍解不出')); });
-          };
-          r.readAsArrayBuffer(blob);
-        };
-        rec.start();
-        var dur = (isFinite(v.duration) && v.duration > 0) ? Math.min(v.duration, 120) : 30;
-        setTimeout(function() { try { rec.stop(); } catch (e) {} }, dur * 1000 + 2000);
-        v.onended = function() { setTimeout(function() { try { rec.stop(); } catch (e) {} }, 400); };
-      } catch (e) { fail(e); }
-    }).catch(function() { fail(new Error('手机端自动播放被拦截（请先点一下页面任意位置，再选文件）')); });
-  });
-}
 
-// ===== 兜底解码：ffmpeg.wasm（自带全套解码器，能解出浏览器媒体引擎解不了的 mp4 音轨）=====
-// 单线程版无需 SharedArrayBuffer / COOP-COEP，普通手机浏览器也能跑；首次用到时按需从 CDN 拉取。
-var _ffmpegPromise = null;
-var _ffmpegFF = null;
-function _loadScript(src) {
-  return new Promise(function (resolve, reject) {
-    var s = document.createElement('script');
-    s.src = src;
-    s.onload = function () { resolve(); };
-    s.onerror = function () { reject(new Error('脚本加载失败：' + src)); };
-    document.head.appendChild(s);
-  });
-}
-function _getFFmpeg(onLog) {
-  if (_ffmpegPromise) return _ffmpegPromise;
-  _ffmpegPromise = (async function () {
-    var FF = (typeof FFmpeg !== 'undefined' && FFmpeg.createFFmpeg) ? FFmpeg : null;
-    if (!FF) {
-      if (onLog) onLog('正在加载解码器（首次稍慢）…');
-      await _loadScript('https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js');
-      FF = (typeof FFmpeg !== 'undefined' && FFmpeg.createFFmpeg) ? FFmpeg
-         : (typeof createFFmpeg !== 'undefined') ? { createFFmpeg: createFFmpeg, fetchFile: (typeof fetchFile !== 'undefined' ? fetchFile : null) }
-         : null;
-    }
-    if (!FF || !FF.createFFmpeg) throw new Error('ffmpeg 脚本加载失败，无法用兜底方式转换');
-    if (!FF.fetchFile) throw new Error('ffmpeg 脚本不完整，无法用兜底方式转换');
-    var fe = FF.createFFmpeg({
-      log: false,
-      corePath: 'https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js',
-      locateFile: function (file) { return 'https://unpkg.com/@ffmpeg/core@0.11.0/dist/' + file; }
-    });
-    if (onLog) onLog('正在初始化解码器…');
-    await fe.load();
-    _ffmpegFF = FF;
-    return fe;
-  })();
-  return _ffmpegPromise;
-}
-async function _fileToWavViaFfmpeg(file, onLog) {
-  var fe = await _getFFmpeg(onLog);
-  var ext = 'mp4';
-  var m = (file.name || '').match(/\.([a-z0-9]+)$/i);
-  if (m) ext = m[1].toLowerCase();
-  var inName = 'src_' + Date.now() + '.' + ext;
-  fe.FS('writeFile', inName, await _ffmpegFF.fetchFile(file));
-  if (onLog) onLog('正在用 ffmpeg 提取音轨并转 wav…');
-  try {
-    await fe.run('-i', inName, '-vn', '-ac', '1', '-ar', '24000', '-f', 'wav', 'out.wav');
-  } catch (e) {
-    throw new Error('ffmpeg 转码失败（文件音轨可能损坏或格式不支持）');
-  }
-  var data = fe.FS('readFile', 'out.wav');
-  try { fe.FS('unlink', inName); } catch (e) {}
-  try { fe.FS('unlink', 'out.wav'); } catch (e) {}
-  if (!data || !data.length) throw new Error('ffmpeg 没有解出音频数据');
-  var bin = '', CH = 0x8000;
-  for (var k = 0; k < data.length; k += CH) {
-    bin += String.fromCharCode.apply(null, data.subarray(k, Math.min(data.length, k + CH)));
-  }
-  return 'data:audio/wav;base64,' + btoa(bin);
-}
-
-async function _fileToWavDataUrl(file, onLog) {
-  var ab = await _readAb(file);
-  var AC = window.AudioContext || window.webkitAudioContext;
-  if (!AC) throw new Error('该浏览器不支持音频解码，请改传 mp3/wav');
-  // 关键：decodeAudioData 会“接管并掏空”传入的缓冲（detached），
-  // 所以每次尝试都必须传一份全新副本，原始 ab 绝不直接交给浏览器
-  var audio = null, lastErr = null;
-  for (var attempt = 0; attempt < 2 && !audio; attempt++) {
-    var ctx = new AC();
-    try { audio = await _decodeOnce(ctx, ab.slice(0)); }
-    catch (e) { lastErr = e; }
-    try { ctx.close(); } catch (e) {}
-  }
-  // 兜底方案 1：ffmpeg.wasm（自带解码器，支持 HE-AAC / 各种 mp4 音轨，跨平台最稳）
-  if (!audio) {
-    try { return await _fileToWavViaFfmpeg(file, onLog); }
-    catch (e) { console.warn('[TTS] ffmpeg 兜底失败：', e); lastErr = e; }
-  }
-  // 兜底方案 2：手机等严格环境下走 <video> 播放 + 录制重编码
-  if (!audio) {
-    try { audio = await _mediaElementDecode(file); }
-    catch (e) { lastErr = e; }
-  }
-  if (!audio) throw (lastErr || new Error('解码失败'));
-  if (!audio.length) throw new Error('文件里没有解出音轨');
-  var SR_SRC = audio.sampleRate;
-  var SR_DST = Math.min(24000, SR_SRC);       // 人声克隆 24k 足够
-  var MAX_SEC = 120;                          // 最长取前 120 秒
-  var nUse = Math.min(audio.length, Math.floor(MAX_SEC * SR_SRC));
-  var nCh = audio.numberOfChannels;
-  var mono = new Float32Array(nUse);          // 混成单声道
-  if (nCh === 1) mono.set(audio.getChannelData(0).subarray(0, nUse));
-  else {
-    var a0 = audio.getChannelData(0), a1 = audio.getChannelData(Math.min(1, nCh - 1));
-    for (var i = 0; i < nUse; i++) mono[i] = (a0[i] + a1[i]) * 0.5;
-  }
-  var ratio = SR_SRC / SR_DST;                // 线性插值重采样
-  var nOut = Math.max(1, Math.floor(nUse / ratio));
-  var out = new Float32Array(nOut);
-  for (var j = 0; j < nOut; j++) {
-    var pos = j * ratio, i0 = Math.floor(pos);
-    if (i0 >= nUse - 1) { out[j] = mono[nUse - 1]; continue; }
-    var fr = pos - i0;
-    out[j] = mono[i0] * (1 - fr) + mono[i0 + 1] * fr;
-  }
-  var bytes = new Uint8Array(_encodeWav(out, SR_DST));
-  var bin = '', CH = 0x8000;
-  for (var k = 0; k < bytes.length; k += CH) bin += String.fromCharCode.apply(null, bytes.subarray(k, Math.min(bytes.length, k + CH)));
-  return 'data:audio/wav;base64,' + btoa(bin);
-}
 
 // 上传一段录音，作为该角色 MiMo 的克隆音色。
 // 官方约束：样本仅支持 mp3 / wav，base64 后 ≤10MB；MIME 必须与真实格式一致。
@@ -806,9 +610,8 @@ function uploadCloneVoice(e) {
   function busy(msg) { if (st) { st.textContent = msg; st.style.color = ''; } }
   var isWav = (/wav/i.test(f.type)) || (/\.wav$/i.test(f.name || ''));
   var isMp3 = (/mpeg|mp3/i.test(f.type)) || (/\.mp3$/i.test(f.name || ''));
-  var direct = isWav || isMp3; // 其余类型（mp4/webm/m4a…）走前端转 wav
-  if (direct && f.size > 9 * 1024 * 1024) { fail('文件太大（约 ' + Math.round(f.size / 1024 / 1024 * 10) / 10 + 'MB）。请用 10~30 秒的清晰录音（建议 mp3）'); return; }
-  if (!direct && f.size > 200 * 1024 * 1024) { fail('文件太大（约 ' + Math.round(f.size / 1024 / 1024) + 'MB），请先剪出有人声的一小段再上传'); return; }
+  if (!(isWav || isMp3)) { fail('仅支持 mp3 / wav 音频，暂不支持视频（mp4 等）'); return; }
+  if (f.size > 9 * 1024 * 1024) { fail('文件太大（约 ' + Math.round(f.size / 1024 / 1024 * 10) / 10 + 'MB）。请用 10~30 秒的清晰录音（建议 mp3）'); return; }
 
   function finish(dataUrl, dispName, sizeBytes) {
     _cloneDbSet(c.id, dataUrl).then(function() {
@@ -824,29 +627,16 @@ function uploadCloneVoice(e) {
     });
   }
 
-  if (direct) {
-    var r = new FileReader();
-    r.onload = function() {
-      var dataUrl = String(r.result || '');
-      if (dataUrl.indexOf('data:') !== 0) { fail('读取文件失败，请换一个音频'); return; }
-      // 统一 MIME：MiMo 只认 audio/wav 与 audio/mpeg
-      dataUrl = dataUrl.replace(/^data:[^,]*,/, isWav ? 'data:audio/wav;base64,' : 'data:audio/mpeg;base64,');
-      finish(dataUrl, f.name || 'sample', f.size);
-    };
-    r.onerror = function() { fail('读取文件失败，请换一个音频'); };
-    r.readAsDataURL(f);
-  } else {
-    busy('正在提取音轨并转换为 wav…（' + Math.round(f.size / 1048576 * 10) / 10 + 'MB · ' + (f.type || '未知类型') + '，首次需下载解码器）');
-    _fileToWavDataUrl(f, busy).then(function(dataUrl) {
-      finish(dataUrl, (f.name || 'video'), f.size);
-    }).catch(function(err) {
-      // 自带完整病历：错误原文 + 出错位置 + 文件信息，截图发来即可定位
-      var d = (err && err.message) ? err.message : String(err);
-      var stk = (err && err.stack) ? String(err.stack).replace(/\s+/g, ' ').split('at ').filter(Boolean)[1] : '';
-      stk = stk ? String(stk).slice(0, 120) : '';
-      fail('转换失败｜' + d + (stk ? ' ｜位置:' + stk : '') + ' ｜文件:' + (f.name || '') + '/' + (f.type || '?') + '/' + Math.round(f.size / 1024) + 'KB');
-    });
-  }
+  var r = new FileReader();
+  r.onload = function() {
+    var dataUrl = String(r.result || '');
+    if (dataUrl.indexOf('data:') !== 0) { fail('读取文件失败，请换一个音频'); return; }
+    // 统一 MIME：MiMo 只认 audio/wav 与 audio/mpeg
+    dataUrl = dataUrl.replace(/^data:[^,]*,/, isWav ? 'data:audio/wav;base64,' : 'data:audio/mpeg;base64,');
+    finish(dataUrl, f.name || 'sample', f.size);
+  };
+  r.onerror = function() { fail('读取文件失败，请换一个音频'); };
+  r.readAsDataURL(f);
 }
 // 清除该角色 MiMo 克隆音色，回到普通音色
 function clearCloneVoice() {
