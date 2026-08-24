@@ -251,6 +251,8 @@
                 <div style="font-size:11px;color:#b8a99a;margin-bottom:4px">克隆音色（仅 MiMo 生效：上传一段该角色清晰录音，将用复刻声线朗读；建议 &lt;30s 的 mp3/wav）</div>
                 <input type="file" accept="audio/*" id="charCloneInput" onchange="uploadCloneVoice(event)" style="font-size:12px;width:100%;">
                 <div style="margin-top:4px;"><a href="javascript:void(0)" onclick="previewCloneVoice()" style="font-size:11px;color:#08c;">试听克隆</a> &nbsp; <a href="javascript:void(0)" onclick="clearCloneVoice()" style="font-size:11px;color:#c08;">清除克隆</a></div>
+                <div style="font-size:11px;color:#b8a99a;margin-top:8px;margin-bottom:3px">MiMo 密钥（克隆必填；也可在主设置填）</div>
+                <input class="field" type="password" id="charMimoKey" onchange="setTtsKey('mimo', this.value)" style="width:100%;">
                 <div id="cloneStatus" style="font-size:11px;color:#7aab7a;margin-top:4px;"></div>
               </div>
               <div class="cs-hint">不同角色设不同音色。先在主设置里填好对应平台密钥；留空则用平台默认音色。在「音色 ID」里手填普通 ID 可关闭克隆。</div>

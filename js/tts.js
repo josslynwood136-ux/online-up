@@ -27,7 +27,7 @@ var TTS_PRESETS = {
   mimo: {
     name: '小米 MiMo',
     model: 'mimo-v2.5-tts', voice: 'mimo_default', url: 'https://api.xiaomimimo.com',
-    models: ['mimo-v2.5-tts'],
+    models: ['mimo-v2.5-tts', 'mimo-v2.5-tts-voiceclone', 'mimo-v2.5-tts-voicedesign'],
     voices: [['mimo_default', '默认'], ['冰糖', '冰糖'], ['茉莉', '茉莉'], ['苏打', '苏打'], ['白桦', '白桦'], ['Mia', 'Mia'], ['Chloe', 'Chloe'], ['Milo', 'Milo'], ['Dean', 'Dean']],
     keyHint: '在 mimo.mi.com 控制台创建的密钥'
   },
@@ -238,9 +238,13 @@ async function mimoSpeak(text, btn, cancelled) {
   var cfg = _ttsCfg(p);
   if (!cfg.key) throw new Error('MiMo 还没填密钥（主设置-角色语音里）');
   var voice = _ttsCharVoice();
-  var isClone = (p === 'mimo' && typeof voice === 'string' && voice.indexOf('data:') === 0);
-  var model = isClone ? 'mimo-v2.5-tts-voiceclone' : _ttsGlobalModel(p);
-  var reqFormat = isClone ? (voice.indexOf('audio/wav') >= 0 ? 'wav' : 'mp3') : 'mp3';
+  var hasCloneSample = (typeof voice === 'string' && voice.indexOf('data:') === 0);
+  var baseModel = _ttsGlobalModel(p);
+  var model = baseModel;
+  if (baseModel === 'mimo-v2.5-tts' && hasCloneSample) model = 'mimo-v2.5-tts-voiceclone'; // 上传样本自动克隆
+  var isClone = (model === 'mimo-v2.5-tts-voiceclone');
+  if (isClone && !hasCloneSample) throw new Error('克隆模型需要先上传克隆音色样本（在该角色聊天设置里上传录音）');
+  var reqFormat = (isClone && hasCloneSample && String(voice).indexOf('audio/wav') >= 0) ? 'wav' : 'mp3';
   var u = cfg.url;
   if (/\/chat\/completions$/i.test(u)) {
     // 已是完整地址
@@ -545,5 +549,7 @@ function syncCharTts() {
     if (c.ttsClone && String(c.ttsClone).indexOf('data:') === 0) cs.textContent = '已启用克隆音色（MiMo）';
     else cs.textContent = '';
   }
+  var mk = $('charMimoKey');
+  if (mk) mk.value = ((state.settings.ttsKeys && state.settings.ttsKeys.mimo) || '');
   _fillDatalist('charTtsVoiceList', (_ttsPreset(p).voices) || []);
 }

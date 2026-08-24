@@ -187,7 +187,7 @@ function renderApiSettings() {
   h += '<div id="ttsBody" style="display:flex;flex-direction:column;gap:12px">';
   h += '<div><div style="font-size:11px;color:#b8a99a;margin-bottom:4px">默认发音平台（单个角色可在「聊天设置」里覆盖）</div><select class="field" id="ttsProviderSelect" onchange="setTtsProvider(this.value)"><option value="minimax"' + (_ttsP === 'minimax' ? ' selected' : '') + '>MiniMax 海螺</option><option value="mimo"' + (_ttsP === 'mimo' ? ' selected' : '') + '>小米 MiMo</option><option value="elevenlabs"' + (_ttsP === 'elevenlabs' ? ' selected' : '') + '>ElevenLabs</option></select></div>';
   h += '<div id="ttsChannelBox"></div>';
-  h += '<div style="font-size:11px;color:#c0b0a0;line-height:1.5">切换上面的平台即可分别填写各渠道密钥。音色在「聊天设置」里按角色单独设（不同角色不同声音）。</div>';
+  h += '<div style="font-size:11px;color:#c0b0a0;line-height:1.5">切换上面的平台即可分别填写各渠道密钥。若要用「克隆/模仿」(MiMo)，先把平台切到「小米 MiMo」并填好它的密钥。音色在「聊天设置」里按角色单独设（不同角色不同声音）。</div>';
   h += '</div></div>';
 
   h += '<div style="background:#fff;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px">';
