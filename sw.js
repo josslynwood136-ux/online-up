@@ -1,6 +1,6 @@
 // 最小 Service Worker：仅用于让 Chrome 把站点当成可安装 PWA（从而按 manifest 全屏启动）
 // 同源静态资源走缓存；跨域（Supabase / 字体 / 翻译等）一律放行到网络，不做缓存，避免弄坏动态功能。
-const CACHE = 'aiphone-shell-v1';
+const CACHE = 'aiphone-shell-v2';
 const SHELL = [
   './',
   'index.html',
@@ -16,7 +16,11 @@ self.addEventListener('install', function (e) {
 });
 
 self.addEventListener('activate', function (e) {
-  e.waitUntil(self.clients.claim());
+  e.waitUntil(
+    caches.keys().then(function (keys) {
+      return Promise.all(keys.filter(function (k) { return k !== CACHE; }).map(function (k) { return caches.delete(k); }));
+    }).then(function () { return self.clients.claim(); })
+  );
 });
 
 self.addEventListener('fetch', function (e) {
