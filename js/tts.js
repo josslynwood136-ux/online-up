@@ -56,11 +56,14 @@ function _ttsCharProvider() {
   var d = (state.settings && state.settings.ttsProvider) || 'minimax';
   return TTS_PRESETS[d] ? d : 'minimax';
 }
-// 音色：优先角色自己设的，否则回退平台默认
+// 音色：优先角色自己设的（按平台分），否则回退平台默认
 function _ttsCharVoice() {
   var c = _activeChar();
-  if (c && c.ttsVoice) return c.ttsVoice;
   var p = _ttsCharProvider();
+  if (c) {
+    if (c.ttsVoices && c.ttsVoices[p]) return c.ttsVoices[p];
+    if (c.ttsVoice) return c.ttsVoice; // 兼容旧的单字段
+  }
   var s = state.settings || {};
   return (s.ttsVoices && s.ttsVoices[p]) || _ttsPreset(p).voice;
 }
@@ -470,7 +473,9 @@ function setCharTtsProvider(val) {
 function setCharTtsVoice(val) {
   var c = activeCharacter();
   if (!c) return;
-  c.ttsVoice = String(val || '').trim();
+  var p = _ttsCharProvider();
+  if (!c.ttsVoices) c.ttsVoices = {};
+  c.ttsVoices[p] = String(val || '').trim();
   saveState();
 }
 function syncCharTts() {
@@ -480,6 +485,6 @@ function syncCharTts() {
   var sel = $('charTtsProvider');
   if (sel) sel.value = (c.ttsProvider && TTS_PRESETS[c.ttsProvider]) ? c.ttsProvider : (c.ttsProvider === '' ? '' : (state.settings.ttsProvider || 'minimax'));
   var inp = $('charTtsVoice');
-  if (inp) inp.value = c.ttsVoice || '';
+  if (inp) inp.value = (c.ttsVoices && c.ttsVoices[p]) || c.ttsVoice || '';
   _fillDatalist('charTtsVoiceList', (_ttsPreset(p).voices) || []);
 }
