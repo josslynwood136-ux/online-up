@@ -616,24 +616,38 @@ function _encodeWav(samples, sampleRate) {
   }
   return buf;
 }
+// 单次解码尝试：带超时保护，防止坏文件让流程永远卡在“正在提取…”
+function _decodeOnce(ctx, ab) {
+  return new Promise(function(resolve, reject) {
+    var done = false;
+    var timer = setTimeout(function() { fin(new Error('解码超时（90 秒），文件可能损坏或太大')); }, 90000);
+    function ok(v) { fin(v, null); }
+    function bad(e) { fin(null, e || new Error('解不出这个文件的音轨（编码可能不支持）')); }
+    function fin(v, err) {
+      if (done) return;
+      done = true; clearTimeout(timer);
+      if (err) reject(err); else resolve(v);
+    }
+    try {
+      var p = ctx.decodeAudioData(ab, ok, function() { bad(); });
+      if (p && typeof p.then === 'function') p.then(ok, function() { bad(); });
+    } catch (e) { bad(e); }
+  });
+}
 async function _fileToWavDataUrl(file) {
   var ab = await _readAb(file);
   var AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) throw new Error('该浏览器不支持音频解码，请改传 mp3/wav');
-  var ctx = new AC();
-  var audio;
-  try {
-    audio = await new Promise(function(resolve, reject) {
-      var done = false;
-      function ok(v) { if (!done) { done = true; resolve(v); } }
-      function bad() { if (!done) { done = true; reject(new Error('解不出这个文件的音轨（编码可能不支持）')); } }
-      try {
-        var p = ctx.decodeAudioData(ab, ok, bad);
-        if (p && typeof p.then === 'function') p.then(ok, bad);
-      } catch (e) { bad(); }
-    });
-  } finally { try { ctx.close(); } catch (e) {} }
-  if (!audio || !audio.length) throw new Error('文件里没有解出音轨');
+  // 尝试两次：个别引擎第一次会莫名失败；第二次传副本（老实现会“消费掉”传入的缓冲）
+  var audio = null, lastErr = null;
+  for (var attempt = 0; attempt < 2 && !audio; attempt++) {
+    var ctx = new AC();
+    try { audio = await _decodeOnce(ctx, attempt ? ab.slice(0) : ab); }
+    catch (e) { lastErr = e; }
+    try { ctx.close(); } catch (e) {}
+  }
+  if (!audio) throw (lastErr || new Error('解码失败'));
+  if (!audio.length) throw new Error('文件里没有解出音轨');
   var SR_SRC = audio.sampleRate;
   var SR_DST = Math.min(24000, SR_SRC);       // 人声克隆 24k 足够
   var MAX_SEC = 120;                          // 最长取前 120 秒
