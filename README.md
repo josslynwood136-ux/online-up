@@ -1,11 +1,11 @@
 # 美乐地 (joss--main)
 
-一个网页版“手机模拟器”角色聊天应用，支持多平台 AI 语音（MiniMax / 小米 MiMo / ElevenLabs）、MiMo 声音克隆、以及把音视频片段转成克隆样本。
+一个网页版“手机模拟器”角色聊天应用，支持多平台 AI 语音（MiniMax / 小米 MiMo / ElevenLabs）与 MiMo 声音克隆。
 
 ## 📝 最近更新（2026-08-24）
 
 - **MiMo 克隆修通**：修正官方接口（`messages` 顺序、输出 `wav`、双鉴权头）；克隆样本改存 IndexedDB，角色只留 `{name,size}` 标记，解决“无法保存”
-- **MP4/WebM/M4A 转克隆样本**：纯前端提取音轨 → 单声道 → 24kHz → WAV；移动端加 `<video>+MediaRecorder` 兜底
+- **克隆恢复纯音频**：移除 mp4/webm/m4a 转码与 ffmpeg 兜底（手机端转换不稳定），克隆仅接受 mp3 / wav
 - **聊天设置新增**：声音风格指令、克隆稳定度滑杆、输出语种跟随
 - **模型更新**：MiniMax 补 speech-2.8/2.6 系列；ElevenLabs 补 v3_conversational / flash_v2_5
 - **界面**：小米密钥框仅在有克隆角色时显示；克隆按钮与滑杆配色美化
@@ -13,10 +13,25 @@
 
 > 完整改动明细见 [CHANGELOG.md](./CHANGELOG.md)
 
+## 📚 版本更新历史（按时期，每个 block 独立说明当期改动）
+
+> **约定（重要）**：每做一次实质改动，就在下面新增一个「### 日期」block，独立写清「本期做了什么、相对上一版改了什么」。
+> 这样日后回看任意某一天的版本，都能直接知道那是 A 还是 B，不用翻上下文。
+> 例如：昨天做了 A 功能 → 加一个 `### 昨天` 写"A 做了什么"；今天加了 B → 加一个 `### 今天` 写"B 在 A 基础上改进了什么"。两个 block 互不依赖，单独看就懂。
+
+### 2026-08-24
+**本期范围（这一版 = 做了什么）**：语音克隆打通（MiMo）+ 聊天设置增强 + 模型预设扩充；并在**同一天回退**了"音视频转克隆样本"功能。
+
+- **语音克隆（MiMo TTS）修复**：`mimoSpeak` 按官方文档修正（`messages` 固定 `user` 在前 + `assistant` 承载合成文本、输出格式改 `wav`、鉴权同时带 `Authorization` 与 `api-key` 两个头，401/403 给中文提示）；克隆样本从 `localStorage`（约 5MB 配额会爆）迁移到 **IndexedDB**（新增 `_cloneDbSet / _cloneDbGet / _cloneDbDel`），角色数据只留轻量标记 `c.ttsClone = {name, size}`，`mimoSpeak` 自动从 IndexedDB 取样本，样本丢失时明确报错
+- **聊天设置增强**：声音风格指令（一句话导演语气，随 user 消息下发）、克隆稳定度滑杆（0.1 稳 ~ 1.2 灵动，联动 temperature / top_p）、输出语种跟随（选非中文自动追加「全程用 X 语发音」）
+- **模型预设**：MiniMax 新增 `speech-2.8-hd / -turbo`、`speech-2.6-hd / -turbo`；ElevenLabs 新增 `eleven_v3_conversational`、`eleven_flash_v2_5`
+- **界面**：小米密钥框改为仅当存在启用克隆的角色时才显示；克隆上传重做为「虚线上传框 + 试听/清除胶囊」，稳定度滑杆换暖色系
+- **（当日回退）音视频转克隆样本**：原本新增 MP4/WebM/M4A → 提取音轨 → 单声道 → 24kHz 重采样 → WAV 的纯前端转换（含 `<video>+MediaRecorder` 兜底，后又加 ffmpeg.wasm 兜底）。实测手机端转换不稳定、失败率高（部分 mp4 音轨浏览器解不出 / 转码失败），已整体移除，克隆恢复为仅接受 mp3 / wav 音频
+
 ## ✨ 功能
 
 - **多平台 AI 语音播报**：MiniMax 海螺 / 小米 MiMo / ElevenLabs，按角色独立设置平台与音色
-- **MiMo 声音克隆**：上传 10~30 秒清晰录音（或 MP4/WebM/M4A 视频片段）复刻角色声线；样本存 IndexedDB，不挤占 localStorage
+- **MiMo 声音克隆**：上传 10~30 秒清晰录音（mp3 / wav）复刻角色声线；样本存 IndexedDB，不挤占 localStorage
 - **声音风格 & 稳定度**：一句话导演语气 + 稳定度滑杆（联动 temperature/top_p）
 - **语种跟随**：跟随聊天设置里的输出语种，非中文自动要求模型用该语言发音
 - **网页推送**：内置 Web Push（VAPID），可推送角色消息到手机通知
@@ -47,18 +62,18 @@ node sever/server.js
 
 ## ⚠️ 已知问题
 
-- **手机端 MP4 转换**：部分视频音轨编码（如 AC3/DTS）手机浏览器解不出，建议先导出 mp3 再上传
+- **克隆仅支持音频**：MiMo 克隆样本仅接受 mp3 / wav；视频（mp4 等）请先用工具导出音频再上传
 - **推送依赖常驻服务器**：服务器休眠则角色无法主动发消息
 
 ## 🗺️ 路线图
 
 - [ ] **后台推送 + 荣耀手环**：Capacitor 打包 APK + 前台服务 + WebSocket；服务器侧加「角色代笔」定时任务（替角色调 LLM 生成主动消息并推送，手环经荣耀运动健康镜像通知）
-- [ ] 完善移动端音频转换的兜底与诊断
+- [ ] 探索更稳的音频导入方式（如服务端转码）以支持更多格式
 
 ## 目录速览
 
 - `index.html` — 入口与聊天设置 UI
-- `js/tts.js` — 三平台 TTS、克隆存储、音视频转换
+- `js/tts.js` — 三平台 TTS、克隆存储（IndexedDB）
 - `js/apps.js` — 语音设置面板
 - `css/style.css` — 样式（含滑杆配色）
 - `sever/server.js` — 中继 / Web Push 服务器
