@@ -187,7 +187,6 @@ function renderApiSettings() {
   h += '<div id="ttsBody" style="display:flex;flex-direction:column;gap:12px">';
   h += '<div><div style="font-size:11px;color:#b8a99a;margin-bottom:4px">默认发音平台（单个角色可在「聊天设置」里覆盖）</div><select class="field" id="ttsProviderSelect" onchange="setTtsProvider(this.value)"><option value="minimax"' + (_ttsP === 'minimax' ? ' selected' : '') + '>MiniMax 海螺</option><option value="mimo"' + (_ttsP === 'mimo' ? ' selected' : '') + '>小米 MiMo</option><option value="elevenlabs"' + (_ttsP === 'elevenlabs' ? ' selected' : '') + '>ElevenLabs</option></select></div>';
   h += '<div id="ttsChannelBox"></div>';
-  h += '<div style="font-size:11px;color:#c0b0a0;line-height:1.5">切换上面的平台即可分别填写各渠道密钥。若要用「克隆/模仿」(MiMo)，先把平台切到「小米 MiMo」并填好它的密钥。音色在「聊天设置」里按角色单独设（不同角色不同声音）。</div>';
   h += '</div></div>';
 
   h += '<div style="background:#fff;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px">';
@@ -240,11 +239,14 @@ function syncTtsChannel() {
   html += '</div>';
   html += '<div id="ttsTestResult" style="font-size:12px;min-height:14px;margin-top:6px;color:#b8a99a"></div>';
   html += '</div>';
-  // 克隆/模仿走 MiMo：默认平台不是 MiMo 时，额外常显 MiMo 密钥框，避免无处填写
-  if (p !== 'mimo') {
+  // 克隆/模仿走 MiMo：只有当确实有角色启用了「克隆音色」时才显示 MiMo 密钥框，
+  // 平时用 MiniMax/ElevenLabs 的用户不会看到多余的小米密钥输入
+  var _needsMimo = false;
+  try { _needsMimo = (state.roles || []).some(function(r) { return !!r.ttsClone; }); } catch (e) {}
+  if (p !== 'mimo' && _needsMimo) {
     var mkey = (s.ttsKeys && s.ttsKeys.mimo) || '';
     html += '<div style="border-top:1px solid #f0ede8;padding-top:10px">';
-    html += '<div style="font-size:12px;color:#4a3f35;margin-bottom:4px">小米 MiMo 密钥（克隆/模仿音色必填）</div>';
+    html += '<div style="font-size:12px;color:#4a3f35;margin-bottom:4px">小米 MiMo 密钥</div>';
     html += '<input class="field" type="password" id="ttsKey_mimo" value="' + escapeHTML(mkey) + '" onchange="setTtsKey(\'mimo\', this.value)">';
     html += '</div>';
   }

@@ -15,8 +15,8 @@ var _ttsSeq = 0; // 播放序号：每次 speakText +1，用于识别"已被新�
 var TTS_PRESETS = {
   minimax: {
     name: 'MiniMax 海螺',
-    model: 'speech-02-hd', voice: 'female-shaonv', url: 'https://api.minimaxi.com',
-    models: ['speech-02-hd', 'speech-02-turbo', 'speech-01-hd', 'speech-01-turbo'],
+    model: 'speech-2.8-hd', voice: 'female-shaonv', url: 'https://api.minimaxi.com',
+    models: ['speech-2.8-hd', 'speech-2.8-turbo', 'speech-2.6-hd', 'speech-2.6-turbo', 'speech-02-hd', 'speech-02-turbo', 'speech-01-hd', 'speech-01-turbo'],
     voices: [
       ['female-shaonv', '少女'], ['female-yujie', '御姐'], ['female-chengshu', '成熟女声'],
       ['female-tianmei', '甜美女声'], ['male-qn-qingse', '青涩青年'], ['male-qn-jingying', '精英青年'],
@@ -34,7 +34,7 @@ var TTS_PRESETS = {
   elevenlabs: {
     name: 'ElevenLabs',
     model: 'eleven_multilingual_v2', voice: '21m00Tcm4TlvDq8ikWAM', url: 'https://api.elevenlabs.io',
-    models: ['eleven_multilingual_v2', 'eleven_turbo_v2_5', 'eleven_v3'],
+    models: ['eleven_multilingual_v2', 'eleven_v3', 'eleven_v3_conversational', 'eleven_flash_v2_5', 'eleven_turbo_v2_5'],
     voices: [
       ['21m00Tcm4TlvDq8ikWAM', 'Rachel 女'], ['EXAVITQu4vr4xnSDxMaL', 'Sarah 女'], ['FGY2WhTYpPnrIDTdsKH5', 'Laura 女'],
       ['Xb7hH8MSUJpSbSDYk0k2', 'Alice 女'], ['pFZP5JQG7iQjIQuC4Bku', 'Lily 女'], ['nPczCjzI2devNBz1zQrb', 'Brian 男'],
@@ -262,6 +262,16 @@ async function mimoSpeak(text, btn, cancelled) {
     if (voice && _ids.indexOf(voice) < 0) voice = _ttsPreset('mimo').voice;
   }
   var outFormat = 'wav'; // 官方只支持 wav / pcm16
+  // 风格指令 + 语种指令：随 user 消息发给模型（普通音色与克隆都生效）
+  // - 风格：角色资料里的 ttsStyle 一句话导演指令
+  // - 语种：跟随聊天设置里选的「对方输出语种」，非中文时明确要求模型用该语言发音
+  var _parts = [];
+  try { var _sc = _activeChar(); if (_sc && _sc.ttsStyle) _parts.push(String(_sc.ttsStyle)); } catch (e) {}
+  try { var _lc = _activeChar(); if (_lc && _lc.lang && _lc.lang !== '中文') _parts.push('全程用' + _lc.lang + '发音'); } catch (e) {}
+  var _userContent = _parts.join('；');
+  // 克隆稳定度：temperature 越低越贴样本，越高越有情绪；top_p 按比例联动
+  var _temp = 0.6;
+  try { var _tc = _activeChar(); if (_tc && typeof _tc.ttsTemp === 'number') _temp = _tc.ttsTemp; } catch (e) {}
   var u = cfg.url;
   if (/\/chat\/completions$/i.test(u)) {
     // 已是完整地址
@@ -278,8 +288,10 @@ async function mimoSpeak(text, btn, cancelled) {
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.key, 'api-key': cfg.key },
     body: JSON.stringify({
       model: model,
-      messages: [{ role: 'user', content: '' }, { role: 'assistant', content: text.slice(0, 4000) }],
-      audio: { format: outFormat, voice: voice }
+      messages: [{ role: 'user', content: _userContent.slice(0, 500) }, { role: 'assistant', content: text.slice(0, 4000) }],
+      audio: { format: outFormat, voice: voice },
+      temperature: _temp,
+      top_p: Math.min(0.97, 0.7 + _temp * 0.25)
     })
   });
   var data = await res.json().catch(function() { return {}; });
@@ -512,6 +524,33 @@ function setCharTtsVoice(val) {
   c.ttsVoices[p] = String(val || '').trim();
   saveState();
 }
+// 声音风格指令（MiMo）：一句自然语言描述语气，随请求 user 消息发给模型
+function setCharTtsStyle(val) {
+  var c = activeCharacter();
+  if (!c) return;
+  c.ttsStyle = String(val || '').trim();
+  saveState();
+}
+// 克隆稳定度滑杆：0.1 稳（贴样本）~ 1.2 灵（有戏）
+function _ttsTempLabel(t) { return t <= 0.35 ? '稳 · 贴样本' : (t <= 0.75 ? '均衡' : '灵动 · 有情绪'); }
+function _ttsTempFill(el) {
+  if (!el) return;
+  var min = parseFloat(el.min) || 0, max = parseFloat(el.max) || 1, v = parseFloat(el.value);
+  if (isNaN(v)) v = min;
+  var pct = (v - min) / ((max - min) || 1) * 100;
+  el.style.setProperty('--fill', Math.max(0, Math.min(100, pct)) + '%');
+}
+function setCharTtsTemp(val) {
+  var c = activeCharacter();
+  if (!c) return;
+  var t = parseFloat(val);
+  if (isNaN(t)) return;
+  c.ttsTemp = Math.max(0, Math.min(1.5, t));
+  saveState();
+  var lbl = $('charTtsTempVal');
+  if (lbl) lbl.textContent = _ttsTempLabel(c.ttsTemp);
+  _ttsTempFill($('charTtsTemp'));
+}
 // ===== 克隆样本存储（IndexedDB）=====
 // 样本可达数 MB，localStorage（整个 state 共享约 5MB 配额）根本放不下；
 // 角色数据里只存轻量标记 {name,size}，音频本体放 IndexedDB（配额几百 MB 起）。
@@ -626,6 +665,15 @@ function syncCharTts() {
   if (sel) sel.value = (c.ttsProvider && TTS_PRESETS[c.ttsProvider]) ? c.ttsProvider : (c.ttsProvider === '' ? '' : (state.settings.ttsProvider || 'minimax'));
   var inp = $('charTtsVoice');
   if (inp) inp.value = (c.ttsVoices && c.ttsVoices[p]) || c.ttsVoice || '';
+  var sty = $('charTtsStyle');
+  if (sty && document.activeElement !== sty) sty.value = c.ttsStyle || '';
+  var tmp = $('charTtsTemp');
+  if (tmp) {
+    tmp.value = (typeof c.ttsTemp === 'number') ? c.ttsTemp : 0.6;
+    var lbl = $('charTtsTempVal');
+    if (lbl) lbl.textContent = _ttsTempLabel(parseFloat(tmp.value));
+    _ttsTempFill(tmp);
+  }
   var cs = $('cloneStatus');
   if (cs) {
     if (c.ttsClone) {

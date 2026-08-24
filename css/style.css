@@ -3512,3 +3512,23 @@ button { border: 0; cursor: pointer; }
 .voice-play-btn:hover { background: rgba(0,0,0,.1); }
 .voice-play-btn.speaking { background: #ffe9c9; color: #c77b1f; animation: pulseVoice 1s ease infinite; }
 @keyframes pulseVoice { 0%,100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+
+/* ===== 语音稳定度滑杆（暖色系） ===== */
+.tts-temp-slider {
+  -webkit-appearance: none; appearance: none;
+  height: 4px; border-radius: 2px; outline: none; cursor: pointer;
+  background: linear-gradient(to right, #b8a99a var(--fill,42%), #ece5db var(--fill,42%));
+}
+.tts-temp-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #a5968a; border: 2.5px solid #fff;
+  box-shadow: 0 1px 4px rgba(90,70,50,.35);
+}
+.tts-temp-slider::-moz-range-thumb {
+  width: 11px; height: 11px; border-radius: 50%;
+  background: #a5968a; border: 2.5px solid #fff;
+  box-shadow: 0 1px 4px rgba(90,70,50,.35);
+}
+.tts-temp-slider::-moz-range-track { height: 4px; border-radius: 2px; background: #ece5db; }
+.tts-temp-slider::-moz-range-progress { height: 4px; border-radius: 2px; background: #b8a99a; }
