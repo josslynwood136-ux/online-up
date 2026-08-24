@@ -127,41 +127,6 @@
   window.uiConfirm = uiConfirm;
   window.uiPrompt = uiPrompt;
 
-  // ---------- 检查更新 ----------
-  window.checkForUpdate = async function () {
-    try {
-      uiToast('正在检查更新…');
-      if (navigator.serviceWorker) {
-        try {
-          var reg = await navigator.serviceWorker.getRegistration();
-          if (reg && reg.update) await reg.update();
-        } catch (e) {}
-      }
-      var res = await fetch('index.html?_chk=' + Date.now(), { cache: 'no-store' });
-      var txt = await res.text();
-      var m = txt.match(/app-build" content="([^"]+)"/);
-      var remote = m ? m[1] : '';
-      var meta = document.querySelector('meta[name="app-build"]');
-      var local = meta ? meta.getAttribute('content') : '';
-      if (remote && local && remote !== local) {
-        if (window.caches) {
-          try {
-            var keys = await caches.keys();
-            await Promise.all(keys.map(function (k) { return caches.delete(k); }));
-          } catch (e) {}
-        }
-        uiToast('发现新版本 ' + remote + '，正在更新…');
-        setTimeout(function () { location.reload(); }, 600);
-      } else if (!remote) {
-        uiAlert('无法获取版本信息，请稍后再试');
-      } else {
-        uiToast('已是最新版本 ' + remote);
-      }
-    } catch (e) {
-      uiAlert('检查更新失败：' + ((e && e.message) || e));
-    }
-  };
-
   // ---------- 覆盖原生（保持向后兼容） ----------
   window.alert = function (msg) {
     var s = String(msg == null ? '' : msg);
