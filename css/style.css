@@ -770,6 +770,7 @@ button { border: 0; cursor: pointer; }
   z-index: 30;
   border-top: 2px dashed rgba(47,155,87,.9);
   pointer-events: none;
+  transition: opacity .12s;
 }
 .select-here-line::before {
   content: '';
@@ -809,12 +810,13 @@ button { border: 0; cursor: pointer; }
   color: #fff;
   font-size: 13px;
   font-weight: 600;
-  cursor: pointer;
+  cursor: grab;
+  touch-action: none;
   box-shadow: 0 4px 14px rgba(47,155,87,.4);
-  transition: transform .12s, opacity .15s;
+  transition: transform .12s, opacity .15s, box-shadow .12s;
   white-space: nowrap;
 }
-.select-here-btn:active { transform: translateY(-50%) scale(.95); }
+.select-here-btn:active { transform: translateY(-50%) scale(.95); cursor: grabbing; box-shadow: 0 2px 8px rgba(47,155,87,.5); }
 .sph-ico { flex: 0 0 auto; }
 .sph-txt { line-height: 1; }
 .sph-cnt {

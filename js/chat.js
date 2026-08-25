@@ -85,6 +85,7 @@ let _selectedMsgs = {};
 let _multiAnchor = -1;
 let _selBlock = null;
 let _previewMsgs = {};
+let _selDrag = null;
 let _lastScrollTop = -1;
 let _scrollDir = 1;
 const SEL_LINE_RATIO = 0.45;
@@ -103,7 +104,7 @@ function onMsgDown(ev, index) {
   if (ev.target && ev.target.closest && ev.target.closest('.voice-avatar')) return;
   var c = activeCharacter();
   var m = c && c.chat && c.chat[index];
-  if (!m || m.role === 'system') return;
+  if (!m) return;
   _pressEl = ev.currentTarget;
   if (_pressEl && _pressEl.classList) _pressEl.classList.add('pressing');
   quotePress(ev, ev.currentTarget, index);
@@ -134,9 +135,9 @@ function enterMultiSelect(anchorIndex) {
   if (f) f.style.display = 'none';
   var bar = $('multiBar');
   if (bar) bar.style.display = 'flex';
+  renderChat();
   showSelectHereUI();
   updateMultiCount();
-  renderChat();
 }
 function exitMultiSelect() {
   var wasActive = _multiSelect;
@@ -159,6 +160,7 @@ function toggleMsgSelect(index) {
   const msg = char && char.chat[index];
   if (!msg) return;
   _selBlock = null;
+  var anchorBefore = _multiAnchor;
   if (_selectedMsgs[index]) {
     delete _selectedMsgs[index];
     if (_multiAnchor === index) _multiAnchor = -1;
@@ -170,6 +172,7 @@ function toggleMsgSelect(index) {
     const keys = Object.keys(_selectedMsgs);
     if (keys.length) _multiAnchor = parseInt(keys[0], 10);
   }
+  if (_multiAnchor !== anchorBefore) positionSelLine();
   updateMultiCount();
   renderSelectionVisual();
   updatePreview();
@@ -217,6 +220,7 @@ function selectAllMsgs() {
   _previewMsgs = {};
   renderSelectionVisual();
   updateMultiCount();
+  positionSelLine();
   updatePreview();
   renderPreviewVisual();
 }
@@ -246,6 +250,11 @@ function showSelectHereUI() {
     body.dataset.multiScr = '1';
     body.addEventListener('scroll', onMultiScroll, { passive: true });
   }
+  if (btn && !btn._selBound) {
+    btn._selBound = true;
+    btn.addEventListener('pointerdown', selLineDown);
+  }
+  positionSelLine();
   updatePreview();
   renderPreviewVisual();
 }
@@ -253,13 +262,78 @@ function hideSelectHereUI() {
   var line = $('selectHereLine');
   var btn = $('selectHereBtn');
   if (line) line.style.display = 'none';
-  if (btn) btn.style.display = 'none';
+  if (btn) {
+    btn.style.display = 'none';
+    if (btn._selBound) {
+      btn._selBound = false;
+      btn.removeEventListener('pointerdown', selLineDown);
+    }
+  }
+  _selDrag = null;
+  window.removeEventListener('pointermove', selLineMove);
+  window.removeEventListener('pointerup', selLineUp);
+  window.removeEventListener('pointercancel', selLineUp);
   var body = $('chatBody');
   if (body && body.dataset.multiScr) {
     body.removeEventListener('scroll', onMultiScroll);
     delete body.dataset.multiScr;
   }
   clearPreview();
+}
+function positionSelLine() {
+  var line = $('selectHereLine'), btn = $('selectHereBtn'), w = $('chatWindow'), body = $('chatBody');
+  if (!line || !w || !body) return;
+  var wr = w.getBoundingClientRect(), br = body.getBoundingClientRect();
+  var top = null;
+  if (_multiAnchor >= 0) {
+    var el = body.querySelector('.msg[data-idx="' + _multiAnchor + '"]');
+    if (el) { var r = el.getBoundingClientRect(); top = r.top + r.height / 2 - wr.top; }
+  }
+  if (top == null) top = wr.height * SEL_LINE_RATIO;
+  var minT = (br.top - wr.top) + 12;
+  var maxT = (br.bottom - wr.top) - 12;
+  if (top < minT) top = minT;
+  if (top > maxT) top = maxT;
+  line.style.top = top + 'px';
+  btn.style.top = top + 'px';
+}
+function selLineDown(e) {
+  if (!_multiSelect) return;
+  var line = $('selectHereLine'), w = $('chatWindow');
+  if (!line || !w) return;
+  var wr = w.getBoundingClientRect();
+  var lr = line.getBoundingClientRect();
+  _selDrag = { y: e.clientY, top: lr.top - wr.top, moved: false };
+  try { e.preventDefault(); } catch (err) {}
+  window.addEventListener('pointermove', selLineMove);
+  window.addEventListener('pointerup', selLineUp);
+  window.addEventListener('pointercancel', selLineUp);
+}
+function selLineMove(e) {
+  if (!_selDrag) return;
+  var line = $('selectHereLine'), btn = $('selectHereBtn'), w = $('chatWindow'), body = $('chatBody');
+  if (!line || !w || !body) return;
+  var wr = w.getBoundingClientRect(), br = body.getBoundingClientRect();
+  var dy = e.clientY - _selDrag.y;
+  var minT = (br.top - wr.top) + 12;
+  var maxT = (br.bottom - wr.top) - 12;
+  var nt = _selDrag.top + dy;
+  if (nt < minT) nt = minT;
+  if (nt > maxT) nt = maxT;
+  if (Math.abs(nt - _selDrag.top) > 3) _selDrag.moved = true;
+  line.style.top = nt + 'px';
+  btn.style.top = nt + 'px';
+  updatePreview();
+  renderPreviewVisual();
+  try { e.preventDefault(); } catch (err) {}
+}
+function selLineUp() {
+  window.removeEventListener('pointermove', selLineMove);
+  window.removeEventListener('pointerup', selLineUp);
+  window.removeEventListener('pointercancel', selLineUp);
+  var moved = _selDrag ? _selDrag.moved : false;
+  _selDrag = null;
+  if (!moved) selectHereTo();
 }
 function clearPreview() {
   _previewMsgs = {};
@@ -278,9 +352,10 @@ function onMultiScroll() {
 function getCutIndex() {
   var w = $('chatWindow');
   var body = $('chatBody');
-  if (!w || !body) return -1;
-  var wr = w.getBoundingClientRect();
-  var lineY = wr.top + wr.height * SEL_LINE_RATIO;
+  var line = $('selectHereLine');
+  if (!w || !body || !line) return -1;
+  var lr = line.getBoundingClientRect();
+  var lineY = lr.top + lr.height / 2;
   var msgs = body.querySelectorAll('.msg[data-idx]');
   var best = -1, bestD = Infinity;
   for (var i = 0; i < msgs.length; i++) {
@@ -338,11 +413,10 @@ function selectHereTo() {
   var range = previewRange();
   if (!range) return;
   var char = activeCharacter();
-  var sel = {};
   for (var i = range.from; i <= range.to; i++) {
-    if (char && char.chat[i]) sel[i] = true;
+    if (char && char.chat[i]) _selectedMsgs[i] = true;
   }
-  _selectedMsgs = sel;
+  if (_multiAnchor < 0 && range.from >= 0) _multiAnchor = range.from;
   _selBlock = { from: range.from, to: range.to };
   _previewMsgs = {};
   updateMultiCount();
@@ -521,19 +595,23 @@ function showQuoteMenu(index) {
   if (navigator.vibrate) { try { navigator.vibrate(18); } catch (e) {} }
   const char = activeCharacter();
   const msg = char.chat[index];
-  if (!msg || msg.role === 'system') return;
+  if (!msg) return;
   const prof = activeProfile();
   const el = $('quoteMenu');
   if (!el) return;
   const isUser = msg.role === 'user';
-  const name = isUser ? prof.name : char.name;
+  const isSystem = msg.role === 'system';
+  const name = isSystem ? '系统' : (isUser ? prof.name : char.name);
   const text = (msg.content || (msg.media ? '[图片]' : '')).slice(0, 60);
   el.querySelector('.q-cut-txt').textContent = name + '：' + text;
-  el.querySelector('.q-reply').onclick = function() { hideQuoteMenu(); quoteMessage(index); };
+  var replyOpt = el.querySelector('.q-reply');
+  var voiceOpt = el.querySelector('.q-voice');
+  if (replyOpt) replyOpt.style.display = isSystem ? 'none' : '';
+  if (voiceOpt) voiceOpt.style.display = isSystem ? 'none' : '';
+  if (replyOpt) replyOpt.onclick = function() { hideQuoteMenu(); quoteMessage(index); };
   var qMulti = el.querySelector('.q-multi');
   if (qMulti) qMulti.onclick = function() { hideQuoteMenu(); enterMultiSelect(index); };
-  var qVoice = el.querySelector('.q-voice');
-  if (qVoice) qVoice.onclick = function() { hideQuoteMenu(); if (typeof speakText === 'function') speakText((msg.content || (msg.media ? '[图片]' : '')), null); };
+  if (voiceOpt) voiceOpt.onclick = function() { hideQuoteMenu(); if (typeof speakText === 'function') speakText((msg.content || (msg.media ? '[图片]' : '')), null); };
   el.querySelector('.q-del').onclick = function() { hideQuoteMenu(); deleteMessage(char.id, index); };
   el.style.display = 'flex';
   var mask = $('quoteMenuMask'); if (mask) mask.classList.add('show');
