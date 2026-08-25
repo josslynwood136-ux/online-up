@@ -429,7 +429,7 @@ function renderChat() {
     }
     const quoteHtml = quoteBlock(msg.quote);
     const tick = isUser ? `<div class="read-tick">${msg.status === 'read' ? '已读' : '已发送'}</div>` : '';
-    const voiceBtnHtml = (!isUser && msg.content && typeof toggleMsgVoice === 'function') ? `<button class="voice-play-btn" title="播放/停止" onclick="event.stopPropagation();toggleMsgVoice(this,${i})">🔈</button>` : '';
+    const voiceBtnHtml = '';
     const avHtml = !isUser ? `<div class="avatar voice-avatar" onclick="event.stopPropagation();showInnerVoice('${char.id}')">${renderAvatar(av, nm)}</div>` : `<div class="avatar">${renderAvatar(av, nm)}</div>`;
     return `${divider}<div class="msg ${isUser ? 'right' : 'left'}${multiCls(i)}" data-idx="${i}" oncontextmenu="return false;" ontouchstart="onMsgDown(event,${i})" onmousedown="onMsgDown(event,${i})" onclick="onMsgTap(event,${i})">${msgCheck(isUser, i)}${avCol(avHtml)}<div class="bubble ${isUser ? 'right' : 'left'}">${quoteHtml}${textHtml}${mediaHtml}${transHtml}${voiceBtnHtml}</div>${tick}</div>`;
   }).join('') + typing;
@@ -530,40 +530,18 @@ function showQuoteMenu(index) {
   el.querySelector('.q-reply').onclick = function() { hideQuoteMenu(); quoteMessage(index); };
   var qMulti = el.querySelector('.q-multi');
   if (qMulti) qMulti.onclick = function() { hideQuoteMenu(); enterMultiSelect(index); };
+  var qVoice = el.querySelector('.q-voice');
+  if (qVoice) qVoice.onclick = function() { hideQuoteMenu(); if (typeof speakText === 'function') speakText((msg.content || (msg.media ? '[图片]' : '')), null); };
   el.querySelector('.q-del').onclick = function() { hideQuoteMenu(); deleteMessage(char.id, index); };
-  el.style.display = 'block';
-  // 定位到被长按的消息附近
-  var msgEl = document.querySelector('#chatBody .msg[data-idx="' + index + '"]');
-  var phone = document.querySelector('.phone');
-  if (msgEl && phone) {
-    var pr = phone.getBoundingClientRect();
-    var mr = msgEl.getBoundingClientRect();
-    var mw = el.offsetWidth, mh = el.offsetHeight;
-    var cx = mr.left + mr.width / 2 - pr.left;
-    var left = cx - mw / 2;
-    left = Math.max(8, Math.min(left, pr.width - mw - 8));
-    var top = mr.top - pr.top - mh - 10;
-    if (top < 8) top = mr.bottom - pr.top + 10;
-    if (top > pr.height - mh - 8) top = pr.height - mh - 8;
-    el.style.left = left + 'px';
-    el.style.top = top + 'px';
-    el.style.bottom = 'auto';
-    el.style.transformOrigin = (cx - left < mw / 2 ? 'left' : 'right') + ' top';
-  }
+  el.style.display = 'flex';
+  var mask = $('quoteMenuMask'); if (mask) mask.classList.add('show');
   setTimeout(function() { el.classList.add('show'); }, 10);
-  // 吞掉长按松手时浏览器补发的那次 click（仅第一次、且点在菜单外），避免误关；菜单内点击不受影响
-  var sw = function(e) {
-    if (el.contains(e.target)) return;
-    e.stopPropagation();
-    if (e.cancelable) e.preventDefault();
-    document.removeEventListener('click', sw, true);
-  };
-  document.addEventListener('click', sw, true);
-  setTimeout(function() { document.removeEventListener('click', sw, true); }, 220);
 }
 function hideQuoteMenu() {
   const el = $('quoteMenu');
+  const mask = $('quoteMenuMask');
   if (el) { el.classList.remove('show'); el.style.display = 'none'; }
+  if (mask) mask.classList.remove('show');
   clearQuotePress();
 }
 document.addEventListener('click', function(e) {
