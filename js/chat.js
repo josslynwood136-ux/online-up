@@ -1221,7 +1221,8 @@ function randomDelay() {
 
 function flushThinkBubble(char) {
   if (!char || !lastThinkText) return;
-  char.chat.push({ role: 'system', type: 'think', content: lastThinkText, collapsed: true, time: new Date().toLocaleString(), ts: Date.now() });
+  var _think = lastThinkText.replace(/\s*[‖|｜]+\s*/g, ' ').trim();
+  char.chat.push({ role: 'system', type: 'think', content: _think, collapsed: true, time: new Date().toLocaleString(), ts: Date.now() });
   lastThinkText = '';
 }
 
@@ -1245,15 +1246,15 @@ async function deliverReply(reply) {
   const _c2 = activeCharacter();
   setChatTyping(false);
   flushThinkBubble(activeCharacter());
-  // 无论是否翻译，都先拆成多条气泡（模拟真人连发短信）；翻译模式下逐条各自翻译
+  // 一条回复拆成多条消息气泡连发，更像真人发短信；翻译模式下逐条翻译
   var _parts = splitReply(txt);
   if (_parts.length <= 1) {
     var _t0 = null;
     if (_c2.translate && _c2.lang && _c2.lang !== '中文') {
-      var _clean0 = txt.replace(/[（(][^）)]*[）)]/g, '').trim();
+      var _clean0 = _parts[0].replace(/[（(][^）)]*[）)]/g, '').trim();
       if (_clean0) _t0 = await translateText(_clean0, _c2.lang).catch(function() { return null; });
     }
-    appendBubble('assistant', txt, null, _t0);
+    appendBubble('assistant', _parts[0], null, _t0);
   } else {
     for (var _k = 0; _k < _parts.length; _k++) {
       var _t = null;
@@ -1261,33 +1262,25 @@ async function deliverReply(reply) {
         var _clean = _parts[_k].replace(/[（(][^）)]*[）)]/g, '').trim();
         if (_clean) _t = await translateText(_clean, _c2.lang).catch(function() { return null; });
       }
+      // 第二条起先冒个"正在输入"的小停顿，像对方在一条条接着发
+      if (_k > 0) {
+        setChatTyping(true);
+        await sleep(400 + Math.random() * 900);
+      }
+      setChatTyping(false);
       appendBubble('assistant', _parts[_k], null, _t);
-      if (_k < _parts.length - 1) { await sleep(500 + Math.random() * 700); }
+      if (_k < _parts.length - 1) { await sleep(300 + Math.random() * 500); }
     }
   }
-  try { if (typeof autoSpeakReply === 'function') autoSpeakReply(txt); } catch (e) {}
+  try { if (typeof autoSpeakReply === 'function') autoSpeakReply(_parts.join(' ')); } catch (e) {}
 }
 
+// 完全按 AI 主动插入的分隔符拆（‖ / | / ｜）；AI 不分段就整段作为一条。
 function splitReply(txt) {
-  if (!txt) return [txt];
-  // 1. 换行（模型听话时最自然，像连发几条）
-  var byLine = txt.split('\n').map(function(s){ return s.trim(); }).filter(function(s){ return s.length; });
-  if (byLine.length > 1) return byLine;
-  // 2. 句末标点（中英文）切
-  var bySentence = txt.match(/[^。！？!?]+[。！？!?]?/g) || [txt];
-  bySentence = bySentence.map(function(s){ return s.trim(); }).filter(function(s){ return s.length; });
-  if (bySentence.length > 1) return bySentence;
-  // 3. 逗号 / 分号 / 省略号 切（制造连发感）
-  var byComma = txt.match(/[^，；;…]+[，；;…]?/g) || [txt];
-  byComma = byComma.map(function(s){ return s.trim(); }).filter(function(s){ return s.length; });
-  if (byComma.length > 1) return byComma;
-  // 4. 仍是一整段且偏长 → 按字数硬切成多条短气泡
-  if (txt.length > 20) {
-    var chunks = [];
-    for (var i = 0; i < txt.length; i += 20) chunks.push(txt.slice(i, i + 20));
-    return chunks;
-  }
-  return [txt];
+  txt = (txt || '').trim();
+  if (!txt) return [''];
+  var parts = txt.split(/\s*[‖|｜]+\s*/).map(function (s) { return s.trim(); }).filter(Boolean);
+  return parts.length ? parts : [txt];
 }
 
 function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
@@ -2317,7 +2310,7 @@ function buildRoleSystemPrompt(char, userText) {
     memCtx,
     '',
     '【回复要求】',
-    '用 ' + char.name + ' 的身份自然回应，不要提 AI 相关话题，不要自我总结。一次回复不必只发一句——像真人连发几条消息那样，自然地写 2~4 句，并且【每句单独占一行、用换行分隔，不要堆成一个大段落】：接住对方的话、顺带追问、分享点小事、有动作或情绪就写出来；线下模式用（）写动作表情，线上模式用语气和 emoji 表达。别为了"简短"把该说的话憋回去，但也别注水啰嗦。',
+    '用 ' + char.name + ' 的身份自然回应，不要提 AI 相关话题，不要自我总结。你的回复要像真人发短信一样，分成 2~4 条独立的短消息连着发：每条是一两句口语，按真实聊天的节奏来——可以先抛一句、停顿一下再补一句，也可以边说边问。每条消息之间必须用符号 ‖ 隔开（最后一条后面不用加），例如：在干嘛‖刚洗完澡，累瘫了‖你呢，还不睡？；线下模式用（）写动作表情，线上模式用语气和 emoji 表达。别为了"简短"把该说的话憋回去，但也别注水啰嗦。',
     '你要有脑子、有主见：对方说的话要真的去想、去接，给出具体而有态度的回应；绝不做只会「嗯嗯好的」的应声虫，不知道或不同意就直说，别硬凑安全又空洞的回答。',
     '【对话质量红线】',
     '1. 先接住对方刚说的话：直接回应对方话里的具体点，再自然延伸；不许答非所问，不许用反问或套话回避。尤其当对方提出直接问题或选择（要不要、该不该、去不去、想不想等），必须先明确回答这个问题，绝不允许无视问题去说别的事——比如对方问"要不要哄"，你必须先回"要 / 不要 / 看情况"，不能岔开去说奶茶店之类无关的事。',
@@ -2338,7 +2331,7 @@ function buildRoleSystemPrompt(char, userText) {
     parts.push('', '【示例对话】', '以下是你与对方的真实对话片段。重点学习你的说话方式、语气、用词和反应习惯；遇到相似情境要沿用这种风格来回应，但不要照抄内容：', char.examples.trim());
   }
   if (char.mode === 'online') {
-    parts.push('【模式：异地】你们是异地状态，相隔两地、只能靠手机发短信联系，现实里没有真实的动作和接触。请完全按“发手机短信”的方式回复：像真人随手打字——口语、碎片化、自然带语气词和表情（😂😭🥺），但别堆砌；严禁括号动作描写（如（笑）（摸摸头）），也不要描写任何动作或身体接触，你们此刻碰不到彼此；想念/想关心时用话语表达，比如“好想你”“要是现在能抱抱你就好了”“隔这么远好烦”；可以连发几条短消息，每条别太长，别写成一大段或作文腔。');
+    parts.push('【模式：异地】你们是异地状态，相隔两地、只能靠手机发短信联系，现实里没有真实的动作和接触。请完全按“发手机短信”的方式回复：像真人随手打字——口语、碎片化、自然带语气词和表情（😂😭🥺），但别堆砌；严禁括号动作描写（如（笑）（摸摸头）），也不要描写任何动作或身体接触，你们此刻碰不到彼此；想念/想关心时用话语表达，比如“好想你”“要是现在能抱抱你就好了”“隔这么远好烦”；回复会被自动拆成多条短消息连着发，所以尽管写成几句碎碎的口语、一句一条，别太长，别写成一大段或作文腔。');
   } else {
     parts.push('【模式：线下】你们是面对面的相处状态。可以用（）自然地描写自己的动作、表情和心情，像真实陪伴一样。');
   }
@@ -3509,24 +3502,28 @@ function idleProactiveTick() {
 function fireProactive(char) {
   _manualAICall = true;
   setChatTyping(true);
-  callAI('', false, true, char).then(function(reply) {
+  callAI('', false, true, char).then(async function(reply) {
     setChatTyping(false);
     var txt = reply || '……';
-    var trans = null;
-    if (char.translate && char.lang && char.lang !== '中文') {
-      var cleanText = txt.replace(/[（(][^）)]*[）)]/g, '').trim();
-      if (cleanText) trans = translateText(cleanText, char.lang).catch(function() { return null; });
-    }
-    var msg = { role: 'assistant', content: txt, time: new Date().toLocaleString(), ts: Date.now() };
-    if (trans) msg.translatedText = trans;
+    var parts = splitReply(txt);
     if (!char.chat) char.chat = [];
     flushThinkBubble(char);
-    char.chat.push(msg);
-    char.unread = (char.unread || 0) + 1;
-    char.read = true;
+    for (var pi = 0; pi < parts.length; pi++) {
+      var ptext = parts[pi];
+      var trans = null;
+      if (char.translate && char.lang && char.lang !== '中文') {
+        var cleanText = ptext.replace(/[（(][^）)]*[）)]/g, '').trim();
+        if (cleanText) trans = await translateText(cleanText, char.lang).catch(function() { return null; });
+      }
+      var pmsg = { role: 'assistant', content: ptext, time: new Date().toLocaleString(), ts: Date.now() + pi };
+      if (trans) pmsg.translatedText = trans;
+      char.chat.push(pmsg);
+      char.unread = (char.unread || 0) + 1;
+      char.read = true;
+    }
     var cw = document.getElementById('chatWindow');
     if (cw && (!cw.classList.contains('open') || state.activeRoleId !== char.id)) {
-      showMsgNote(char.id, char.name, char.avatar, txt || '发来一条消息');
+      showMsgNote(char.id, char.name, char.avatar, parts[0] || '发来一条消息');
     }
     saveState();
     if (state.activeRoleId === char.id) renderChat();
