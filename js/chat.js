@@ -61,6 +61,7 @@ function openChat(characterId, skin) {
   if (ob) ob.remove();
   $('chatWindow').classList.add('open');
   $('chatWindow').classList.toggle('comic-skin', skin === 'comic');
+  var cs = $('chatSettings'); if (cs) cs.classList.remove('open'); // 进入聊天时确保设置面板已收起
   renderChat();
 }
 
@@ -74,6 +75,7 @@ function closeChat() {
   if (ob) ob.remove();
   $('chatWindow').classList.remove('open');
   $('chatWindow').classList.remove('comic-skin');
+  var cs = $('chatSettings'); if (cs) cs.classList.remove('open'); // 关闭聊天时一并收起设置，避免设置面板滞留覆盖
   hidePanels();
 }
 
@@ -407,11 +409,16 @@ function renderChat() {
     if (msg.media && msg.media.type === 'image') {
       mediaHtml = `<img src="${escapeHTML(msg.media.src)}" style="max-width:180px;border-radius:12px;display:block;margin-top:4px">`;
     } else   if (msg.media && msg.media.type === 'audio') {
+      const noAudio = !!msg.media.noAudio;
       const dur = msg.media.duration || 0;
-      const durTxt = dur ? dur + '″' : '语音';
+      const durTxt = noAudio ? '文字语音' : (dur ? dur + '″' : '语音');
       const bars = waveBars(msg.media.wave, i + 1);
       const unplayed = (msg.media.played || msg.role !== 'user') ? '' : '<span class="voice-unplayed"></span>';
-      mediaHtml = `<div class="voice-msg" onclick="event.stopPropagation();playVoiceMsg(this,${i})">${unplayed}<span class="voice-play-ico">▶</span><span class="voice-wave" onclick="event.stopPropagation();seekVoice(this,${i},event)">${bars}</span><span class="voice-dur">${durTxt}</span><span class="voice-speed" onclick="event.stopPropagation();cycleVoiceSpeed(this,${i})">${_voiceSpeed}×</span></div>`;
+      if (noAudio) {
+        mediaHtml = `<div class="voice-msg voice-msg-text">${unplayed}<span class="voice-play-ico">🎙</span><span class="voice-dur">文字语音</span></div>`;
+      } else {
+        mediaHtml = `<div class="voice-msg" onclick="event.stopPropagation();playVoiceMsg(this,${i})">${unplayed}<span class="voice-play-ico">▶</span><span class="voice-wave" onclick="event.stopPropagation();seekVoice(this,${i},event)">${bars}</span><span class="voice-dur">${durTxt}</span><span class="voice-speed" onclick="event.stopPropagation();cycleVoiceSpeed(this,${i})">${_voiceSpeed}×</span></div>`;
+      }
     } else if (msg.media && msg.media.type === 'file') {
       mediaHtml = `<a href="${escapeHTML(msg.media.src)}" download="${escapeHTML(msg.media.name || 'file')}" style="display:inline-block;margin-top:4px;color:inherit;text-decoration:none"><div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.18);padding:8px 10px;border-radius:10px"><span style="font-size:22px">📄</span><span style="font-size:13px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(msg.media.name || '文件')}</span></div></a>`;
     }
@@ -697,9 +704,22 @@ function enterVoicePreview(p) {
   _voicePhase = 'preview';
   _voicePreview = p;
   var ui = $('voiceRecUI');
-  if (ui) { ui.classList.remove('recording'); ui.classList.add('preview'); }
+  if (ui) { ui.classList.remove('recording', 'no-audio'); ui.classList.add('preview'); }
   var t = $('voiceRecText'); if (t) t.value = p.text || '';
   var hint = $('voiceRecHint'); if (hint) hint.textContent = p.text ? '识别到文字，可修改后发送' : '没识别到文字，可手动写几个字再发';
+  var wave = $('voiceRecWave'); if (wave) { wave.className = 'voice-rec-wave'; wave.innerHTML = ''; }
+}
+// 不想录音、直接打字当语音发：打开预览框（无音频），可输入文字后发送
+function openTextVoice() {
+  hidePanels();
+  _voicePhase = 'preview';
+  _voicePreview = { dataUrl: null, mime: null, dur: 0, wave: null, text: '' };
+  _voiceUserEdited = false;
+  var ui = $('voiceRecUI');
+  if (ui) { ui.style.display = 'flex'; ui.classList.remove('recording'); ui.classList.add('preview', 'no-audio'); }
+  var f = document.querySelector('#chatWindow .chat-footer'); if (f) f.style.visibility = 'hidden';
+  var t = $('voiceRecText'); if (t) { t.value = ''; try { t.focus(); } catch (e) {} }
+  var hint = $('voiceRecHint'); if (hint) hint.textContent = '直接打字，对方会当作语音收到';
   var wave = $('voiceRecWave'); if (wave) { wave.className = 'voice-rec-wave'; wave.innerHTML = ''; }
 }
 function onVoiceTextInput() { _voiceUserEdited = true; }
@@ -780,7 +800,7 @@ function updateVoiceTimer() {
 
 function showVoiceRecordingUI() {
   var ui = $('voiceRecUI');
-  if (ui) { ui.style.display = 'flex'; ui.classList.add('recording'); ui.classList.remove('preview'); }
+  if (ui) { ui.style.display = 'flex'; ui.classList.add('recording'); ui.classList.remove('preview', 'no-audio'); }
   var wave = $('voiceRecWave');
   if (wave && !wave.children.length) { var h = ''; for (var k = 0; k < 16; k++) h += '<i></i>'; wave.innerHTML = h; }
   var f = document.querySelector('#chatWindow .chat-footer');
@@ -854,10 +874,16 @@ async function sendVoiceMessage(text, dataUrl, mime, dur, wave) {
     renderReplyBar();
   }
   // 音频本体存 IndexedDB，聊天记录里只留引用（vid），省 localStorage 配额
-  var vid = 'v' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
-  var media = { type: 'audio', vid: vid, mime: mime, duration: dur, wave: wave || null };
-  try { await _voiceDbSet(vid, dataUrl); }
-  catch (e) { media.src = dataUrl; } // IDB 不可用（无痕模式等）则退回内联
+  var media;
+  if (dataUrl) {
+    var vid = 'v' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
+    media = { type: 'audio', vid: vid, mime: mime, duration: dur, wave: wave || null };
+    try { await _voiceDbSet(vid, dataUrl); }
+    catch (e) { media.src = dataUrl; } // IDB 不可用（无痕模式等）则退回内联
+  } else {
+    // 纯打字当语音发：没有音频本体，只留文字
+    media = { type: 'audio', noAudio: true, duration: 0, wave: null, played: true };
+  }
   appendBubble('user', text || '', media, null, null, quoteData);
   touchActiveChar();
   if (typeof willowBlocksReplyFor === 'function' && willowBlocksReplyFor(char.id, char.name)) {
