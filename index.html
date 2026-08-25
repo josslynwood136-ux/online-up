@@ -124,10 +124,16 @@
       <div id="voiceRecUI" class="voice-rec-ui" style="display:none">
         <button class="voice-rec-cancel" onclick="cancelVoiceRecord()" title="取消">✕</button>
         <div class="voice-rec-main">
-          <div class="voice-rec-status"><span class="voice-rec-dot"></span><span id="voiceRecTime">0″</span><span id="voiceRecHint" class="voice-rec-hint">上滑取消</span></div>
-          <div id="voiceRecText" class="voice-rec-text"></div>
+          <div class="voice-rec-status"><span class="voice-rec-dot"></span><span id="voiceRecTime">0″</span><span id="voiceRecHint" class="voice-rec-hint">录音中…</span></div>
+          <div id="voiceRecWave" class="voice-rec-wave"></div>
+          <textarea id="voiceRecText" class="voice-rec-text" placeholder="（语音识别中…若没出字，停止后可手动打几个字，对方才能读懂你的语音）" oninput="onVoiceTextInput()"></textarea>
         </div>
-        <button class="voice-rec-send" onclick="stopAndSendVoice()" title="发送">发送</button>
+        <div class="voice-rec-actions">
+          <button class="voice-rec-stop" id="voiceRecStop" onclick="finishVoiceRecord()">■ 停止</button>
+          <button class="voice-rec-play" id="voiceRecPlay" onclick="previewVoicePlay()">▶ 试听</button>
+          <button class="voice-rec-reset" id="voiceRecReset" onclick="resetVoiceRecord()">↺ 重录</button>
+          <button class="voice-rec-send" id="voiceRecSend" onclick="confirmVoiceSend()">发送</button>
+        </div>
       </div>
     </div>
 

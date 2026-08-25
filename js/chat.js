@@ -627,14 +627,19 @@ let _voiceSpeed = 1;            // 语音播放倍速 1/1.5/2
 let _voiceCtxHint = false;      // 告诉 AI 上一条是语音来的
 let _voiceAudio = null;
 let _voiceUrlCache = {};        // vid -> dataUrl 缓存
+let _voicePhase = 'idle';       // idle | recording | preview
+let _voicePreview = null;       // 预览态缓存：{dataUrl,mime,dur,wave,text}
+let _voicePreviewAudio = null;  // 预览试听用的 Audio
+let _voiceUserEdited = false;   // 用户是否手动改过转写文字
 
 function toggleVoiceRecord() {
-  if (_voiceActive) { stopAndSendVoice(); }
-  else { _voicePressing = true; startVoiceRecord(); }
+  if (_voicePhase === 'recording') { finishVoiceRecord(); }
+  else if (_voicePhase === 'idle') { startVoiceRecord(); }
 }
 
 async function startVoiceRecord() {
   if (_voiceActive) return;
+  _voicePressing = true;
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     toastVoice('这个浏览器不支持录音（建议 Chrome / 安卓）');
     _voicePressing = false;
@@ -668,47 +673,66 @@ async function startVoiceRecord() {
   _voiceRec.onstop = onVoiceRecorded;
   try { _voiceRec.start(); } catch (e) { toastVoice('录音启动失败'); _voicePressing = false; return; }
   _voiceActive = true;
+  _voicePhase = 'recording';
+  _voiceUserEdited = false;
   _voiceStart = Date.now();
   startVoiceTranscript();
   showVoiceRecordingUI();
-  updateVoiceRecHint('上滑取消', false);
-  updateVoiceRecHint('', true);
+  var tt = $('voiceRecText'); if (tt) tt.value = '';
+  updateVoiceRecHint('录音中…点「停止」结束', false);
   _voiceTimer = setInterval(updateVoiceTimer, 200);
 }
 
-// 按住说话：pointerdown 开始，松手发送，上滑取消
-function voiceBtnDown(e) {
-  if (e && e.preventDefault) e.preventDefault();
-  if (_voiceActive || _voicePressing) return;
-  _voicePressing = true;
-  _voiceCancelArmed = false;
-  _voicePendingCancel = false;
-  _voiceStartY = (e && e.clientY) || 0;
-  try { if (e && e.target && e.target.setPointerCapture) e.target.setPointerCapture(e.pointerId); } catch (x) {}
-  document.addEventListener('pointermove', voiceBtnMove, { passive: true });
-  document.addEventListener('pointerup', voiceBtnUp, { passive: true });
-  document.addEventListener('pointercancel', voiceBtnUp, { passive: true });
-  startVoiceRecord();
+// 点按式录音：第一次点麦克风开始，再点「停止」结束，结束后进入预览（试听/改字/发送）
+function finishVoiceRecord() {
+  if (_voicePhase !== 'recording' || !_voiceActive) return;
+  _voiceActive = false;
+  if (_voiceRec && _voiceRec.state === 'recording') { try { _voiceRec.stop(); } catch (e) {} }
+  if (_voiceRecognition) { try { _voiceRecognition.stop(); } catch (e) {} _voiceRecognition = null; }
+  if (_voiceStream) { _voiceStream.getTracks().forEach(function (t) { try { t.stop(); } catch (x) {} }); _voiceStream = null; }
+  if (_voiceTimer) { clearInterval(_voiceTimer); _voiceTimer = null; }
+  // MediaRecorder.onstop -> onVoiceRecorded -> enterVoicePreview
 }
-function voiceBtnMove(e) {
-  if (!_voicePressing) return;
-  var dy = ((e && e.clientY) || 0) - _voiceStartY;
-  if (dy < -60) {
-    if (!_voiceCancelArmed) { _voiceCancelArmed = true; updateVoiceRecHint('松开手指，取消发送', false); }
-  } else if (_voiceCancelArmed) {
-    _voiceCancelArmed = false; updateVoiceRecHint('上滑取消', false);
+function enterVoicePreview(p) {
+  _voicePhase = 'preview';
+  _voicePreview = p;
+  var ui = $('voiceRecUI');
+  if (ui) { ui.classList.remove('recording'); ui.classList.add('preview'); }
+  var t = $('voiceRecText'); if (t) t.value = p.text || '';
+  var hint = $('voiceRecHint'); if (hint) hint.textContent = p.text ? '识别到文字，可修改后发送' : '没识别到文字，可手动写几个字再发';
+  var wave = $('voiceRecWave'); if (wave) { wave.className = 'voice-rec-wave'; wave.innerHTML = ''; }
+}
+function onVoiceTextInput() { _voiceUserEdited = true; }
+function confirmVoiceSend() {
+  if (!_voicePreview) return;
+  var text = (($('voiceRecText') && $('voiceRecText').value) || '').trim();
+  var p = _voicePreview; _voicePreview = null;
+  if (_voicePreviewAudio) { try { _voicePreviewAudio.pause(); } catch (e) {} _voicePreviewAudio = null; }
+  _voicePhase = 'idle';
+  hideVoiceRecordingUI();
+  sendVoiceMessage(text, p.dataUrl, p.mime, p.dur, p.wave);
+}
+function previewVoicePlay() {
+  if (_voicePreviewAudio) {
+    try { _voicePreviewAudio.pause(); } catch (e) {}
+    _voicePreviewAudio = null;
+    var b = $('voiceRecPlay'); if (b) b.textContent = '▶ 试听';
+    return;
   }
+  if (!_voicePreview) return;
+  var a = new Audio(_voicePreview.dataUrl);
+  if (_voicePreview.mime) a.type = _voicePreview.mime;
+  _voicePreviewAudio = a;
+  var b = $('voiceRecPlay'); if (b) b.textContent = '⏸ 停止';
+  a.onended = function () { _voicePreviewAudio = null; if (b) b.textContent = '▶ 试听'; };
+  a.play().catch(function () { _voicePreviewAudio = null; if (b) b.textContent = '▶ 试听'; });
 }
-function voiceBtnUp(e) {
-  if (!_voicePressing) return;
-  _voicePressing = false;
-  document.removeEventListener('pointermove', voiceBtnMove);
-  document.removeEventListener('pointerup', voiceBtnUp);
-  document.removeEventListener('pointercancel', voiceBtnUp);
-  if (_voiceCancelArmed) { cancelVoiceRecord(); return; }
-  if (!_voiceActive) { _voicePendingCancel = true; return; } // 授权中松手，等 start 完成即取消
-  if (Date.now() - _voiceStart < 800) { cancelVoiceRecord(); toastVoice('录音时间太短'); return; }
-  stopAndSendVoice();
+function resetVoiceRecord() {
+  if (_voicePreviewAudio) { try { _voicePreviewAudio.pause(); } catch (e) {} _voicePreviewAudio = null; }
+  _voicePreview = null;
+  _voicePhase = 'idle';
+  hideVoiceRecordingUI();
+  startVoiceRecord();
 }
 
 // 录音同时跑语音识别，把说的话转成文字（无识别能力时静默跳过，只存语音）
@@ -737,9 +761,10 @@ function startVoiceTranscript() {
 }
 function updateVoiceRecHint(text, isTranscript) {
   if (isTranscript) {
-    var tt = $('voiceRecText'); if (tt) tt.textContent = text || '';
+    var tt = $('voiceRecText');
+    if (tt && !_voiceUserEdited && document.activeElement !== tt) tt.value = text || '';
   } else {
-    var hh = $('voiceRecHint'); if (hh) hh.textContent = text || '上滑取消';
+    var hh = $('voiceRecHint'); if (hh) hh.textContent = text || '';
   }
 }
 
@@ -755,29 +780,30 @@ function updateVoiceTimer() {
 
 function showVoiceRecordingUI() {
   var ui = $('voiceRecUI');
-  if (ui) ui.style.display = 'flex';
-  var btn = $('voiceRecBtn');
-  if (btn) btn.classList.add('recording');
+  if (ui) { ui.style.display = 'flex'; ui.classList.add('recording'); ui.classList.remove('preview'); }
+  var wave = $('voiceRecWave');
+  if (wave && !wave.children.length) { var h = ''; for (var k = 0; k < 16; k++) h += '<i></i>'; wave.innerHTML = h; }
   var f = document.querySelector('#chatWindow .chat-footer');
   if (f) f.style.visibility = 'hidden';
 }
 function hideVoiceRecordingUI() {
   var ui = $('voiceRecUI');
-  if (ui) ui.style.display = 'none';
-  var btn = $('voiceRecBtn');
-  if (btn) btn.classList.remove('recording');
+  if (ui) { ui.style.display = 'none'; ui.classList.remove('recording', 'preview'); }
   var f = document.querySelector('#chatWindow .chat-footer');
   if (f) f.style.visibility = '';
 }
 
 function cancelVoiceRecord() {
   if (_voiceRec && _voiceRec.state === 'recording') { try { _voiceRec.stop(); } catch (e) {} }
+  if (_voicePreviewAudio) { try { _voicePreviewAudio.pause(); } catch (e) {} _voicePreviewAudio = null; }
   // 标记丢弃刚录到的音频
   _voiceChunks = [];
   _voiceTranscript = '';
   _voiceInterim = '';
   _voiceActive = false;
   _voicePressing = false;
+  _voicePhase = 'idle';
+  _voicePreview = null;
   if (_voiceRecognition) { try { _voiceRecognition.stop(); } catch (e) {} _voiceRecognition = null; }
   if (_voiceStream) { _voiceStream.getTracks().forEach(t => { try { t.stop(); } catch (x) {} }); _voiceStream = null; }
   if (_voiceTimer) { clearInterval(_voiceTimer); _voiceTimer = null; }
@@ -785,17 +811,7 @@ function cancelVoiceRecord() {
   var t = $('voiceRecTime'); if (t) t.textContent = '0″';
 }
 
-function stopAndSendVoice() {
-  if (!_voiceActive) return;
-  _voiceActive = false;
-  _voicePressing = false;
-  if (_voiceRec && _voiceRec.state === 'recording') { try { _voiceRec.stop(); } catch (e) {} }
-  if (_voiceRecognition) { try { _voiceRecognition.stop(); } catch (e) {} _voiceRecognition = null; }
-  if (_voiceStream) { _voiceStream.getTracks().forEach(t => { try { t.stop(); } catch (x) {} }); _voiceStream = null; }
-  if (_voiceTimer) { clearInterval(_voiceTimer); _voiceTimer = null; }
-  hideVoiceRecordingUI();
-  // onVoiceRecorded 在 MediaRecorder.onstop 里被触发，负责组装并发送
-}
+function stopAndSendVoice() { finishVoiceRecord(); }
 
 async function onVoiceRecorded() {
   var dur = Math.max(1, Math.round((Date.now() - _voiceStart) / 1000));
@@ -807,11 +823,11 @@ async function onVoiceRecorded() {
   var reader = new FileReader();
   reader.onload = async function () {
     var dataUrl = reader.result;
-    // 没识别到文字就只存语音，AI 会看到 [audio]；识别到了就当正文发给 AI
+    // 没识别到文字就留空，预览里用户可手动补写；识别到了就当预览文字
     var text = (_voiceTranscript || '').trim();
     var wave = null;
     try { wave = await computeWaveform(blob); } catch (e) {}
-    sendVoiceMessage(text, dataUrl, mime, dur, wave);
+    enterVoicePreview({ dataUrl: dataUrl, mime: mime, dur: dur, wave: wave, text: text });
   };
   reader.onerror = function () { _voiceTranscript = ''; };
   reader.readAsDataURL(blob);
@@ -1020,15 +1036,11 @@ function toastVoice(msg) {
   document.body.appendChild(t);
   setTimeout(function () { if (t.parentNode) t.remove(); }, 1800);
 }
-// 绑定麦克风按钮（支持按住说话；不支持 PointerEvent 的旧浏览器退回点击开关）
+// 绑定麦克风按钮：点一下开始录音，再点（或点「停止」）结束，进入预览
 (function bindVoiceBtn() {
   var b = $('voiceRecBtn');
   if (!b) return;
-  if (window.PointerEvent) {
-    b.addEventListener('pointerdown', voiceBtnDown);
-  } else {
-    b.addEventListener('click', function () { toggleVoiceRecord(); });
-  }
+  b.addEventListener('click', function (e) { if (e && e.preventDefault) e.preventDefault(); toggleVoiceRecord(); });
 })();
 
 // ===== AI 对话 =====
