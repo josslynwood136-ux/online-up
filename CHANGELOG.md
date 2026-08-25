@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-08-25
+
+### 语音消息功能增强
+- **iOS/Safari 录音修复**：`startVoiceRecord` 用 `MediaRecorder.isTypeSupported` 探测浏览器支持的录制格式（webm/mp4/aac…），不再硬写 `audio/webm`（iPhone 上会录出空 blob）。
+- **语音消息改存 IndexedDB**：音频本体不再塞进 localStorage（整个 state 共享约 5MB 配额，多录几条就爆），消息里只留 `storeId` 索引，渲染时 `hydrateVoiceMessages` 异步回填到 `<audio>`；IndexedDB 不可用时自动退回内联 `src`。
+- **真·ASR 转写**：录音同时用 Web Speech API 实时转写（Chrome/安卓支持，iOS Safari 自动跳过不影响录音），说话内容作为气泡文字 + 喂给角色，让对方真正"听懂"再回应；转写为空时退回原占位话术。
+- **长按体验优化**：① `voiceTouchStart` 加防重入（`touch+mouse` 双触发只算一次）；② 录音中上滑超过阈值标记取消，松手作废不发送。
+
+### 本期文件版本
+- `js/chat.js` → `?v=20260825a`
+
+---
+
 ## 2026-08-24
 
 ### 一、语音克隆（MiMo TTS）修复
