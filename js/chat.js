@@ -951,18 +951,12 @@ async function sendVoiceMessage(text, dataUrl, mime, dur, wave) {
   _voiceCtxHint = true;
   _manualAICall = true;
   setChatTyping(true);
-  callAI(text || '', false, false)
-    .then(async function (reply) {
-      await deliverReply(reply || '我在。');
-      // 发的是语音 → 回复自动朗读（除非已全局开启自动朗读）
-      if (!autoVoiceEnabled() && typeof speakText === 'function') speakText(reply || '我在。');
-    })
-    .catch(function (err) {
-      if (err.name === 'AbortError') { setChatTyping(false); return; }
-      setChatTyping(false);
-      appendBubble('system', '暂时没回应（' + err.message + '）');
-    })
-    .finally(function () { _voiceCtxHint = false; });
+  generateAndDeliver(text || '', {
+    onDone: function (rt) {
+      // 发的是语音 → 回复自动朗读（除非已全局开启自动朗读，流式已在内部朗读过则不再重复）
+      if (!streamingOn() && !autoVoiceEnabled() && typeof speakText === 'function') speakText(rt);
+    }
+  }).finally(function () { _voiceCtxHint = false; });
 }
 
 // 播放语音气泡（用户发的语音消息）
@@ -1155,6 +1149,9 @@ function sendChat() {
     appendBubble('user', text, null, null, null, quoteData);
     input.value = '';
     touchActiveChar();
+    _manualAICall = true;
+    setChatTyping(true);
+    generateAndDeliver(text, {});
     return;
   } else {
     const char = activeCharacter();
@@ -1164,13 +1161,7 @@ function sendChat() {
     }
     _manualAICall = true;
     setChatTyping(true);
-    callAI('', false, true).then(async function(reply) {
-      await deliverReply(reply || '我在。');
-    }).catch(function(err) {
-      if (err.name === 'AbortError') { setChatTyping(false); return; }
-      setChatTyping(false);
-      appendBubble('system', '暂时没回应（' + err.message + '）');
-    });
+    generateAndDeliver('', { proactive: true });
   }
 }
 
@@ -1198,13 +1189,7 @@ function regenerateReply() {
   renderChat();
   _manualAICall = true;
   setChatTyping(true);
-  callAI(userText, false, false).then(async function(reply) {
-    await deliverReply(reply || '我在。');
-  }).catch(function(err) {
-    if (err && err.name === 'AbortError') { setChatTyping(false); return; }
-    setChatTyping(false);
-    appendBubble('system', '重新生成失败（' + (err && err.message || err) + '）');
-  });
+  generateAndDeliver(userText, { errMsg: '重新生成失败' });
 }
 window.regenerateReply = regenerateReply;
 
@@ -1284,6 +1269,170 @@ function splitReply(txt) {
 }
 
 function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+
+// 是否启用流式实时分条
+function streamingOn() {
+  return !!(state.settings && state.settings.streamReply);
+}
+
+// 把已成型的一段（含 ‖ 分隔）实时塞进气泡；typing 指示器会一直挂在最后，形成"正在输入→蹦出"的节奏
+async function emitStreamSegment(text, char) {
+  var t = null;
+  if (char.translate && char.lang && char.lang !== '中文') {
+    var clean = text.replace(/[（(][^）)]*[）)]/g, '').trim();
+    if (clean) t = await translateText(clean, char.lang).catch(function () { return null; });
+  }
+  appendBubble('assistant', text, null, t);
+}
+
+// 流式生成并实时分条：边接收 SSE 边把已完成的 ‖ 段弹成气泡，流结束再补最后一段
+async function streamDeliver(text, opts) {
+  opts = opts || {};
+  var char = opts.forChar || activeCharacter();
+  if (!char) return '';
+  var delay = randomDelay();
+  await sleep(delay);
+  if (_multiSelect) { setChatTyping(false); return ''; }
+  lastThinkText = '';
+  lastRetract = null;
+  var systemPrompt = buildRoleSystemPrompt(char, text);
+  var built = buildAIMessages(char, text, opts.proactive, '');
+  var userContent = built.userContent;
+  var cfg = activeAIConfig();
+  var isReasoner = /reasoner|r1|o1|o3|-think|thinking/i.test(cfg.model || '');
+  if (!isReasoner) {
+    var tk = await callAIThink(char, userContent, systemPrompt, built.history, cfg);
+    lastRetract = (tk.retract !== null) ? tk.retract : null;
+    if (tk.note) {
+      userContent += '\n\n（参考你刚才的内心活动：' + tk.note + '）现在只输出要发给用户的正式回复，紧扣对方刚才那句话来接，保持角色语气，不要出现任何内心活动文字。';
+    }
+  }
+  // 撤回：仅按角色性格判断
+  var doRetract = (lastRetract === true);
+  lastRetract = null;
+  if (doRetract) {
+    appendBubble('system', char.name + ' 撤回了一条消息');
+    setChatTyping(false);
+    await sleep(800 + Math.random() * 1200);
+    setChatTyping(true);
+  }
+  setChatTyping(true);
+  flushThinkBubble(char);
+
+  var messages = [{ role: 'system', content: systemPrompt }, ...built.history, { role: 'user', content: userContent }];
+  var body = {
+    model: cfg.model,
+    messages: messages,
+    max_tokens: cfg.maxTokens || 500,
+    temperature: cfg.temp ?? 0.75,
+    top_p: cfg.topP ?? 0.9,
+    presence_penalty: cfg.presencePenalty ?? 0,
+    frequency_penalty: cfg.frequencyPenalty ?? 0,
+    stream: true
+  };
+  if (activeAbort) try { activeAbort.abort(); } catch (e) {}
+  var controller = new AbortController();
+  activeAbort = controller;
+  var timer = setTimeout(function () { try { controller.abort(); } catch (e) {} }, 90000);
+  var allText = '';
+  var full = '';
+  try {
+    var response = await aiRequest(joinUrl(cfg.url, 'chat/completions'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + cfg.key },
+      signal: controller.signal,
+      body: JSON.stringify(body)
+    });
+    if (!response.ok) {
+      var edata = await response.json().catch(function () { return {}; });
+      throw new Error((edata.error && edata.error.message) || ('HTTP ' + response.status));
+    }
+    if (!response.body || !response.body.getReader) {
+      // 接口不支持流式 → 退回一次性取回整段
+      var jr = await response.json().catch(function () { return {}; });
+      full = (jr.choices && jr.choices[0] && jr.choices[0].message && jr.choices[0].message.content || '').trim() || '⚠️ 回复失败';
+      allText = full;
+    } else {
+      var reader = response.body.getReader();
+      var decoder = new TextDecoder('utf-8');
+      var buf = '';
+      var rawText = '';
+      while (true) {
+        var rr = await reader.read();
+        if (rr.done) break;
+        var chunk = decoder.decode(rr.value, { stream: true });
+        buf += chunk;
+        rawText += chunk;
+        var events = buf.split('\n\n');
+        buf = events.pop();
+        for (var ei = 0; ei < events.length; ei++) {
+          var ev = events[ei];
+          var lines = ev.split('\n');
+          var dline = null;
+          for (var li = 0; li < lines.length; li++) { if (lines[li].indexOf('data:') === 0) { dline = lines[li]; break; } }
+          if (!dline) continue;
+          var d = dline.slice(5).trim();
+          if (d === '[DONE]') continue;
+          var j;
+          try { j = JSON.parse(d); } catch (e2) { continue; }
+          var delta = j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content;
+          if (delta) { full += delta; allText += delta; }
+        }
+        var segs = full.split(/\s*[‖|｜]+\s*/);
+        if (segs.length > 1) {
+          for (var k = 0; k < segs.length - 1; k++) {
+            var seg = segs[k].trim();
+            if (seg) await emitStreamSegment(seg, char);
+          }
+          full = segs[segs.length - 1]; // 余下可能是半句，留到下次/流结束
+        }
+      }
+      // 接口忽略 stream、直接返回整段 JSON（没任何 data: 事件）→ 退回 JSON 解析
+      if (!allText.trim() && rawText.trim()) {
+        try {
+          var jr2 = JSON.parse(rawText);
+          var c = (jr2.choices && jr2.choices[0] && jr2.choices[0].message && jr2.choices[0].message.content || '').trim();
+          if (c) { full = c; allText = c; }
+        } catch (e2) {}
+      }
+    }
+  } finally {
+    clearTimeout(timer);
+    if (activeAbort === controller) activeAbort = null;
+  }
+  var rem = full.trim();
+  if (rem) {
+    await emitStreamSegment(rem, char);
+  }
+  setChatTyping(false);
+  try { if (typeof autoSpeakReply === 'function') autoSpeakReply(allText.replace(/\s*[‖|｜]+\s*/g, ' ')); } catch (e) {}
+  return allText.trim();
+}
+
+// 统一入口：按开关走流式 / 非流式。onDone(rawText) 在消息已呈现后回调（用于通话字幕等）
+async function generateAndDeliver(text, opts) {
+  opts = opts || {};
+  _manualAICall = true;
+  try {
+    var raw;
+    if (streamingOn()) {
+      raw = await streamDeliver(text || '', opts);
+    } else {
+      raw = await callAI(text || '', opts.shortTest || false, opts.proactive || false, opts.forChar || null);
+    }
+    var out = (opts.fallback && !raw) ? opts.fallback : (raw || '我在。');
+    if (!streamingOn()) {
+      await deliverReply(out);
+    }
+    if (opts.onDone) opts.onDone(raw || out);
+  } catch (err) {
+    if (err && err.name === 'AbortError') { setChatTyping(false); return; }
+    setChatTyping(false);
+    var base = opts.errMsg || '暂时没回应';
+    var detail = (err && err.message) ? '（' + err.message + '）' : '';
+    appendBubble('system', base + detail);
+  }
+}
 
 // ===== 心声功能：点头像看 TA 此刻的心情和生活 =====
 var MOOD_EMOJI = { happy: '😊', miss: '🥺', jealous: '😒', tsundere: '😏', tired: '😮💨', calm: '🙂', excited: '🤩' };
@@ -2594,6 +2743,8 @@ function openSettings() {
   if (char) {
     $('charLang').value = char.lang || '中文';
     $('translateSwitch').classList.toggle('on', char.translate === true);
+    var ss = $('streamSwitch');
+    if (ss) ss.classList.toggle('on', !!(state.settings && state.settings.streamReply));
     var tpSel = $('translateProviderSelect');
     if (tpSel) tpSel.value = (state.settings && state.settings.translateProvider) || 'deeplweb';
     updateTranslateKeyUI();
@@ -2899,6 +3050,13 @@ async function aiConsolidateMemoriesUI() {
   finally { if (btn) { btn.disabled = false; btn.textContent = '🧹 AI 整理记忆'; } }
 }
 function togglePin() { state.settings.pinned = !state.settings.pinned; saveState(); $('pinSwitch').classList.toggle('on', state.settings.pinned); }
+function toggleStream() {
+  if (!state.settings) state.settings = {};
+  state.settings.streamReply = !state.settings.streamReply;
+  saveState();
+  var sw = $('streamSwitch');
+  if (sw) sw.classList.toggle('on', state.settings.streamReply);
+}
 function toggleAutoPost() {
   var char = activeCharacter();
   if (!char) return;
@@ -3330,23 +3488,21 @@ function callGenerateReply(userText) {
   }
   _manualAICall = true;
   setChatTyping(true);
-  callAI(userText || '', false, !userText).then(async function(reply) {
-    const fallback = userText
-      ? '嗯。'
-      : (state.call && state.call.type === 'video' ? '嘿，看到你啦～' : '喂？听得到吗？');
-    const raw = reply || fallback;
-    const wantsEnd = /（挂断）|\(挂断\)/.test(raw);
-    const line = raw.replace(/（挂断）|\(挂断\)/g, '').trim() || fallback;
-    await deliverReply(line);
+  var cProactive = !userText;
+  var cFallback = userText
+    ? '嗯。'
+    : (state.call && state.call.type === 'video' ? '嘿，看到你啦～' : '喂？听得到吗？');
+  var cDoPost = function (raw) {
+    var line = (raw || cFallback).replace(/（挂断）|\(挂断\)/g, '').trim() || cFallback;
+    var wantsEnd = /（挂断）|\(挂断\)/.test(raw || '');
     showCallCaption(line);
-    const s2 = document.getElementById('callStatus');
+    var s2 = document.getElementById('callStatus');
     if (s2 && !state.call.ended) s2.textContent = '通话中';
     if (wantsEnd && !state.call.ended) {
-      setTimeout(function() { if (!state.call.ended) endCall(); }, 1500);
+      setTimeout(function () { if (!state.call.ended) endCall(); }, 1500);
     }
-  }).catch(function(err) {
-    appendBubble('system', '（暂时没回应：' + (err && err.message || err) + '）');
-  }).finally(function() { setChatTyping(false); });
+  };
+  generateAndDeliver(userText || '', { proactive: cProactive, fallback: cFallback, onDone: cDoPost });
 }
 
 function callSend() {
