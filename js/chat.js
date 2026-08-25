@@ -1442,13 +1442,134 @@ function isMemoryFluff(line) {
   return MEM_FLUFF_RE.test(s);
 }
 
-// 把 "【喜好】用户爱喝冰美式" 解析成 {title:'喜好', text:'用户爱喝冰美式'}
+// 把 "【喜好|long|4|开心】用户爱喝冰美式" 解析成结构化记忆
 function parseMemoryLine(raw) {
   var line = String(raw || '').trim();
-  var title = '记忆';
-  var m = line.match(/^\s*[\[【]([^】\]]{1,8})[\]】]\s*(.*)$/);
-  if (m) { title = m[1].trim(); line = m[2].trim(); }
-  return { title: title, text: line };
+  line = line.replace(/^[\s\-·•●■]+\s*/, '').replace(/^[0-9]+[.、)]\s*/, '');
+  var title = '记忆', rest = line, tags = [], layer = null, weight = 3, emotion = '';
+  var m = line.match(/^\s*[\[【]([^】\]]{1,20})[\]】]\s*([\s\S]*)$/);
+  if (m) {
+    var inner = m[1].trim();
+    rest = m[2].trim();
+    var parts = inner.split(/[|｜]/).map(function(s) { return s.trim(); }).filter(Boolean);
+    title = parts.shift() || '记忆';
+    parts.forEach(function(p) {
+      if (p === 'short' || p === 'long' || p === 'core') layer = p;
+      else if (/^\d{1,2}$/.test(p)) { var n = parseInt(p, 10); if (n >= 1 && n <= 5) weight = n; }
+      else if (p) emotion = p;
+    });
+  }
+  if (title && title !== '记忆') tags.push(title);
+  return { title: title, text: rest, layer: layer, weight: weight, emotion: emotion, tags: tags };
+}
+
+// ===== 记忆引擎：分层 / 权重 / 标签 / 关联图谱 / 遗忘淡化 =====
+var MEM_LAYERS = { core: '核心', long: '长期', short: '短期' };
+var MEM_DECAY = { core: 0, long: 0.015, short: 0.07 };        // 每天 strength 衰减量
+var MEM_RECENCY_HALF = { core: 1e12, long: 30, short: 3 };     // 召回权重半衰期（天）
+var MEM_MAX = 200;
+
+function normalizeMemory(m) {
+  if (!m) return m;
+  if (m.layer !== 'core' && m.layer !== 'long' && m.layer !== 'short') m.layer = 'long';
+  if (typeof m.weight !== 'number' || m.weight < 1 || m.weight > 5) m.weight = 3;
+  if (!Array.isArray(m.tags)) m.tags = (m.title && m.title !== '记忆') ? [m.title] : [];
+  if (!Array.isArray(m.links)) m.links = [];
+  if (typeof m.strength !== 'number') m.strength = 1;
+  if (typeof m.access !== 'number') m.access = 0;
+  if (!m.lastSeen) { var d = Date.parse(String(m.date || '').replace(/\//g, '-')); m.lastSeen = isNaN(d) ? Date.now() : d; }
+  return m;
+}
+function keyTokens(s) {
+  var t = String(s || ''), out = [], re = /[一-龥]{2,4}|[a-zA-Z]{3,}/g, m;
+  while ((m = re.exec(t))) out.push(m[0].toLowerCase());
+  return out;
+}
+function memDaysSince(m, now) {
+  now = now || Date.now();
+  var t = m.lastSeen || Date.now();
+  return Math.max(0, (now - t) / 86400000);
+}
+function memRecency(m, now) {
+  var half = MEM_RECENCY_HALF[m.layer] || 30;
+  return Math.pow(0.5, memDaysSince(m, now) / half);
+}
+function effectiveMemWeight(m, now) {
+  now = now || Date.now();
+  var s = (typeof m.strength === 'number') ? m.strength : 1;
+  var r = (m.layer === 'core') ? 1 : memRecency(m, now);
+  return (m.weight || 3) * s * r;
+}
+function decayMemories(char) {
+  if (!char || !char.memories) return;
+  var now = Date.now();
+  if (char._memDecayTs && (now - char._memDecayTs) < 3600000) return; // 每小时最多衰减一次
+  char._memDecayTs = now;
+  var changed = false;
+  char.memories.forEach(function(m) {
+    normalizeMemory(m);
+    if (m.layer === 'core') { m.strength = 1; return; }
+    var rate = MEM_DECAY[m.layer] || 0.015;
+    var ns = (typeof m.strength === 'number') ? m.strength : 1;
+    var target = Math.max(0.05, ns - rate * memDaysSince(m, now));
+    if (Math.abs(target - ns) > 0.005) { m.strength = Math.round(target * 100) / 100; changed = true; }
+  });
+  if (changed) saveState();
+}
+function reinforceMemory(m) {
+  normalizeMemory(m);
+  m.strength = Math.min(1, (typeof m.strength === 'number' ? m.strength : 1) + 0.12);
+  m.lastSeen = Date.now();
+  m.access = (m.access || 0) + 1;
+}
+function memLinkIds(a, b) {
+  if (!a.links) a.links = [];
+  if (!b.links) b.links = [];
+  if (a.links.indexOf(b.id) < 0) a.links.push(b.id);
+  if (b.links.indexOf(a.id) < 0) b.links.push(a.id);
+  if (a.links.length > 12) a.links.length = 12;
+  if (b.links.length > 12) b.links.length = 12;
+}
+function memShouldLink(a, b) {
+  if (!a || !b || a.id === b.id) return false;
+  var sa = {}, sb = {};
+  (a.tags || []).forEach(function(t) { sa[t] = 1; });
+  (b.tags || []).forEach(function(t) { sb[t] = 1; });
+  for (var k in sa) if (sb[k]) return true;
+  var wa = keyTokens(a.text), wb = keyTokens(b.text), inter = 0;
+  wa.forEach(function(w) { if (wb.indexOf(w) >= 0) inter++; });
+  return inter >= 2;
+}
+function autoLinkMemories(char) {
+  var ms = char.memories;
+  if (!ms || ms.length < 2) return;
+  for (var i = 0; i < ms.length; i++) {
+    normalizeMemory(ms[i]);
+    for (var j = i + 1; j < ms.length; j++) {
+      normalizeMemory(ms[j]);
+      if (memShouldLink(ms[i], ms[j])) memLinkIds(ms[i], ms[j]);
+    }
+  }
+}
+function pushMemory(char, pm) {
+  if (!pm || !pm.text || isMemoryFluff(pm.text)) return false;
+  if (!Array.isArray(char.memories)) char.memories = [];
+  var norm = pm.text.replace(/[。，、！？!?.,\s]/g, '');
+  var dup = char.memories.some(function(m) { return (m.text || '').replace(/[。，、！？!?.,\s]/g, '') === norm; });
+  if (dup) return false;
+  var layer = (pm.layer === 'short' || pm.layer === 'core') ? pm.layer : 'long';
+  char.memories.unshift({
+    id: 'mem-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+    title: pm.title || '记忆',
+    text: pm.text,
+    date: new Date().toLocaleString(),
+    layer: layer,
+    tags: (pm.tags && pm.tags.length) ? pm.tags : (pm.title && pm.title !== '记忆' ? [pm.title] : []),
+    weight: (typeof pm.weight === 'number' && pm.weight >= 1 && pm.weight <= 5) ? pm.weight : 3,
+    emotion: pm.emotion || '',
+    links: [], strength: 1, lastSeen: Date.now(), access: 0
+  });
+  return true;
 }
 
 function buildAIMessages(char, text, proactive, retryReason) {
@@ -2101,7 +2222,7 @@ function ensureCharLive(char) {
 
 function buildRoleSystemPrompt(char, userText) {
   ensureCharLive(char);
-  const memories = pickRelevantMemories(char, userText);
+  const memCtx = buildMemoryContext(char, userText);
   var profile = activeProfile();
   var parts = [
     '你是 ' + char.name + '。你必须完全代入这个角色，用角色的语气和性格说话。你不是 AI，不是语言模型。',
@@ -2128,7 +2249,7 @@ function buildRoleSystemPrompt(char, userText) {
     '说话方式：' + (profile.speaking || '未填写'),
     '',
     '【相关记忆】',
-    memories.length ? memories.map(function(mem) { return '- ' + (mem.title ? mem.title + '：' : '') + mem.text; }).join('\n') : '暂无',
+    memCtx,
     '',
     '【回复要求】',
     '用 ' + char.name + ' 的身份自然回应，不要提 AI 相关话题，不要自我总结。一次回复不必只发一句——像真人连发几条消息那样，自然地写 2~4 句，并且【每句单独占一行、用换行分隔，不要堆成一个大段落】：接住对方的话、顺带追问、分享点小事、有动作或情绪就写出来；线下模式用（）写动作表情，线上模式用语气和 emoji 表达。别为了"简短"把该说的话憋回去，但也别注水啰嗦。',
@@ -2200,20 +2321,136 @@ function buildRoleSystemPrompt(char, userText) {
 }
 
 function pickRelevantMemories(char, text) {
-  const memories = (char.memories || []).filter(function(m) { return !m || !isMemoryFluff(m.text); });
-  const query = (text || '').toLowerCase();
-  return memories
-    .map(mem => {
-      const hay = `${mem.title || ''} ${mem.text || ''}`.toLowerCase();
-      let score = 0;
-      query.split(/[\s,，。！？!?、]+/).filter(Boolean).forEach(word => {
-        if (word.length > 1 && hay.includes(word)) score += 2;
-      });
-      [...query].forEach(ch => { if (/[\u4e00-\u9fa5]/.test(ch) && hay.includes(ch)) score += 0.2; });
-      return { ...mem, score };
-    })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 6);
+  decayMemories(char);
+  var now = Date.now();
+  var mems = (char.memories || []).map(normalizeMemory).filter(function(m) { return m && !isMemoryFluff(m.text); });
+  var qwords = (text || '').toLowerCase().split(/[\s,，。！？!?、]+/).filter(Boolean);
+  var qkeys = keyTokens(text);
+  var scored = mems.map(function(m) {
+    var hay = ((m.title || '') + ' ' + (m.tags || []).join(' ') + ' ' + (m.text || '')).toLowerCase();
+    var score = 0;
+    qwords.forEach(function(w) { if (w.length > 1 && hay.indexOf(w) >= 0) score += 2; });
+    qkeys.forEach(function(w) { if (hay.indexOf(w) >= 0) score += 0.5; });
+    score += effectiveMemWeight(m, now) * 0.6;
+    return { mem: m, score: score };
+  });
+  scored.sort(function(a, b) { return b.score - a.score; });
+  var chosen = scored.slice(0, 6);
+  var ids = {};
+  chosen.forEach(function(c) { ids[c.mem.id] = true; });
+  // 顺藤摸瓜：把关联记忆也带进来（记忆图谱）
+  chosen.forEach(function(c) {
+    (c.mem.links || []).forEach(function(lid) {
+      if (ids[lid]) return;
+      var lm = mems.find(function(x) { return x.id === lid; });
+      if (lm) { ids[lid] = true; chosen.push({ mem: lm, score: c.score * 0.4 }); }
+    });
+  });
+  chosen.forEach(function(c) { reinforceMemory(c.mem); });
+  saveState();
+  return mems.filter(function(m) { return ids[m.id]; });
+}
+
+function buildMemoryContext(char, text) {
+  var mems = pickRelevantMemories(char, text);
+  if (!mems.length) return '暂无';
+  var now = Date.now();
+  var groups = { core: [], long: [], short: [] };
+  mems.forEach(function(m) { if (groups[m.layer]) groups[m.layer].push(m); });
+  function fmt(m) {
+    var faded = (m.layer !== 'core' && typeof m.strength === 'number' && m.strength < 0.35);
+    var pre = faded ? '（有点记不清了）' : '';
+    var tag = (m.tags && m.tags.length > 1) ? '[' + m.tags.slice(0, 3).join('/') + ']' : '';
+    return '- ' + (m.title && m.title !== '记忆' ? m.title + '：' : '') + pre + (tag ? tag + ' ' : '') + m.text + (m.emotion ? '（' + m.emotion + '）' : '');
+  }
+  var out = [];
+  if (groups.core.length) out.push('■ 核心记忆（TA 绝不会忘）\n' + groups.core.map(fmt).join('\n'));
+  if (groups.long.length) out.push('◆ 长期记忆\n' + groups.long.map(fmt).join('\n'));
+  if (groups.short.length) out.push('· 短期记忆（刚发生，可能淡忘）\n' + groups.short.map(fmt).join('\n'));
+  return out.join('\n');
+}
+
+function memoryCardHtml(mem, charId, deleteOnclick) {
+  normalizeMemory(mem);
+  var layerName = MEM_LAYERS[mem.layer] || '长期';
+  var dots = '';
+  for (var i = 0; i < 5; i++) dots += (i < (mem.weight || 3)) ? '●' : '○';
+  var faded = (mem.layer !== 'core' && (mem.strength != null && mem.strength < 0.35));
+  var char = getCharacter(charId) || activeCharacter();
+  var linkChips = (mem.links || []).slice(0, 5).map(function(lid) {
+    var t = (char && char.memories || []).filter(function(x) { return x.id === lid; })[0];
+    if (!t) return '';
+    return '<span class="mem-link-chip" onclick="memJumpLink(\'' + charId + '\',\'' + lid + '\')">' + escapeHTML(((t.title && t.title !== '记忆') ? t.title + '：' : '') + (t.text || '').slice(0, 14)) + '</span>';
+  }).join('');
+  return '<div class="mem-card' + (faded ? ' mem-faded' : '') + '" data-mem-id="' + mem.id + '">' +
+    '<div class="mem-card-top">' +
+      '<span class="mem-layer mem-layer-' + mem.layer + '">' + layerName + '</span>' +
+      '<span class="mem-weight" title="重要度">' + dots + '</span>' +
+      (mem.emotion ? '<span class="mem-emotion">' + escapeHTML(mem.emotion) + '</span>' : '') +
+      (faded ? '<span class="mem-faded-tag">已淡化</span>' : '') +
+      '<span class="mem-card-acts">' +
+        '<button class="mem-mini" onclick="memStartLink(\'' + charId + '\',\'' + mem.id + '\')">关联</button>' +
+        (deleteOnclick ? '<button class="mem-mini mem-del" onclick="' + deleteOnclick + '">删</button>' : '') +
+      '</span>' +
+    '</div>' +
+    '<div class="mem-card-title">' + escapeHTML(mem.title && mem.title !== '记忆' ? mem.title : ((mem.tags && mem.tags[0]) || '记忆')) + '</div>' +
+    '<div class="mem-card-text">' + escapeHTML(mem.text) + '</div>' +
+    (linkChips ? '<div class="mem-links">' + linkChips + '</div>' : '') +
+  ';</div>';
+}
+
+var _memFilter = 'all', _memSort = 'date';
+function memSetFilter(f) { _memFilter = f; document.querySelectorAll('#memFilters .mem-fbtn').forEach(function(b) { b.classList.toggle('on', b.dataset.f === f); }); renderSettingsMemories(); }
+function memSetSort(s) { _memSort = s; document.querySelectorAll('#memFilters .mem-sbtn').forEach(function(b) { b.classList.toggle('on', b.dataset.s === s); }); renderSettingsMemories(); }
+
+function memStartLink(charId, memId) {
+  var char = getCharacter(charId) || activeCharacter();
+  if (!char) return;
+  var mem = (char.memories || []).filter(function(m) { return m.id === memId; })[0];
+  if (!mem) return;
+  var ov = $('memLinkOverlay'); if (!ov) return;
+  ov.dataset.char = charId; ov.dataset.mem = memId;
+  renderMemLinkList('');
+  ov.style.display = 'flex';
+  setTimeout(function() { ov.classList.add('show'); }, 10);
+}
+function renderMemLinkList(q) {
+  var ov = $('memLinkOverlay'); if (!ov) return;
+  var charId = ov.dataset.char, memId = ov.dataset.mem;
+  var char = getCharacter(charId) || activeCharacter();
+  if (!char) return;
+  var mem = (char.memories || []).filter(function(m) { return m.id === memId; })[0];
+  var list = $('memLinkList'); if (!list) return;
+  q = (q || '').toLowerCase();
+  var others = (char.memories || []).filter(function(m) {
+    return m.id !== memId && (!q || ((m.text || '') + ' ' + (m.title || '')).toLowerCase().indexOf(q) >= 0);
+  });
+  list.innerHTML = others.map(function(m) {
+    var on = (mem.links || []).indexOf(m.id) >= 0;
+    return '<div class="mem-link-row' + (on ? ' on' : '') + '" onclick="memToggleLink(\'' + charId + '\',\'' + memId + '\',\'' + m.id + '\')"><span class="mem-link-t">' + escapeHTML(((m.title && m.title !== '记忆') ? m.title + '：' : '') + (m.text || '')) + '</span><span class="mem-link-ck">' + (on ? '✓' : '＋') + '</span></div>';
+  }).join('') || '<div class="mem-link-empty">没有其它记忆</div>';
+}
+function memToggleLink(charId, memId, otherId) {
+  var char = getCharacter(charId) || activeCharacter();
+  if (!char) return;
+  var a = (char.memories || []).filter(function(m) { return m.id === memId; })[0];
+  var b = (char.memories || []).filter(function(m) { return m.id === otherId; })[0];
+  if (!a || !b) return;
+  normalizeMemory(a); normalizeMemory(b);
+  var i = a.links.indexOf(otherId);
+  if (i >= 0) { a.links.splice(i, 1); var j = b.links.indexOf(memId); if (j >= 0) b.links.splice(j, 1); }
+  else memLinkIds(a, b);
+  saveState();
+  renderMemLinkList($('memLinkSearch') ? $('memLinkSearch').value : '');
+  if (window._memRerender) window._memRerender();
+}
+function hideMemLink() {
+  var ov = $('memLinkOverlay'); if (!ov) return;
+  ov.classList.remove('show'); ov.style.display = 'none';
+}
+function memJumpLink(charId, lid) {
+  var el = document.querySelector('.mem-card[data-mem-id="' + lid + '"]');
+  if (el) { try { el.scrollIntoView({ block: 'center' }); } catch (e) {} el.classList.add('mem-flash'); setTimeout(function() { el.classList.remove('mem-flash'); }, 900); }
 }
 
 // 按日期把记忆分组（用于时间线展示）。mem.date 形如 "2026/8/18 14:30:00"
@@ -2291,28 +2528,37 @@ function renderSettingsMemories() {
   var char = activeCharacter();
   var box = $('settingsMemories');
   if (!box || !char) return;
-  box.innerHTML = renderMemoriesGrouped(char.memories, function(mem) {
-    return `
-    <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid #f5f2ee;">
-      <div style="flex:1;min-width:0;">
-        <b style="font-size:13px;">${escapeHTML(mem.title || '记忆')}</b>
-        <div style="font-size:12px;color:#b8a99a;word-break:break-all;">${escapeHTML(mem.text)}</div>
-      </div>
-      <button onclick="settingsDeleteMemory('${mem.id}')" style="border:none;background:#f7f5f2;color:#c0392b;border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer;flex:0 0 auto;">删</button>
-    </div>`;
-  }, '<div style="color:#b8a99a;font-size:12px;padding:6px 0;">这个角色还没有记忆。</div>');
+  window._memRerender = renderSettingsMemories;
+  var q = ($('memSearch') && $('memSearch').value || '').toLowerCase().trim();
+  var f = _memFilter, sort = _memSort;
+  var list = (char.memories || []).map(normalizeMemory);
+  if (q) list = list.filter(function(m) { return ((m.text || '') + ' ' + (m.title || '') + ' ' + (m.tags || []).join(' ')).toLowerCase().indexOf(q) >= 0; });
+  if (f === 'faded') list = list.filter(function(m) { return m.layer !== 'core' && m.strength != null && m.strength < 0.35; });
+  else if (f !== 'all') list = list.filter(function(m) { return m.layer === f; });
+  if (sort === 'weight') list.sort(function(a, b) { return (b.weight || 3) - (a.weight || 3) || (b.strength || 0) - (a.strength || 0); });
+  else list.sort(function(a, b) { return String(b.date || '').localeCompare(String(a.date || '')); });
+  box.innerHTML = list.length ? list.map(function(m) { return memoryCardHtml(m, char.id, "settingsDeleteMemory('" + m.id + "')"); }).join('') : '<div style="color:#b8a99a;font-size:12px;padding:6px 0;">没有匹配的记忆。</div>';
 }
 function settingsAddMemory() {
   var char = activeCharacter();
   if (!char) return;
-  var title = $('settingsMemTitle').value.trim();
   var text = $('settingsMemText').value.trim();
   if (!text) return alert('请输入记忆内容');
-  if (!Array.isArray(char.memories)) char.memories = [];
-  char.memories.unshift({ id: 'mem-' + Date.now(), title: title, text: text, date: new Date().toLocaleString() });
+  var title = $('settingsMemTitle').value.trim();
+  var layer = ($('memLayer') && $('memLayer').value) || 'long';
+  var weight = ($('memWeight') && parseInt($('memWeight').value, 10)) || 3;
+  var tagsInput = ($('memTags') && $('memTags').value.trim()) || '';
+  var emotion = ($('memEmotion') && $('memEmotion').value.trim()) || '';
+  var tags = [];
+  if (title && title !== '记忆') tags.push(title);
+  tagsInput.split(/[,，\s]+/).filter(Boolean).forEach(function(t) { if (tags.indexOf(t) < 0) tags.push(t); });
+  pushMemory(char, { title: title || '记忆', text: text, layer: layer, weight: weight, emotion: emotion, tags: tags });
+  autoLinkMemories(char);
   saveState();
-  $('settingsMemTitle').value = '';
   $('settingsMemText').value = '';
+  $('settingsMemTitle').value = '';
+  if ($('memTags')) $('memTags').value = '';
+  if ($('memEmotion')) $('memEmotion').value = '';
   renderSettingsMemories();
 }
 function settingsDeleteMemory(memId) {
@@ -2373,8 +2619,8 @@ async function manualSummarizeMemory() {
       body: JSON.stringify({
         model: cfg.model,
         messages: [
-          { role: 'system', content: '你是从角色全部聊天记录里整理"长期记忆"的书记员。提取值得永久记住的内容，分四类，越具体、越有画面感越好：\n【喜好】用户的真实喜好、厌恶、习惯、小怪癖、饮食偏好\n【约定】两人之间具体的约定、计划、承诺、还没做完的事\n【心情】对话里真实的情绪事件——用户的状态、角色为TA做的事、温情瞬间、梗/笑点，有具体情景才记\n【角色】角色对用户的印象与小心思\n规则：每条必须有具体信息量，严禁"互相想念""感情很好"这类空话；每条一句话，开头带【类别】前缀；最多 8 条，用竖线 | 分隔；只输出条目，不要其它说明。' },
-          { role: 'user', content: '以下是该角色的全部聊天记录，请逐段浏览后整理出值得记住的内容。\n\n' + msgs + '\n\n请输出带【类别】前缀的记忆条目，用 | 分隔。没有值得记的就只输出"无"。' }
+          { role: 'system', content: '你是从角色全部聊天记录里整理"记忆"的书记员。提取值得记住的内容，越具体、越有画面感越好。\n分类标签（写进前方括号）：【喜好】【约定】【心情】【角色】【秘密】【禁忌】【梗】。\n每条严格按此格式输出：【标签|层级|重要度|情绪】内容\n- 层级：short=刚发生的临时小事/当下情绪；long=稳定事实（默认用这个）；core=关于TA身份或对用户的根本态度，几乎不忘，极少用。\n- 重要度：1~5 的整数。\n- 情绪：可选，一个词，如 开心/愧疚/期待/生气。\n规则：每条必须有具体信息量，严禁"互相想念""感情很好"这类空话；最多 10 条，每条单独一行，用换行分隔；没有值得记的就只输出"无"。' },
+          { role: 'user', content: '以下是该角色的全部聊天记录，请逐段浏览后整理出值得记住的内容。\n\n' + msgs + '\n\n请输出带【类别】前缀的记忆条目，每条单独一行。没有值得记的就只输出"无"。' }
         ],
         max_tokens: 300,
         temperature: 0.3
@@ -2384,21 +2630,14 @@ async function manualSummarizeMemory() {
     if (!res.ok) return alert('总结失败：' + (data.error && data.error.message || res.status));
     var text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '').trim();
     if (!text) return alert('没有总结出内容。');
-    var lines = text.split(/[|\n]+/).map(function(s) { return s.trim(); }).filter(function(s) { return s && s !== '无'; });
+    var lines = text.split(/\n+/).map(function(s) { return s.trim(); }).filter(function(s) { return s && s !== '无'; });
     if (!lines.length) return alert('AI 认为没有值得记录的信息。');
     var added = 0;
     lines.forEach(function(raw) {
-      var pm = parseMemoryLine(raw);
-      if (!pm.text) return;
-      if (!Array.isArray(char.memories)) char.memories = [];
-      if (isMemoryFluff(pm.text)) return;
-      var norm = pm.text.replace(/[。，、！？!?.,\s]/g, '');
-      var dup = char.memories.some(function(m) { return m.text.replace(/[。，、！？!?.,\s]/g, '') === norm; });
-      if (dup) return;
-      char.memories.unshift({ id: 'mem-' + Date.now() + '-' + Math.floor(Math.random() * 1000), title: pm.title, text: pm.text, date: new Date().toLocaleString() });
-      added++;
+      if (pushMemory(char, parseMemoryLine(raw))) added++;
     });
-    if (char.memories.length > 50) char.memories.length = 50;
+    autoLinkMemories(char);
+    if (char.memories.length > MEM_MAX) char.memories.length = MEM_MAX;
     saveState();
     renderSettingsMemories();
     alert(added ? '已加入 ' + added + ' 条记忆。' : '没有新增记忆（内容已存在）。');
@@ -2432,8 +2671,8 @@ async function autoSaveMemory(char) {
         body: JSON.stringify({
           model: cfg.model,
           messages: [
-            { role: 'system', content: '你是从对话里整理"长期记忆"的书记员。请提取值得让角色永久记住的内容，分四类，越具体、越有画面感越好，不要写空话套话：\n【喜好】用户的真实喜好、厌恶、习惯、小怪癖、饮食偏好\n【约定】两人之间具体的约定、计划、承诺、还没做完的事\n【心情】这段对话里真实的情绪事件——用户当下的状态、角色为TA做的事、一个温情的瞬间、一个梗/笑点。只要是有具体情景的就值得记，不要只写"感情好"这种没有事实的空话\n【角色】角色对用户的印象与小心思（TA 观察到用户什么、暗暗记着要为用户做什么）\n规则：每条必须有具体信息量，严禁"互相想念""感情很好"这类没有事实的空话；每条一句话，开头带【类别】前缀；最多 6 条，用竖线 | 分隔；尽量多记，没内容的类别可跳过；只输出条目，不要其它说明。' },
-            { role: 'user', content: '对话如下：\n' + recent + '\n\n请输出带【类别】前缀的记忆条目，用 | 分隔。没有值得记的就只输出"无"。' }
+            { role: 'system', content: '你是从对话里整理"记忆"的书记员。请提取值得让角色记住的内容，越具体越好，不要写空话。\n分类标签（写进前方括号）：【喜好】【约定】【心情】【角色】【秘密】【禁忌】【梗】。\n每条严格按此格式输出：【标签|层级|重要度|情绪】内容\n- 层级：short=刚发生的临时小事/当下情绪；long=稳定事实（默认）；core=关于TA身份或对用户的根本态度，极少用。\n- 重要度：1~5 的整数。\n- 情绪：可选一个词。\n规则：每条必须有信息量，严禁"互相想念""感情很好"空话；最多 8 条，每条单独一行，用换行分隔；没值得记的就输出"无"。' },
+            { role: 'user', content: '对话如下：\n' + recent + '\n\n请输出带【类别】前缀的记忆条目，每条单独一行。没有值得记的就只输出"无"。' }
           ],
           max_tokens: 300,
           temperature: 0.3
@@ -2443,22 +2682,14 @@ async function autoSaveMemory(char) {
       if (!res.ok) return;
       var text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '').trim();
       if (!text) return;
-       var lines = text.split(/[|\n]+/).map(function(s) { return s.trim(); }).filter(function(s) { return s && s !== '无'; });
+       var lines = text.split(/\n+/).map(function(s) { return s.trim(); }).filter(function(s) { return s && s !== '无'; });
        if (!lines.length) return;
        var changed = false;
        lines.forEach(function(raw) {
-         var pm = parseMemoryLine(raw);
-         if (!pm.text) return;
-         if (!Array.isArray(char.memories)) char.memories = [];
-         if (isMemoryFluff(pm.text)) return;
-         var norm = pm.text.replace(/[。，、！？!?.,\s]/g, '');
-         var dup = char.memories.some(function(m) { return m.text.replace(/[。，、！？!?.,\s]/g, '') === norm; });
-         if (dup) return;
-         char.memories.unshift({ id: 'mem-' + Date.now() + '-' + Math.floor(Math.random() * 1000), title: pm.title, text: pm.text, date: new Date().toLocaleString() });
-         changed = true;
+          if (pushMemory(char, parseMemoryLine(raw))) changed = true;
        });
-      if (char.memories.length > 50) char.memories.length = 50;
-      if (changed) saveState();
+       if (changed) { autoLinkMemories(char); if (char.memories.length > MEM_MAX) char.memories.length = MEM_MAX; }
+       if (changed) saveState();
     } finally {
       clearTimeout(tmr);
     }

@@ -429,6 +429,7 @@ let igCharAvatarData = '';
 function renderIGCharEditor() {
   const isNew = !igEditingCharId;
   const char = isNew ? {} : (state.roles.find(r => r.id === igEditingCharId) || {});
+  window._memRerender = renderIGCharEditor;
   igCharAvatarData = isNew ? '' : (char.avatar || '');
 
   const avatarPreview = igCharAvatarData
@@ -501,19 +502,30 @@ function renderIGCharEditor() {
         </div>
         ${isNew ? '' : `
         <div class="ig-ce-section">
-          <div class="ig-ce-label">记忆库</div>
-          <input class="ig-ce-input" id="igMemoryTitle" placeholder="记忆标题 / 标签">
+          <div class="ig-ce-label">记忆库 <span style="font-size:11px;color:#aaa;font-weight:400">分层·权重·标签·关联·会遗忘</span></div>
+          <input class="ig-ce-input" id="igMemoryTitle" placeholder="标题 / 类别（如 喜好、秘密、禁忌、梗）">
           <textarea class="ig-ce-textarea" id="igMemoryText" placeholder="这个角色需要记住什么？" style="margin-top:8px;"></textarea>
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            <select class="ig-ce-input" id="igMemoryLayer" style="flex:1">
+              <option value="long">长期</option>
+              <option value="short">短期</option>
+              <option value="core">核心</option>
+            </select>
+            <select class="ig-ce-input" id="igMemoryWeight" style="flex:1">
+              <option value="3" selected>重要度 3</option>
+              <option value="1">重要度 1</option>
+              <option value="2">重要度 2</option>
+              <option value="4">重要度 4</option>
+              <option value="5">重要度 5</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            <input class="ig-ce-input" id="igMemoryTags" placeholder="标签（空格分隔）" style="flex:1">
+            <input class="ig-ce-input" id="igMemoryEmotion" placeholder="情绪（可选）" style="flex:1">
+          </div>
           <button class="ig-ce-btn ig-ce-btn-primary" style="width:100%;margin-top:8px;" onclick="igAddMemory()">＋ 加入记忆</button>
           <div style="margin-top:10px;">
-            ${renderMemoriesGrouped(char.memories, mem => `
-              <div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid #efefef;">
-                <div style="flex:1;min-width:0;">
-                  <b>${escapeHTML(mem.title || '记忆')}</b>
-                  <div style="font-size:12px;color:#8e8e8e;margin-top:2px;word-break:break-all;">${escapeHTML(mem.text)}</div>
-                </div>
-                <button class="ig-ce-btn ig-ce-btn-danger" style="padding:4px 10px;font-size:12px;flex:0 0 auto;" onclick="igDeleteMemory('${mem.id}')">删</button>
-              </div>`, '<div style="font-size:12px;color:#8e8e8e;padding:6px 0;">这个角色还没有记忆。</div>')}
+            ${(char.memories || []).map(function(mem) { return memoryCardHtml(normalizeMemory(mem), igEditingCharId, "igDeleteMemory('" + mem.id + "')"); }).join('') || '<div style="font-size:12px;color:#8e8e8e;padding:6px 0;">这个角色还没有记忆。</div>'}
           </div>
         </div>`}
         <div style="padding:16px 16px 30px;display:flex;gap:10px;">
@@ -557,8 +569,15 @@ function igAddMemory() {
   const title = $('igMemoryTitle') ? $('igMemoryTitle').value.trim() : '';
   const text = $('igMemoryText') ? $('igMemoryText').value.trim() : '';
   if (!text) return showIGToast('请输入记忆内容');
-  if (!Array.isArray(char.memories)) char.memories = [];
-  char.memories.unshift({ id: 'mem-' + Date.now(), title: title, text: text, date: new Date().toLocaleString() });
+  const layer = ($('igMemoryLayer') && $('igMemoryLayer').value) || 'long';
+  const weight = ($('igMemoryWeight') && parseInt($('igMemoryWeight').value, 10)) || 3;
+  const tagsInput = ($('igMemoryTags') && $('igMemoryTags').value.trim()) || '';
+  const emotion = ($('igMemoryEmotion') && $('igMemoryEmotion').value.trim()) || '';
+  const tags = [];
+  if (title && title !== '记忆') tags.push(title);
+  tagsInput.split(/[,，\s]+/).filter(Boolean).forEach(function(t) { if (tags.indexOf(t) < 0) tags.push(t); });
+  pushMemory(char, { title: title || '记忆', text: text, layer: layer, weight: weight, emotion: emotion, tags: tags });
+  if (typeof autoLinkMemories === 'function') autoLinkMemories(char);
   saveState();
   renderIGCharEditor();
 }

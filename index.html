@@ -402,12 +402,42 @@
           <div style="display:flex;align-items:center;gap:10px;">
             <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 3h8a2 2 0 012 2v12l-3-2-3 2-3-2-3 2V5a2 2 0 012-2z"/></svg>
             <span>记忆库</span>
+            <span style="font-size:11px;color:#b8a99a;margin-left:auto">分层·权重·标签·关联·会遗忘</span>
           </div>
-          <input id="settingsMemTitle" placeholder="记忆标题 / 标签" style="border:none;background:#f7f5f2;border-radius:8px;padding:8px 10px;font-size:13px;outline:none;">
+          <input id="memSearch" placeholder="🔍 搜索记忆" style="border:none;background:#f7f5f2;border-radius:8px;padding:8px 10px;font-size:13px;outline:none;" oninput="renderSettingsMemories()">
+          <div id="memFilters" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+            <button class="mem-fbtn on" data-f="all" onclick="memSetFilter('all')">全部</button>
+            <button class="mem-fbtn" data-f="core" onclick="memSetFilter('core')">核心</button>
+            <button class="mem-fbtn" data-f="long" onclick="memSetFilter('long')">长期</button>
+            <button class="mem-fbtn" data-f="short" onclick="memSetFilter('short')">短期</button>
+            <button class="mem-fbtn" data-f="faded" onclick="memSetFilter('faded')">已淡化</button>
+            <span style="flex:1"></span>
+            <button class="mem-sbtn on" data-s="date" onclick="memSetSort('date')">时间</button>
+            <button class="mem-sbtn" data-s="weight" onclick="memSetSort('weight')">重要度</button>
+          </div>
+          <input id="settingsMemTitle" placeholder="标题 / 类别（如 喜好、秘密、禁忌、梗）" style="border:none;background:#f7f5f2;border-radius:8px;padding:8px 10px;font-size:13px;outline:none;">
           <textarea id="settingsMemText" placeholder="这个角色需要记住什么？" style="border:none;background:#f7f5f2;border-radius:8px;padding:8px 10px;font-size:13px;outline:none;resize:none;min-height:44px;"></textarea>
+          <div style="display:flex;gap:8px;">
+            <select id="memLayer" title="层级" style="flex:1;border:none;background:#f7f5f2;border-radius:8px;padding:8px 10px;font-size:13px;outline:none;color:#5a4a3a;">
+              <option value="long">长期</option>
+              <option value="short">短期</option>
+              <option value="core">核心</option>
+            </select>
+            <select id="memWeight" title="重要度" style="flex:1;border:none;background:#f7f5f2;border-radius:8px;padding:8px 10px;font-size:13px;outline:none;color:#5a4a3a;">
+              <option value="3" selected>重要度 3</option>
+              <option value="1">重要度 1</option>
+              <option value="2">重要度 2</option>
+              <option value="4">重要度 4</option>
+              <option value="5">重要度 5</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <input id="memTags" placeholder="标签（空格分隔，如 奶茶 生日）" style="flex:1;border:none;background:#f7f5f2;border-radius:8px;padding:8px 10px;font-size:13px;outline:none;">
+            <input id="memEmotion" placeholder="情绪（可选）" style="flex:1;border:none;background:#f7f5f2;border-radius:8px;padding:8px 10px;font-size:13px;outline:none;">
+          </div>
           <button onclick="settingsAddMemory()" style="border:none;background:#b8a99a;color:#fff;border-radius:8px;padding:9px 0;font-size:13px;cursor:pointer;">＋ 加入记忆</button>
           <button id="manualSumBtn" onclick="manualSummarizeMemory()" style="border:none;background:#e8e2da;color:#7a6a5a;border-radius:8px;padding:9px 0;font-size:13px;cursor:pointer;">✍️ 手动总结</button>
-          <div id="settingsMemories" style="max-height:200px;overflow-y:auto;"></div>
+          <div id="settingsMemories" style="max-height:260px;overflow-y:auto;"></div>
         </div>
       </div>
       <div class="cs-group-title">通知</div>
@@ -451,6 +481,14 @@
     </div>
     <div class="q-sheet q-cancel-sheet">
       <div class="q-cancel" onclick="hideQuoteMenu()">取消</div>
+    </div>
+  </div>
+
+  <div class="mem-link-overlay" id="memLinkOverlay" style="display:none">
+    <div class="mem-link-sheet">
+      <div class="mem-link-head">关联记忆<button class="mem-link-close" onclick="hideMemLink()">✕</button></div>
+      <input id="memLinkSearch" class="mem-link-search" placeholder="搜索要关联的记忆…" oninput="renderMemLinkList(this.value)">
+      <div id="memLinkList" class="mem-link-list"></div>
     </div>
   </div>
 

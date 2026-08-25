@@ -576,21 +576,35 @@ function renderCharacterEditor(id) {
 }
 
 function renderMemoryEditor(char) {
+  window._memRerender = function() { renderCharacterEditor(char.id); };
   return `
     <div class="card">
-      <h2 class="section-title">记忆库</h2>
-      <input class="field" id="memoryTitle" placeholder="记忆标题 / 标签">
+      <h2 class="section-title">记忆库 <span style="font-size:11px;color:#b8a99a;font-weight:400">分层·权重·标签·关联·会遗忘</span></h2>
+      <input class="field" id="memoryTitle" placeholder="标题 / 类别（如 喜好、秘密、禁忌、梗）">
       <textarea class="textarea" id="memoryText" placeholder="这个角色需要记住什么？" style="margin-top:8px"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <select class="field" id="memoryLayer" style="flex:1">
+          <option value="long">长期</option>
+          <option value="short">短期</option>
+          <option value="core">核心</option>
+        </select>
+        <select class="field" id="memoryWeight" style="flex:1">
+          <option value="3" selected>重要度 3</option>
+          <option value="1">重要度 1</option>
+          <option value="2">重要度 2</option>
+          <option value="4">重要度 4</option>
+          <option value="5">重要度 5</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <input class="field" id="memoryTags" placeholder="标签（空格分隔）" style="flex:1">
+        <input class="field" id="memoryEmotion" placeholder="情绪（可选）" style="flex:1">
+      </div>
       <button class="primary-btn" style="width:100%;margin-top:8px" onclick="addMemory('${char.id}')">加入记忆</button>
     </div>
-    ${renderMemoriesGrouped(char.memories, mem => `
-      <div class="list-card">
-        <div style="flex:1;min-width:0">
-          <b>${escapeHTML(mem.title || '记忆')}</b>
-          <div class="subtle">${escapeHTML(mem.text)}</div>
-        </div>
-        <button class="danger-btn" onclick="deleteMemory('${char.id}','${mem.id}')">删</button>
-      </div>`, '<div class="card subtle">这个角色还没有记忆。</div>')}`;
+    <div id="memoryListBox">
+      ${(char.memories || []).map(function(mem) { return memoryCardHtml(normalizeMemory(mem), char.id, "deleteMemory('" + char.id + "','" + mem.id + "')"); }).join('') || '<div class="card subtle">这个角色还没有记忆。</div>'}
+    </div>`;
 }
 
 function saveCharacter(id) {
@@ -667,7 +681,16 @@ function addMemory(charId) {
   const char = getCharacter(charId);
   const text = $('memoryText').value.trim();
   if (!text) return alert('先写记忆内容');
-  char.memories.unshift({ id: 'mem-' + Date.now(), title: $('memoryTitle').value.trim(), text, date: new Date().toLocaleString() });
+  const title = $('memoryTitle').value.trim();
+  const layer = ($('memoryLayer') && $('memoryLayer').value) || 'long';
+  const weight = ($('memoryWeight') && parseInt($('memoryWeight').value, 10)) || 3;
+  const tagsInput = ($('memoryTags') && $('memoryTags').value.trim()) || '';
+  const emotion = ($('memoryEmotion') && $('memoryEmotion').value.trim()) || '';
+  const tags = [];
+  if (title && title !== '记忆') tags.push(title);
+  tagsInput.split(/[,，\s]+/).filter(Boolean).forEach(function(t) { if (tags.indexOf(t) < 0) tags.push(t); });
+  pushMemory(char, { title: title || '记忆', text: text, layer: layer, weight: weight, emotion: emotion, tags: tags });
+  if (typeof autoLinkMemories === 'function') autoLinkMemories(char);
   saveState();
   renderCharacterEditor(charId);
 }

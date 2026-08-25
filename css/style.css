@@ -1039,6 +1039,57 @@ button { border: 0; cursor: pointer; }
 .switch::after { content:'';position:absolute;left:2px;top:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 2px rgba(0,0,0,.1); }
 .switch.on::after { left:22px; }
 
+/* ===== 记忆库（分层/权重/标签/关联/淡化） ===== */
+.mem-fbtn, .mem-sbtn {
+  border: 1px solid #e0ddd8; background: #fff; color: #8a7a6a;
+  font-size: 12px; padding: 5px 11px; border-radius: 999px; cursor: pointer; transition: all .12s;
+}
+.mem-fbtn.on, .mem-sbtn.on { background: #b8a99a; border-color: #b8a99a; color: #fff; }
+.mem-fbtn:active, .mem-sbtn:active { transform: scale(.95); }
+.mem-card {
+  background: #fff; border: 1px solid #efeae3; border-radius: 10px; padding: 9px 10px; margin-bottom: 8px;
+  transition: box-shadow .2s;
+}
+.mem-card.mem-faded { opacity: .72; border-style: dashed; }
+.mem-card.mem-flash { box-shadow: 0 0 0 2px #2f9b57; }
+.mem-card-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+.mem-layer { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; color: #fff; }
+.mem-layer-core { background: linear-gradient(135deg,#7b4bd6,#5b2fb0); }
+.mem-layer-long { background: linear-gradient(135deg,#2f9b57,#22b865); }
+.mem-layer-short { background: linear-gradient(135deg,#e0a32e,#e08a2e); }
+.mem-weight { font-size: 11px; color: #e0a32e; letter-spacing: 1px; }
+.mem-emotion { font-size: 11px; color: #c0628a; background: #fbeef3; border-radius: 999px; padding: 1px 8px; }
+.mem-faded-tag { font-size: 11px; color: #b8a99a; border: 1px solid #e0ddd8; border-radius: 999px; padding: 1px 8px; }
+.mem-card-acts { margin-left: auto; display: flex; gap: 6px; }
+.mem-mini { border: none; background: #f2efe9; color: #8a7a6a; border-radius: 7px; padding: 3px 9px; font-size: 12px; cursor: pointer; }
+.mem-mini:active { background: #e6e1d9; }
+.mem-mini.mem-del { background: #fbeaea; color: #c0392b; }
+.mem-card-title { font-size: 13px; font-weight: 700; color: #4a3f35; }
+.mem-card-text { font-size: 12.5px; color: #6a5d4f; line-height: 1.45; word-break: break-word; margin-top: 2px; }
+.mem-links { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.mem-link-chip { font-size: 11px; color: #5a7a9a; background: #eef4fa; border-radius: 999px; padding: 2px 9px; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mem-link-chip:active { background: #dce8f5; }
+.mem-link-overlay {
+  position: absolute; inset: 0; z-index: 2000; display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(0,0,0,.32); opacity: 0; transition: opacity .15s;
+}
+.mem-link-overlay.show { opacity: 1; }
+.mem-link-sheet {
+  width: 100%; max-height: 70%; background: #fff; border-radius: 16px 16px 0 0; padding: 14px;
+  display: flex; flex-direction: column; box-sizing: border-box; transform: translateY(20px); transition: transform .18s;
+}
+.mem-link-overlay.show .mem-link-sheet { transform: translateY(0); }
+.mem-link-head { display: flex; align-items: center; font-size: 15px; font-weight: 700; color: #4a3f35; margin-bottom: 10px; }
+.mem-link-close { margin-left: auto; border: none; background: #f2efe9; color: #8a7a6a; border-radius: 8px; padding: 4px 11px; font-size: 13px; cursor: pointer; }
+.mem-link-search { border: none; background: #f7f5f2; border-radius: 8px; padding: 9px 11px; font-size: 13px; outline: none; margin-bottom: 8px; }
+.mem-link-list { overflow-y: auto; }
+.mem-link-row { display: flex; align-items: center; gap: 8px; padding: 10px 6px; border-bottom: 1px solid #f5f2ee; cursor: pointer; }
+.mem-link-row.on { background: #f0faf3; }
+.mem-link-t { flex: 1; min-width: 0; font-size: 13px; color: #5a4d40; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mem-link-ck { flex: 0 0 auto; font-weight: 700; color: #b8a99a; }
+.mem-link-row.on .mem-link-ck { color: #2f9b57; }
+.mem-link-empty { font-size: 12px; color: #b8a99a; padding: 12px 0; text-align: center; }
+
 .model-tag {
   display:inline-block;font-size:11px;padding:3px 8px;border:1px solid #e0ddd8;
   border-radius:6px;cursor:pointer;color:#4a3f35;background:#fff;
