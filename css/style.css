@@ -757,7 +757,7 @@ button { border: 0; cursor: pointer; }
   content: ''; display: block; width: 9px; height: 5px; border-left: 2px solid #fff; border-bottom: 2px solid #fff;
   transform: rotate(-45deg); margin: 3px auto 0;
 }
-.msg.msg-selected { opacity: .5; }
+.msg.msg-selected { opacity: 1; }
 .msg.msg-selected .bubble { box-shadow: 0 0 0 2px #2f9b57; }
 .msg.msg-selected .rp-card { box-shadow: 0 0 0 2px #2f9b57; }
 

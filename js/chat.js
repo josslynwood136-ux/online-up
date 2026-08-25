@@ -123,6 +123,7 @@ function enterMultiSelect(anchorIndex) {
   _multiSelect = true;
   _selectedMsgs = {};
   _multiAnchor = (typeof anchorIndex === 'number' && anchorIndex >= 0) ? anchorIndex : -1;
+  if (_multiAnchor >= 0) _selectedMsgs[_multiAnchor] = true;
   _selBlock = null;
   _previewMsgs = {};
   _lastScrollTop = -1;
@@ -158,15 +159,16 @@ function toggleMsgSelect(index) {
   const msg = char && char.chat[index];
   if (!msg) return;
   _selBlock = null;
-  var count = Object.keys(_selectedMsgs).length;
-  if (count === 0) {
-    _multiAnchor = index;
-    _selectedMsgs[index] = true;
-  } else if (count === 1 && _multiAnchor === index) {
+  if (_selectedMsgs[index]) {
     delete _selectedMsgs[index];
-    _multiAnchor = -1;
+    if (_multiAnchor === index) _multiAnchor = -1;
   } else {
-    selectRange(Math.min(_multiAnchor, index), Math.max(_multiAnchor, index));
+    _selectedMsgs[index] = true;
+    if (_multiAnchor < 0) _multiAnchor = index;
+  }
+  if (_multiAnchor < 0) {
+    const keys = Object.keys(_selectedMsgs);
+    if (keys.length) _multiAnchor = parseInt(keys[0], 10);
   }
   updateMultiCount();
   renderSelectionVisual();
@@ -194,7 +196,7 @@ function updateMultiCount() {
   var n = Object.keys(_selectedMsgs).length;
   var c = $('multiCount');
   if (c) {
-    c.textContent = n === 1 ? '已选 1 条 · 再点一条可选中到此处' : '已选 ' + n + ' 条';
+    c.textContent = n === 0 ? '轻点消息进行选择' : (n === 1 ? '已选 1 条' : '已选 ' + n + ' 条');
   }
   var del = $('multiDeleteBtn');
   if (del) del.classList.toggle('can-del', n > 0);

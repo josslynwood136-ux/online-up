@@ -6,11 +6,13 @@
 function openApp(name) {
   try {
     $('appModal').classList.add('active');
+    $('slider').style.pointerEvents = 'none';
     $('slider').style.overflowX = 'hidden';
     $('slider').style.cursor = 'default';
     const dbg = document.querySelector('.debug-btn');
     if (dbg) dbg.style.display = 'none';
     hidePanels();
+    closeSettings();
     if (name !== '许愿柳' && name !== '许愿流') { const mc0 = c(); if (mc0) mc0.classList.remove('willow-fit'); }
     window._openAppName = name;
     setTitle(name === 'QQ' ? '' : name);
@@ -75,6 +77,7 @@ function closeApp() {
   $('appModal').classList.remove('active');
   musicAppOpen = false;
   updateMiniPlayer();
+  $('slider').style.pointerEvents = '';
   $('slider').style.overflowX = 'auto';
   $('slider').style.cursor = 'grab';
   const dbg = document.querySelector('.debug-btn');
@@ -86,6 +89,8 @@ function closeApp() {
 
 // ---------- 底部标签栏 ----------
 function switchTab(t, el) {
+  closeChat();
+  closeSettings();
   document.querySelectorAll('.tab-item').forEach(i => i.classList.remove('active'));
   el.classList.add('active');
   const title = t === 'msg' ? '消息' : t === 'contact' ? '联系人' : t === 'moment' ? '动态' : '我的';
