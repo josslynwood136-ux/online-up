@@ -944,19 +944,7 @@ async function sendVoiceMessage(text, dataUrl, mime, dur, wave) {
   }
   appendBubble('user', text || '', media, null, null, quoteData);
   touchActiveChar();
-  if (typeof willowBlocksReplyFor === 'function' && willowBlocksReplyFor(char.id, char.name)) {
-    appendBubble('system', '（许愿柳生效中：' + char.name + ' 今天不回复你的消息。）');
-    return;
-  }
-  _voiceCtxHint = true;
-  _manualAICall = true;
-  setChatTyping(true);
-  generateAndDeliver(text || '', {
-    onDone: function (rt) {
-      // 发的是语音 → 回复自动朗读（除非已全局开启自动朗读，流式已在内部朗读过则不再重复）
-      if (!streamingOn() && !autoVoiceEnabled() && typeof speakText === 'function') speakText(rt);
-    }
-  }).finally(function () { _voiceCtxHint = false; });
+  return;
 }
 
 // 播放语音气泡（用户发的语音消息）
@@ -1149,9 +1137,6 @@ function sendChat() {
     appendBubble('user', text, null, null, null, quoteData);
     input.value = '';
     touchActiveChar();
-    _manualAICall = true;
-    setChatTyping(true);
-    generateAndDeliver(text, {});
     return;
   } else {
     const char = activeCharacter();
