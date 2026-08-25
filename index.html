@@ -105,7 +105,7 @@
           <div class="panel-item" onclick="renderStickerManager()"><div class="panel-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></div>表情包</div>
         </div>
         <div class="footer-main">
-          <button class="icon-btn" id="voiceRecBtn" onclick="toggleVoiceRecord()" title="发语音">🎤</button>
+          <button class="icon-btn" id="voiceRecBtn" title="按住说话">🎤</button>
           <button class="icon-btn" onclick="toggleMore()">＋</button>
           <button class="icon-btn" onclick="toggleEmoji()">☺</button>
           <div class="chat-input-wrapper">
@@ -123,7 +123,10 @@
       </button>
       <div id="voiceRecUI" class="voice-rec-ui" style="display:none">
         <button class="voice-rec-cancel" onclick="cancelVoiceRecord()" title="取消">✕</button>
-        <div class="voice-rec-status"><span class="voice-rec-dot"></span><span id="voiceRecTime">0″</span><span class="voice-rec-hint">录音中…</span></div>
+        <div class="voice-rec-main">
+          <div class="voice-rec-status"><span class="voice-rec-dot"></span><span id="voiceRecTime">0″</span><span id="voiceRecHint" class="voice-rec-hint">上滑取消</span></div>
+          <div id="voiceRecText" class="voice-rec-text"></div>
+        </div>
         <button class="voice-rec-send" onclick="stopAndSendVoice()" title="发送">发送</button>
       </div>
     </div>
