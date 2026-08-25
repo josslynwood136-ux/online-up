@@ -2,12 +2,14 @@
 
 一个网页版“手机模拟器”角色聊天应用，支持多平台 AI 语音（MiniMax / 小米 MiMo / ElevenLabs）与 MiMo 声音克隆。
 
-## 📝 最近更新（2026-08-25）
+## 📝 最近更新（2026-08-24）
 
-- **发语音升级**：录音自动探测浏览器支持的格式（兼容 iOS Safari，不再录出空 blob）；语音消息本体改存 IndexedDB，state 只留索引，不挤占 localStorage 配额
-- **真·ASR 转写**：录音同时用 Web Speech 实时转写（Chrome/安卓支持，iOS 自动跳过），说话内容作为气泡文字并直接喂给角色，让对方真正"听懂"再回应
-- **长按体验**：防 touch+mouse 双触发；录音中上滑超阈值可取消，松手作废
-- **（此前 08-24）MiMo 克隆修通 + 聊天设置增强 + 模型预设扩充**，详见下方更新历史
+- **MiMo 克隆修通**：修正官方接口（`messages` 顺序、输出 `wav`、双鉴权头）；克隆样本改存 IndexedDB，角色只留 `{name,size}` 标记，解决“无法保存”
+- **克隆恢复纯音频**：移除 mp4/webm/m4a 转码与 ffmpeg 兜底（手机端转换不稳定），克隆仅接受 mp3 / wav
+- **聊天设置新增**：声音风格指令、克隆稳定度滑杆、输出语种跟随
+- **模型更新**：MiniMax 补 speech-2.8/2.6 系列；ElevenLabs 补 v3_conversational / flash_v2_5
+- **界面**：小米密钥框仅在有克隆角色时显示；克隆按钮与滑杆配色美化
+- **规划中**：Capacitor 打包 APK + 前台服务 + WebSocket，做后台推送与荣耀手环提醒
 
 > 完整改动明细见 [CHANGELOG.md](./CHANGELOG.md)
 
@@ -34,14 +36,6 @@
 - **UI**：克隆上传框 `accept` 重新放开视频类型，按钮文案改回「🎙 上传录音或视频 · mp3 / wav / mp4 均可」
 - **说明**：视频转码需要后端（部署 `sever/server.js`）；若以纯静态方式打开网页（无后端），视频上传会提示改用 mp3/wav，不影响音频直传
 
-### 2026-08-25
-**本期范围（这一版 = 做了什么）**：发送语音消息功能增强——录音格式兼容、存储迁移 IndexedDB、接 ASR 转写、长按交互优化（均在 `js/chat.js`）。
-
-- **iOS/Safari 录音修复**：`startVoiceRecord` 用 `MediaRecorder.isTypeSupported` 探测浏览器支持的录制格式（webm/mp4/aac…），不再硬写 `audio/webm`（iPhone 上会录出空 blob）
-- **语音消息改存 IndexedDB**：音频本体不再塞进 localStorage（整个 state 共享约 5MB 配额，多录几条就爆），消息里只留 `storeId` 索引，渲染时 `hydrateVoiceMessages` 异步回填到 `<audio>`；IndexedDB 不可用时自动退回内联 `src`
-- **真·ASR 转写**：录音同时用 Web Speech API 实时转写（Chrome/安卓支持，iOS Safari 自动跳过不影响录音），说话内容作为气泡文字 + 喂给角色，让对方真正"听懂"再回应；转写为空时退回原占位话术
-- **长按体验优化**：① `voiceTouchStart` 加防重入（`touch+mouse` 双触发只算一次）；② 录音中上滑超过阈值标记取消，松手作废不发送
-
 ## ✨ 功能
 
 - **多平台 AI 语音播报**：MiniMax 海螺 / 小米 MiMo / ElevenLabs，按角色独立设置平台与音色
@@ -49,7 +43,6 @@
 - **声音风格 & 稳定度**：一句话导演语气 + 稳定度滑杆（联动 temperature/top_p）
 - **语种跟随**：跟随聊天设置里的输出语种，非中文自动要求模型用该语言发音
 - **网页推送**：内置 Web Push（VAPID），可推送角色消息到手机通知
-- **发送语音消息**：长按麦克风录音发送，录音同时实时转写（ASR）让对方按内容回应；录音格式自动适配、音频存 IndexedDB 不挤占 localStorage
 
 ## 🚀 运行 / 部署
 
@@ -89,7 +82,6 @@ node sever/server.js
 
 - `index.html` — 入口与聊天设置 UI
 - `js/tts.js` — 三平台 TTS、克隆存储（IndexedDB）
-- `js/chat.js` — 聊天、发送语音消息（录音 / ASR 转写 / IndexedDB 存储）、AI 对话
 - `js/apps.js` — 语音设置面板
 - `css/style.css` — 样式（含滑杆配色）
 - `sever/server.js` — 中继 / Web Push 服务器

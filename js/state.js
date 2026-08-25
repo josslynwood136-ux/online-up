@@ -387,8 +387,9 @@ function cleanupChatImages(minLen) {
     (role.chat || []).forEach(function(msg) {
       if (msg.media && msg.media.src && msg.media.src.length > minLen) {
         freed += msg.media.src.length;
-        msg.media = null;
-        if (!msg.content) msg.content = '[图片已清理]';
+        var wasImg = msg.media.type === 'image';
+        if (msg.media.type === 'audio') msg.media = null;
+        if (!msg.content) msg.content = wasImg ? '[图片已清理]' : '[语音已清理]';
         removed++;
       }
     });
