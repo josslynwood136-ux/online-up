@@ -1463,21 +1463,44 @@ function parseMemoryLine(raw) {
   return { title: title, text: rest, layer: layer, weight: weight, emotion: emotion, tags: tags };
 }
 
-// ===== 记忆引擎：分层 / 权重 / 标签 / 关联图谱 / 遗忘淡化 =====
+// ===== 记忆引擎：分层 / 权重 / 标签 / 关联图谱 / 遗忘曲线 / 矛盾检测 / 巩固 =====
 var MEM_LAYERS = { core: '核心', long: '长期', short: '短期' };
-var MEM_DECAY = { core: 0, long: 0.015, short: 0.07 };        // 每天 strength 衰减量
-var MEM_RECENCY_HALF = { core: 1e12, long: 30, short: 3 };     // 召回权重半衰期（天）
+var MEM_INTERVAL = { core: 365, long: 30, short: 4 };   // 遗忘曲线基础间隔（天）
+var MEM_EASE = 2.1;                                      // 每次成功回忆后的间隔放大
 var MEM_MAX = 200;
+var MEM_NEG = /不(想|要|喜|爱|去|会|是)|没(有|想|要|爱)|讨厌|恨|怕|烦|厌恶|嫌|戒|拒绝|不想|不喜欢|不要|别|雷区|禁忌/;
+var MEM_POS = /爱(喝|吃|去|你)|喜欢|想要|想(要|见|去|吃|喝)|期待|开心|高兴|享受|迷|爱吃|爱喝|乐意|愿意|想你/;
 
+function memIntervalBase(layer) { return MEM_INTERVAL[layer] || 30; }
+function memType(m) {
+  var t = m.tags || [];
+  if (t.indexOf('秘密') >= 0) return 'secret';
+  if (t.indexOf('禁忌') >= 0) return 'taboo';
+  if (t.indexOf('约定') >= 0) return 'promise';
+  return 'normal';
+}
+function memPolarity(text) {
+  var h = String(text || '');
+  var hasNeg = MEM_NEG.test(h), hasPos = MEM_POS.test(h);
+  if (hasNeg && !hasPos) return -1;
+  if (hasPos && !hasNeg) return 1;
+  if (hasNeg && hasPos) return 0;
+  return null;
+}
 function normalizeMemory(m) {
   if (!m) return m;
   if (m.layer !== 'core' && m.layer !== 'long' && m.layer !== 'short') m.layer = 'long';
   if (typeof m.weight !== 'number' || m.weight < 1 || m.weight > 5) m.weight = 3;
   if (!Array.isArray(m.tags)) m.tags = (m.title && m.title !== '记忆') ? [m.title] : [];
   if (!Array.isArray(m.links)) m.links = [];
+  else m.links = m.links.map(function(l) { return (typeof l === 'string') ? { id: l, w: 1 } : l; });
+  if (!Array.isArray(m.conflictWith)) m.conflictWith = [];
+  if (typeof m.conflict !== 'boolean') m.conflict = false;
+  if (typeof m.reps !== 'number') m.reps = 0;
+  if (typeof m.intervalDays !== 'number') m.intervalDays = memIntervalBase(m.layer);
   if (typeof m.strength !== 'number') m.strength = 1;
   if (typeof m.access !== 'number') m.access = 0;
-  if (!m.lastSeen) { var d = Date.parse(String(m.date || '').replace(/\//g, '-')); m.lastSeen = isNaN(d) ? Date.now() : d; }
+  if (typeof m.lastSeen !== 'number') { var d = Date.parse(String(m.date || '').replace(/\//g, '-')); m.lastSeen = isNaN(d) ? Date.now() : d; }
   return m;
 }
 function keyTokens(s) {
@@ -1490,55 +1513,69 @@ function memDaysSince(m, now) {
   var t = m.lastSeen || Date.now();
   return Math.max(0, (now - t) / 86400000);
 }
-function memRecency(m, now) {
-  var half = MEM_RECENCY_HALF[m.layer] || 30;
-  return Math.pow(0.5, memDaysSince(m, now) / half);
+// 遗忘曲线：R = e^(-Δt / interval)，被回忆会拉长 interval
+function memRetention(m, now) {
+  if (m.layer === 'core') return 1;
+  var iv = m.intervalDays || memIntervalBase(m.layer);
+  return Math.exp(-memDaysSince(m, now) / iv);
 }
 function effectiveMemWeight(m, now) {
   now = now || Date.now();
-  var s = (typeof m.strength === 'number') ? m.strength : 1;
-  var r = (m.layer === 'core') ? 1 : memRecency(m, now);
-  return (m.weight || 3) * s * r;
+  var r = memRetention(m, now);
+  return (m.weight || 3) * r * (1 + 0.08 * (m.reps || 0));
 }
+// 遗忘 + 巩固：每小时至多一次；按曲线更新 retention，并做层级晋升
 function decayMemories(char) {
   if (!char || !char.memories) return;
   var now = Date.now();
-  if (char._memDecayTs && (now - char._memDecayTs) < 3600000) return; // 每小时最多衰减一次
+  if (char._memDecayTs && (now - char._memDecayTs) < 3600000) return;
   char._memDecayTs = now;
   var changed = false;
   char.memories.forEach(function(m) {
     normalizeMemory(m);
     if (m.layer === 'core') { m.strength = 1; return; }
-    var rate = MEM_DECAY[m.layer] || 0.015;
-    var ns = (typeof m.strength === 'number') ? m.strength : 1;
-    var target = Math.max(0.05, ns - rate * memDaysSince(m, now));
-    if (Math.abs(target - ns) > 0.005) { m.strength = Math.round(target * 100) / 100; changed = true; }
+    var r = memRetention(m, now);
+    m.strength = Math.round(r * 100) / 100;
+    var ageDays = memDaysSince(m, now) + ((Date.now() - (Date.parse(String(m.date || '').replace(/\//g, '-')) || Date.now())) / 86400000);
+    // 巩固：短期记忆被反复回忆或够老 → 晋升长期；长期被高度巩固 → 极少晋升核心
+    if (m.layer === 'short' && (m.reps >= 3 || ageDays > 10) && m.strength > 0.5) { m.layer = 'long'; m.intervalDays = memIntervalBase('long'); changed = true; }
+    else if (m.layer === 'long' && m.reps >= 10 && m.strength > 0.85) { m.layer = 'core'; m.intervalDays = memIntervalBase('core'); m.strength = 1; changed = true; }
+    changed = true;
   });
   if (changed) saveState();
 }
+// 成功回忆（间隔复习法）：拉长短遗忘间隔，重置 retention
 function reinforceMemory(m) {
   normalizeMemory(m);
-  m.strength = Math.min(1, (typeof m.strength === 'number' ? m.strength : 1) + 0.12);
+  m.reps = (m.reps || 0) + 1;
+  var base = memIntervalBase(m.layer);
+  var iv = m.intervalDays || base;
+  m.intervalDays = Math.min(365, Math.max(base, iv * (m.reps === 1 ? 1 : MEM_EASE)));
   m.lastSeen = Date.now();
+  m.strength = 1;
   m.access = (m.access || 0) + 1;
+  if (m.layer === 'short' && m.reps >= 3) { m.layer = 'long'; m.intervalDays = memIntervalBase('long'); }
 }
-function memLinkIds(a, b) {
+function memLinkIds(a, b, w) {
   if (!a.links) a.links = [];
   if (!b.links) b.links = [];
-  if (a.links.indexOf(b.id) < 0) a.links.push(b.id);
-  if (b.links.indexOf(a.id) < 0) b.links.push(a.id);
-  if (a.links.length > 12) a.links.length = 12;
-  if (b.links.length > 12) b.links.length = 12;
+  var aw = a.links.filter(function(l) { return l.id === b.id; })[0];
+  if (aw) aw.w = (aw.w || 1) + 1; else a.links.push({ id: b.id, w: w || 1 });
+  var bw = b.links.filter(function(l) { return l.id === a.id; })[0];
+  if (bw) bw.w = (bw.w || 1) + 1; else b.links.push({ id: a.id, w: w || 1 });
+  if (a.links.length > 16) a.links.length = 16;
+  if (b.links.length > 16) b.links.length = 16;
 }
+// 返回关键词重合数（>=2 才关联），关联权重取重合度
 function memShouldLink(a, b) {
-  if (!a || !b || a.id === b.id) return false;
+  if (!a || !b || a.id === b.id) return 0;
   var sa = {}, sb = {};
   (a.tags || []).forEach(function(t) { sa[t] = 1; });
   (b.tags || []).forEach(function(t) { sb[t] = 1; });
-  for (var k in sa) if (sb[k]) return true;
+  for (var k in sa) if (sb[k]) return 3;
   var wa = keyTokens(a.text), wb = keyTokens(b.text), inter = 0;
   wa.forEach(function(w) { if (wb.indexOf(w) >= 0) inter++; });
-  return inter >= 2;
+  return inter >= 2 ? inter : 0;
 }
 function autoLinkMemories(char) {
   var ms = char.memories;
@@ -1547,9 +1584,34 @@ function autoLinkMemories(char) {
     normalizeMemory(ms[i]);
     for (var j = i + 1; j < ms.length; j++) {
       normalizeMemory(ms[j]);
-      if (memShouldLink(ms[i], ms[j])) memLinkIds(ms[i], ms[j]);
+      var ov = memShouldLink(ms[i], ms[j]);
+      if (ov >= 2) memLinkIds(ms[i], ms[j], ov);
     }
   }
+}
+// 矛盾检测：同主题、相反情绪 → 互相标记 conflict
+function detectConflict(char, m) {
+  if (!char || !char.memories) return;
+  var nt = keyTokens(m.text);
+  if (nt.length < 2) return;
+  var mp = memPolarity(m.text);
+  if (mp === null || mp === 0) return;
+  char.memories.forEach(function(e) {
+    if (e === m) return;
+    if ((e.conflictWith || []).indexOf(m.id) >= 0) return;
+    var et = keyTokens(e.text);
+    if (et.length < 2) return;
+    var inter = nt.filter(function(w) { return et.indexOf(w) >= 0; });
+    if (inter.length < 2) return;
+    var ep = memPolarity(e.text);
+    if (ep === null || ep === 0) return;
+    if (ep !== mp) {
+      m.conflict = true;
+      if (m.conflictWith.indexOf(e.id) < 0) m.conflictWith = m.conflictWith.concat(e.id);
+      e.conflict = true;
+      if (e.conflictWith.indexOf(m.id) < 0) e.conflictWith = e.conflictWith.concat(m.id);
+    }
+  });
 }
 function pushMemory(char, pm) {
   if (!pm || !pm.text || isMemoryFluff(pm.text)) return false;
@@ -1558,7 +1620,7 @@ function pushMemory(char, pm) {
   var dup = char.memories.some(function(m) { return (m.text || '').replace(/[。，、！？!?.,\s]/g, '') === norm; });
   if (dup) return false;
   var layer = (pm.layer === 'short' || pm.layer === 'core') ? pm.layer : 'long';
-  char.memories.unshift({
+  var mem = {
     id: 'mem-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
     title: pm.title || '记忆',
     text: pm.text,
@@ -1567,8 +1629,11 @@ function pushMemory(char, pm) {
     tags: (pm.tags && pm.tags.length) ? pm.tags : (pm.title && pm.title !== '记忆' ? [pm.title] : []),
     weight: (typeof pm.weight === 'number' && pm.weight >= 1 && pm.weight <= 5) ? pm.weight : 3,
     emotion: pm.emotion || '',
-    links: [], strength: 1, lastSeen: Date.now(), access: 0
-  });
+    links: [], conflict: false, conflictWith: [], reps: 0,
+    intervalDays: memIntervalBase(layer), strength: 1, lastSeen: Date.now(), access: 0
+  };
+  char.memories.unshift(mem);
+  detectConflict(char, mem);
   return true;
 }
 
@@ -2326,11 +2391,18 @@ function pickRelevantMemories(char, text) {
   var mems = (char.memories || []).map(normalizeMemory).filter(function(m) { return m && !isMemoryFluff(m.text); });
   var qwords = (text || '').toLowerCase().split(/[\s,，。！？!?、]+/).filter(Boolean);
   var qkeys = keyTokens(text);
+  var mood = char._moodText || '';
   var scored = mems.map(function(m) {
     var hay = ((m.title || '') + ' ' + (m.tags || []).join(' ') + ' ' + (m.text || '')).toLowerCase();
     var score = 0;
+    // 关键词（含短语）命中
     qwords.forEach(function(w) { if (w.length > 1 && hay.indexOf(w) >= 0) score += 2; });
     qkeys.forEach(function(w) { if (hay.indexOf(w) >= 0) score += 0.5; });
+    // 标签精确命中（类别匹配权重更高）
+    (m.tags || []).forEach(function(t) { if (qwords.indexOf(t.toLowerCase()) >= 0) score += 2.5; });
+    // 情绪同频：角色此刻情绪与记忆情绪一致 → 更易被唤起
+    if (m.emotion && mood && mood.indexOf(m.emotion) >= 0) score += 1.5;
+    // 重要度 × 遗忘曲线 × 巩固次数
     score += effectiveMemWeight(m, now) * 0.6;
     return { mem: m, score: score };
   });
@@ -2338,12 +2410,12 @@ function pickRelevantMemories(char, text) {
   var chosen = scored.slice(0, 6);
   var ids = {};
   chosen.forEach(function(c) { ids[c.mem.id] = true; });
-  // 顺藤摸瓜：把关联记忆也带进来（记忆图谱）
+  // 顺藤摸瓜：沿关联图谱把相关记忆带进来，边权越高越优先
   chosen.forEach(function(c) {
-    (c.mem.links || []).forEach(function(lid) {
-      if (ids[lid]) return;
-      var lm = mems.find(function(x) { return x.id === lid; });
-      if (lm) { ids[lid] = true; chosen.push({ mem: lm, score: c.score * 0.4 }); }
+    (c.mem.links || []).forEach(function(l) {
+      if (ids[l.id]) return;
+      var lm = mems.find(function(x) { return x.id === l.id; });
+      if (lm) { ids[l.id] = true; chosen.push({ mem: lm, score: c.score * 0.4 * Math.min(1.5, (l.w || 1) / 2) }); }
     });
   });
   chosen.forEach(function(c) { reinforceMemory(c.mem); });
@@ -2353,20 +2425,42 @@ function pickRelevantMemories(char, text) {
 
 function buildMemoryContext(char, text) {
   var mems = pickRelevantMemories(char, text);
-  if (!mems.length) return '暂无';
   var now = Date.now();
+  var allMems = (char.memories || []).map(normalizeMemory);
+  // 突然想起：偶发唤起一条已淡化 / 久未提起的记忆（让"遗忘-想起"可见）
+  if (Math.random() < 0.3) {
+    var pool = allMems.filter(function(m) {
+      return m.id && !mems.some(function(x) { return x.id === m.id; }) && m.layer !== 'core';
+    }).sort(function(a, b) { return (a.strength || 1) - (b.strength || 1); });
+    var flash = pool.filter(function(m) { var s = m.strength || 1; return s < 0.6 && s > 0.15; })[0] || pool[0];
+    if (flash) mems.push(flash);
+  }
+  if (!mems.length) return '暂无';
   var groups = { core: [], long: [], short: [] };
   mems.forEach(function(m) { if (groups[m.layer]) groups[m.layer].push(m); });
   function fmt(m) {
-    var faded = (m.layer !== 'core' && typeof m.strength === 'number' && m.strength < 0.35);
+    var faded = (m.layer !== 'core' && memRetention(m, now) < 0.35);
     var pre = faded ? '（有点记不清了）' : '';
+    var typ = memType(m);
+    if (typ === 'secret') pre += '（藏在心里的秘密）';
+    else if (typ === 'taboo') pre += '（对方雷区，TA 会避开）';
+    else if (typ === 'promise') pre += '（和对方的约定，TA 记着）';
+    if (m.conflict) pre += '（注意：这条似乎和别处记忆矛盾，以最新为准）';
     var tag = (m.tags && m.tags.length > 1) ? '[' + m.tags.slice(0, 3).join('/') + ']' : '';
     return '- ' + (m.title && m.title !== '记忆' ? m.title + '：' : '') + pre + (tag ? tag + ' ' : '') + m.text + (m.emotion ? '（' + m.emotion + '）' : '');
   }
   var out = [];
+  if (char.memReflection) out.push('◎ 我对这段关系的感觉（自我认知）：' + char.memReflection);
   if (groups.core.length) out.push('■ 核心记忆（TA 绝不会忘）\n' + groups.core.map(fmt).join('\n'));
   if (groups.long.length) out.push('◆ 长期记忆\n' + groups.long.map(fmt).join('\n'));
   if (groups.short.length) out.push('· 短期记忆（刚发生，可能淡忘）\n' + groups.short.map(fmt).join('\n'));
+  // 类型约束：让秘密 / 禁忌 / 约定真正影响角色行为
+  var hasSecret = mems.some(function(m) { return memType(m) === 'secret'; });
+  var hasTaboo = mems.some(function(m) { return memType(m) === 'taboo'; });
+  var hasPromise = mems.some(function(m) { return memType(m) === 'promise'; });
+  if (hasSecret) out.push('（带「秘密」的是 TA 藏在心里的，没到合适时机别主动抖出来）');
+  if (hasTaboo) out.push('（带「禁忌」的是对方雷区，TA 会刻意避开，绝不会主动去做或提起）');
+  if (hasPromise) out.push('（带「约定」的是和对方的承诺，TA 记着，合适时会兑现或提起）');
   return out.join('\n');
 }
 
@@ -2375,9 +2469,15 @@ function memoryCardHtml(mem, charId, deleteOnclick) {
   var layerName = MEM_LAYERS[mem.layer] || '长期';
   var dots = '';
   for (var i = 0; i < 5; i++) dots += (i < (mem.weight || 3)) ? '●' : '○';
-  var faded = (mem.layer !== 'core' && (mem.strength != null && mem.strength < 0.35));
+  var faded = (mem.layer !== 'core' && memRetention(mem, Date.now()) < 0.35);
+  var typ = memType(mem);
+  var typBadge = typ === 'secret' ? '<span class="mem-type mem-type-secret">秘</span>'
+    : typ === 'taboo' ? '<span class="mem-type mem-type-taboo">忌</span>'
+    : typ === 'promise' ? '<span class="mem-type mem-type-promise">约</span>' : '';
+  var conflictBadge = mem.conflict ? '<span class="mem-conflict" title="与另一条记忆矛盾">⚠矛盾</span>' : '';
   var char = getCharacter(charId) || activeCharacter();
-  var linkChips = (mem.links || []).slice(0, 5).map(function(lid) {
+  var linkChips = (mem.links || []).slice(0, 5).map(function(l) {
+    var lid = l.id;
     var t = (char && char.memories || []).filter(function(x) { return x.id === lid; })[0];
     if (!t) return '';
     return '<span class="mem-link-chip" onclick="memJumpLink(\'' + charId + '\',\'' + lid + '\')">' + escapeHTML(((t.title && t.title !== '记忆') ? t.title + '：' : '') + (t.text || '').slice(0, 14)) + '</span>';
@@ -2385,6 +2485,7 @@ function memoryCardHtml(mem, charId, deleteOnclick) {
   return '<div class="mem-card' + (faded ? ' mem-faded' : '') + '" data-mem-id="' + mem.id + '">' +
     '<div class="mem-card-top">' +
       '<span class="mem-layer mem-layer-' + mem.layer + '">' + layerName + '</span>' +
+      typBadge + conflictBadge +
       '<span class="mem-weight" title="重要度">' + dots + '</span>' +
       (mem.emotion ? '<span class="mem-emotion">' + escapeHTML(mem.emotion) + '</span>' : '') +
       (faded ? '<span class="mem-faded-tag">已淡化</span>' : '') +
@@ -2426,7 +2527,7 @@ function renderMemLinkList(q) {
     return m.id !== memId && (!q || ((m.text || '') + ' ' + (m.title || '')).toLowerCase().indexOf(q) >= 0);
   });
   list.innerHTML = others.map(function(m) {
-    var on = (mem.links || []).indexOf(m.id) >= 0;
+    var on = (mem.links || []).some(function(l) { return l.id === m.id; });
     return '<div class="mem-link-row' + (on ? ' on' : '') + '" onclick="memToggleLink(\'' + charId + '\',\'' + memId + '\',\'' + m.id + '\')"><span class="mem-link-t">' + escapeHTML(((m.title && m.title !== '记忆') ? m.title + '：' : '') + (m.text || '')) + '</span><span class="mem-link-ck">' + (on ? '✓' : '＋') + '</span></div>';
   }).join('') || '<div class="mem-link-empty">没有其它记忆</div>';
 }
@@ -2437,8 +2538,8 @@ function memToggleLink(charId, memId, otherId) {
   var b = (char.memories || []).filter(function(m) { return m.id === otherId; })[0];
   if (!a || !b) return;
   normalizeMemory(a); normalizeMemory(b);
-  var i = a.links.indexOf(otherId);
-  if (i >= 0) { a.links.splice(i, 1); var j = b.links.indexOf(memId); if (j >= 0) b.links.splice(j, 1); }
+  var i = (a.links || []).findIndex(function(l) { return l.id === otherId; });
+  if (i >= 0) { a.links.splice(i, 1); var j = (b.links || []).findIndex(function(l) { return l.id === memId; }); if (j >= 0) b.links.splice(j, 1); }
   else memLinkIds(a, b);
   saveState();
   renderMemLinkList($('memLinkSearch') ? $('memLinkSearch').value : '');
@@ -2533,11 +2634,12 @@ function renderSettingsMemories() {
   var f = _memFilter, sort = _memSort;
   var list = (char.memories || []).map(normalizeMemory);
   if (q) list = list.filter(function(m) { return ((m.text || '') + ' ' + (m.title || '') + ' ' + (m.tags || []).join(' ')).toLowerCase().indexOf(q) >= 0; });
-  if (f === 'faded') list = list.filter(function(m) { return m.layer !== 'core' && m.strength != null && m.strength < 0.35; });
+  if (f === 'faded') list = list.filter(function(m) { return m.layer !== 'core' && memRetention(m, Date.now()) < 0.35; });
   else if (f !== 'all') list = list.filter(function(m) { return m.layer === f; });
-  if (sort === 'weight') list.sort(function(a, b) { return (b.weight || 3) - (a.weight || 3) || (b.strength || 0) - (a.strength || 0); });
+  if (sort === 'weight') list.sort(function(a, b) { return (b.weight || 3) - (a.weight || 3) || memRetention(b, Date.now()) - memRetention(a, Date.now()); });
   else list.sort(function(a, b) { return String(b.date || '').localeCompare(String(a.date || '')); });
-  box.innerHTML = list.length ? list.map(function(m) { return memoryCardHtml(m, char.id, "settingsDeleteMemory('" + m.id + "')"); }).join('') : '<div style="color:#b8a99a;font-size:12px;padding:6px 0;">没有匹配的记忆。</div>';
+  var refl = char.memReflection ? '<div class="mem-reflection">◎ AI 自我总结（角色对自己的感觉）：' + escapeHTML(char.memReflection) + '</div>' : '';
+  box.innerHTML = refl + (list.length ? list.map(function(m) { return memoryCardHtml(m, char.id, "settingsDeleteMemory('" + m.id + "')"); }).join('') : '<div style="color:#b8a99a;font-size:12px;padding:6px 0;">没有匹配的记忆。</div>');
 }
 function settingsAddMemory() {
   var char = activeCharacter();
@@ -2637,6 +2739,7 @@ async function manualSummarizeMemory() {
       if (pushMemory(char, parseMemoryLine(raw))) added++;
     });
     autoLinkMemories(char);
+    try { await aiConsolidateMemories(char); } catch (e) {}
     if (char.memories.length > MEM_MAX) char.memories.length = MEM_MAX;
     saveState();
     renderSettingsMemories();
@@ -2688,12 +2791,119 @@ async function autoSaveMemory(char) {
        lines.forEach(function(raw) {
           if (pushMemory(char, parseMemoryLine(raw))) changed = true;
        });
-       if (changed) { autoLinkMemories(char); if (char.memories.length > MEM_MAX) char.memories.length = MEM_MAX; }
-       if (changed) saveState();
+        if (changed) {
+          autoLinkMemories(char);
+          if (!char._memConsolidatedAt || (Date.now() - char._memConsolidatedAt) > 6 * 3600000) {
+            try { await aiConsolidateMemories(char); } catch (e) {}
+          }
+          if (char.memories.length > MEM_MAX) char.memories.length = MEM_MAX;
+        }
+        if (changed) saveState();
     } finally {
       clearTimeout(tmr);
     }
   } catch (e) {}
+}
+function extractJSON(t) {
+  t = String(t || '').trim();
+  var i = t.indexOf('['), j = t.lastIndexOf(']');
+  if (i >= 0 && j > i) { try { return JSON.parse(t.slice(i, j + 1)); } catch (e) {} }
+  var a = t.indexOf('{'), b = t.lastIndexOf('}');
+  if (a >= 0 && b > a) { try { return JSON.parse(t.slice(a, b + 1)); } catch (e) {} }
+  try { return JSON.parse(t); } catch (e) { return null; }
+}
+// AI 亲自整理记忆：合并重复、推理解决矛盾、升降层级、忘记无意义、写下自我总结
+async function aiConsolidateMemories(char) {
+  if (!char) return false;
+  var cfg = (state.apiProfiles && state.activeApiProfile)
+    ? state.apiProfiles.find(function(p) { return p.id === state.activeApiProfile; }) : null;
+  cfg = cfg || state.api;
+  if (!cfg || !cfg.key || !cfg.url || !cfg.model) return false;
+  if (!char.memories || char.memories.length < 2) return false;
+  var list = char.memories.map(function(m) {
+    return { id: m.id, title: m.title, text: m.text, layer: m.layer, weight: m.weight, tags: m.tags || [], emotion: m.emotion || '' };
+  });
+  var sys = '你是这个角色本人，现在要整理自己的记忆库。下面是你目前记住的所有内容（JSON 数组）。请像人一样回顾并整理：\n' +
+    '1) 合并高度重复/同义的记忆，保留信息量最大的那条；\n' +
+    '2) 若两条记忆互相矛盾，凭你的判断保留更可信/更新近的一条，把另一条 status 设为 "drop"；\n' +
+    '3) 真正重要、反复出现的，可把 layer 升为 long 甚至 core；纯粹临时的可降为 short；已无意义的 drop；\n' +
+    '4) 可微调 text/title/tags/weight 让它更准确凝练；\n' +
+    '5) 用一句话写一段 "reflection"：你对自己和这个用户/这段关系的整体感觉（它会作为你的自我认知被你记住）。\n' +
+    '只输出严格 JSON，格式：{"reflection":"...","memories":[{"id":"原id","title":"","text":"","layer":"core|long|short","weight":1-5,"tags":[],"emotion":"","status":"keep|drop"}]}。不要任何解释文字。';
+  var ctrl = new AbortController();
+  var tmr = setTimeout(function() { ctrl.abort(); }, 30000);
+  try {
+    var res = await aiRequest(joinUrl(cfg.url, 'chat/completions'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.key },
+      signal: ctrl.signal,
+      body: JSON.stringify({
+        model: cfg.model,
+        messages: [
+          { role: 'system', content: sys },
+          { role: 'user', content: JSON.stringify(list) }
+        ],
+        max_tokens: 1200,
+        temperature: 0.4
+      })
+    });
+    var data = await res.json().catch(function() { return {}; });
+    if (!res.ok) return false;
+    var text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '').trim();
+    if (!text) return false;
+    var obj = extractJSON(text);
+    if (!obj || !Array.isArray(obj.memories)) return false;
+    var byId = {};
+    char.memories.forEach(function(m) { byId[m.id] = m; });
+    var keepIds = {};
+    obj.memories.forEach(function(it) {
+      if (it.status === 'drop') return;
+      var ex = byId[it.id];
+      if (ex) {
+        ex.title = it.title || ex.title;
+        ex.text = it.text || ex.text;
+        if (it.layer === 'core' || it.layer === 'long' || it.layer === 'short') ex.layer = it.layer;
+        if (typeof it.weight === 'number') ex.weight = Math.max(1, Math.min(5, it.weight));
+        if (Array.isArray(it.tags)) ex.tags = it.tags;
+        if (it.emotion) ex.emotion = it.emotion;
+        ex.conflict = false;
+        keepIds[it.id] = true;
+      } else {
+        var nm = {
+          id: it.id || ('mem-' + Date.now() + '-' + Math.floor(Math.random() * 1000)),
+          title: it.title || '记忆', text: it.text || '', date: new Date().toLocaleString(),
+          layer: (it.layer === 'short' || it.layer === 'core') ? it.layer : 'long',
+          tags: Array.isArray(it.tags) ? it.tags : [], weight: (typeof it.weight === 'number') ? it.weight : 3,
+          emotion: it.emotion || '', links: [], conflict: false, conflictWith: [], reps: 0,
+          intervalDays: memIntervalBase(it.layer || 'long'), strength: 1, lastSeen: Date.now(), access: 0
+        };
+        char.memories.unshift(nm); keepIds[nm.id] = true;
+      }
+    });
+    char.memories = char.memories.filter(function(m) { return keepIds[m.id]; });
+    if (obj.reflection) char.memReflection = obj.reflection;
+    char._memConsolidatedAt = Date.now();
+    autoLinkMemories(char);
+    if (char.memories.length > MEM_MAX) char.memories.length = MEM_MAX;
+    saveState();
+    return true;
+  } catch (e) { return false; }
+  finally { clearTimeout(tmr); }
+}
+async function aiConsolidateMemoriesUI() {
+  var char = activeCharacter();
+  if (!char) return;
+  var btn = document.getElementById('memConsolidateBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'AI 整理中…'; }
+  try {
+    var ok = await aiConsolidateMemories(char);
+    renderSettingsMemories();
+    if (window._memRerender) window._memRerender();
+    if (ok && char.memReflection) alert('AI 已重新整理记忆（合并重复、解决矛盾、写下自我总结）：\n\n' + char.memReflection);
+    else if (ok) alert('AI 已重新整理记忆。');
+    else alert('没整理成（记忆太少，或接口没连上）。');
+  } catch (e) { alert('整理失败：' + (e && e.message || e)); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = '🧹 AI 整理记忆'; } }
 }
 function togglePin() { state.settings.pinned = !state.settings.pinned; saveState(); $('pinSwitch').classList.toggle('on', state.settings.pinned); }
 function toggleAutoPost() {

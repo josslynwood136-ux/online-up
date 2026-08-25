@@ -1060,6 +1060,11 @@ button { border: 0; cursor: pointer; }
 .mem-weight { font-size: 11px; color: #e0a32e; letter-spacing: 1px; }
 .mem-emotion { font-size: 11px; color: #c0628a; background: #fbeef3; border-radius: 999px; padding: 1px 8px; }
 .mem-faded-tag { font-size: 11px; color: #b8a99a; border: 1px solid #e0ddd8; border-radius: 999px; padding: 1px 8px; }
+.mem-type { font-size: 11px; font-weight: 700; color: #fff; border-radius: 999px; padding: 1px 8px; }
+.mem-type-secret { background: linear-gradient(135deg,#6d5bd0,#4b3fb0); }
+.mem-type-taboo { background: linear-gradient(135deg,#c0392b,#a02b1f); }
+.mem-type-promise { background: linear-gradient(135deg,#2f9b57,#22b865); }
+.mem-conflict { font-size: 11px; color: #c0392b; background: #fbeaea; border: 1px solid #eccaca; border-radius: 999px; padding: 1px 8px; }
 .mem-card-acts { margin-left: auto; display: flex; gap: 6px; }
 .mem-mini { border: none; background: #f2efe9; color: #8a7a6a; border-radius: 7px; padding: 3px 9px; font-size: 12px; cursor: pointer; }
 .mem-mini:active { background: #e6e1d9; }
@@ -1067,6 +1072,7 @@ button { border: 0; cursor: pointer; }
 .mem-card-title { font-size: 13px; font-weight: 700; color: #4a3f35; }
 .mem-card-text { font-size: 12.5px; color: #6a5d4f; line-height: 1.45; word-break: break-word; margin-top: 2px; }
 .mem-links { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.mem-reflection { font-size: 12.5px; color: #5b4b9a; background: linear-gradient(135deg,#f3edff,#efe7fb); border: 1px solid #e0d4f5; border-radius: 10px; padding: 9px 11px; margin-bottom: 8px; line-height: 1.5; }
 .mem-link-chip { font-size: 11px; color: #5a7a9a; background: #eef4fa; border-radius: 999px; padding: 2px 9px; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mem-link-chip:active { background: #dce8f5; }
 .mem-link-overlay {
