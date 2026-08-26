@@ -161,7 +161,7 @@ function _attachSpinner(bubbleEl) {
   if (_ttsCurSpinner && _ttsCurSpinner.parentNode) _ttsCurSpinner.parentNode.removeChild(_ttsCurSpinner);
   var sp = document.createElement('div');
   sp.className = 'voice-spinner';
-  sp.innerHTML = '<span class="voice-spinner-ring"></span><span class="voice-spinner-pct">0%</span>';
+  sp.innerHTML = '<span class="voice-spinner-ring"></span>';
   document.body.appendChild(sp);
   // 用头像真实位置固定到「头像正上方」，并跟随滚动/缩放，保证不被聊天区裁剪
   function place() {
@@ -173,22 +173,21 @@ function _attachSpinner(bubbleEl) {
   sp._place = place;
   window.addEventListener('scroll', place, true);
   window.addEventListener('resize', place);
-  // 接口不返回真实进度，用平滑假进度先跑到 92%，生成完成/失败再归零移除
-  var pct = 0;
-  sp._timer = setInterval(function () {
-    if (pct < 92) {
-      pct = Math.min(92, pct + Math.random() * 7 + 1.5);
-      sp.style.setProperty('--p', pct.toFixed(0) + '%');
-      var pc = sp.querySelector('.voice-spinner-pct');
-      if (pc) pc.textContent = Math.floor(pct) + '%';
-    }
-  }, 280);
+  // 接口不返回真实进度：用指数趋近曲线平滑、单调递增地爬到 90%（越接近完成越慢，像真实进度）
+  var startT = Date.now();
+  function tick() {
+    var e = (Date.now() - startT) / 1000;
+    var val = 90 * (1 - Math.exp(-e / 3.5)); // 约 8~10s 内逼近 90%
+    sp.style.setProperty('--p', val.toFixed(1) + '%');
+    sp._raf = requestAnimationFrame(tick);
+  }
+  sp._raf = requestAnimationFrame(tick);
   _ttsCurSpinner = sp;
   return sp;
 }
 function _removeSpinner() {
   if (_ttsCurSpinner) {
-    if (_ttsCurSpinner._timer) { try { clearInterval(_ttsCurSpinner._timer); } catch (e) {} _ttsCurSpinner._timer = null; }
+    if (_ttsCurSpinner._raf) { try { cancelAnimationFrame(_ttsCurSpinner._raf); } catch (e) {} _ttsCurSpinner._raf = null; }
     if (_ttsCurSpinner._place) { try { window.removeEventListener('scroll', _ttsCurSpinner._place, true); window.removeEventListener('resize', _ttsCurSpinner._place); } catch (e) {} }
     if (_ttsCurSpinner.parentNode) _ttsCurSpinner.parentNode.removeChild(_ttsCurSpinner);
   }
