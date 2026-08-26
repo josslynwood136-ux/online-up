@@ -1477,9 +1477,10 @@ button { border: 0; cursor: pointer; }
 .home-log-close{position:absolute;top:12px;right:12px;width:34px;height:34px;border-radius:50%;background:#eee;color:#333;font-size:16px;display:grid;place-items:center;cursor:pointer}
 .home-fur{position:absolute;background-size:contain;background-repeat:no-repeat;background-position:center;display:flex;align-items:flex-end;justify-content:center;border-radius:8px;transition:filter .15s;-webkit-tap-highlight-color:transparent;z-index:1}
 .home-room.living .home-fur{ background:none !important; }
-.home-room.living .home-fur .fur-emoji{ display:none; }
+.home-room.living .home-fur:active{ transform:none; filter:brightness(1.06); }
+.home-room.living .home-fur .fur-emoji{ display:block; font-size:clamp(30px,10vw,58px); line-height:1; filter:drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
 .home-room.living .home-fur .fur-plant-pot{ display:none; }
-.home-room.living .home-fur .fur-art{ display:none; }
+.home-room.living .home-fur .fur-art{ display:flex; }
 .home-fur:active{filter:brightness(1.15)}
 .home-fur-name{font-size:11px;background:rgba(0,0,0,.55);color:#fff;padding:3px 7px;border-radius:8px;margin:0 2px 3px;pointer-events:auto;white-space:nowrap;cursor:pointer}
 
@@ -1699,11 +1700,29 @@ button { border: 0; cursor: pointer; }
 .fpp-leaf.l2{ bottom:54%; right:30%; width:16%; height:9%; transform:rotate(25deg); }
 .fpp-leaf.l3{ bottom:62%; left:42%; width:14%; height:8%; transform:rotate(-10deg); }
 /* 客厅装修（温暖木质 · 采光） */
-.lr-wall{ position:absolute; inset:0; z-index:0; background:linear-gradient(180deg,#faf5ef 0%,#f3ece2 100%); }
-.lr-floor{ position:absolute; left:0; right:0; bottom:0; height:28%; z-index:0; background:linear-gradient(180deg,#dbb88a 0%,#c9a574 50%,#bd9868 100%); }
-.lr-floor::before{ content:''; position:absolute; inset:0; background:repeating-linear-gradient(90deg,transparent 0 44px,rgba(140,100,55,.12) 44px 46px); }
+.lr-wall{ position:absolute; left:0; right:0; top:0; height:38%; z-index:0;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.35), rgba(180,140,100,.05) 72%, rgba(150,110,70,.14)),
+    repeating-linear-gradient(90deg, rgba(190,150,110,.07) 0 2px, transparent 2px 28px),
+    linear-gradient(180deg,#fdf8f1 0%,#f3e9db 100%);
+}
+.lr-wall::after{ content:''; position:absolute; left:0; right:0; top:0; height:6px; background:linear-gradient(180deg,#fff,#e9dccb); }
+.lr-wainscot{ position:absolute; left:0; right:0; top:22%; height:15.4%; z-index:0;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.25), rgba(150,110,70,.10)),
+    repeating-linear-gradient(90deg, rgba(150,110,70,.10) 0 1.5px, transparent 1.5px 40px),
+    linear-gradient(180deg,#efe2cf,#e3d2b8);
+  border-top:2px solid #d8c3a3; border-bottom:2px solid #cdb793;
+}
+.lr-base{ position:absolute; left:0; right:0; top:37.2%; height:1.6%; z-index:1; background:linear-gradient(180deg,#cdb086,#b8966a); box-shadow:0 2px 5px rgba(120,90,60,.25); }
+.lr-floor{ position:absolute; left:0; right:0; top:38%; bottom:0; height:auto; z-index:0; background:linear-gradient(180deg,#dab487 0%,#cba776 50%,#bd9868 100%); clip-path:polygon(24% 0,76% 0,100% 100%,0 100%); }
+.lr-floor::before{ content:''; position:absolute; inset:0; background:repeating-linear-gradient(0deg, rgba(120,80,40,.06) 0 2px, transparent 2px 54px); }
+.lr-floor::after{ content:''; position:absolute; inset:0; pointer-events:none; background:radial-gradient(120% 80% at 50% 0%, rgba(255,255,255,.16), transparent 55%); }
+.lr-corner{ position:absolute; top:38%; bottom:0; z-index:0; }
+.lr-corner-l{ left:0; width:24%; clip-path:polygon(0 0,100% 0,0 100%); background:linear-gradient(155deg,#ecdcc6 0%,#d3b793 100%); }
+.lr-corner-r{ right:0; width:24%; clip-path:polygon(100% 0,0 0,100% 100%); background:linear-gradient(205deg,#ecdcc6 0%,#d3b793 100%); }
 
-.lr-window{ position:absolute; top:8%; left:6%; width:28%; height:32%; z-index:1; border-radius:6px 6px 3px 3px; overflow:hidden; background:#fff; }
+.lr-window{ position:absolute; top:5%; left:6%; width:26%; height:27%; z-index:1; border-radius:6px 6px 3px 3px; overflow:hidden; background:#fff; }
 .lr-sky{ position:absolute; inset:0; background:linear-gradient(180deg,#c4e8ff 0%,#e8f4ff 70%,#fff8e8 100%); }
 .lr-sun{ position:absolute; right:12%; top:14%; width:22%; height:22%; border-radius:50%; background:radial-gradient(circle,#fff8d0,#ffe88a); }
 .lr-mullion{ position:absolute; left:50%; top:0; bottom:0; width:3px; margin-left:-1.5px; background:#fff; }

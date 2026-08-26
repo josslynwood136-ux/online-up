@@ -1489,7 +1489,12 @@ function renderHome() {
       inner = furArt(f.id);
     }
     var hasArt = (!isYard && !imgUrl && inner) ? ' art' : '';
-    return '<div class="home-fur' + hasArt + '" data-fid="' + f.id + '" style="left:' + f.x + '%;top:' + f.y + '%;width:' + f.w + '%;height:' + f.h + '%;background-image:' + (imgUrl && !isYard ? ('url(\'' + escapeHTML(imgUrl) + '\')') : 'none') + '">' + (inner ? '<div class="' + (isYard ? 'yard-fur-art' : 'fur-art') + '">' + inner + '</div>' : '') + '<span class="home-fur-name">' + escapeHTML(f.name) + '</span></div>';
+    var depthStyle = '';
+    if (activeId === 'living') {
+      var d = Math.max(0, Math.min(100, f.y)) / 100;
+      depthStyle = ';transform:scale(' + (0.6 + d * 0.8).toFixed(3) + ');transform-origin:50% 100%;z-index:' + Math.round(20 + f.y);
+    }
+    return '<div class="home-fur' + hasArt + '" data-fid="' + f.id + '" style="left:' + f.x + '%;top:' + f.y + '%;width:' + f.w + '%;height:' + f.h + '%;background-image:' + (imgUrl && !isYard ? ('url(\'' + escapeHTML(imgUrl) + '\')') : 'none') + depthStyle + '">' + (inner ? '<div class="' + (isYard ? 'yard-fur-art' : 'fur-art') + '">' + inner + '</div>' : '') + '<span class="home-fur-name">' + escapeHTML(f.name) + '</span></div>';
   }).join('');
   var roomTabs = Object.keys(h.rooms).map(function(rid) {
     var r = h.rooms[rid];
@@ -5595,7 +5600,12 @@ function homePersonHtml(id, who, pos) {
   var inner = face.emoji ? '<span class="home-person-emoji">' + escapeHTML(face.emoji) + '</span>' : '';
   var tag = (who === 'ta') ? '<span class="home-partner-tag">❤ ' + escapeHTML((activeRole() && activeRole().name) || 'TA') + '</span>' : '';
   var title = (who === 'ta') ? ' title="和 ' + escapeHTML((activeRole() && activeRole().name) || 'TA') + ' 互动"' : '';
-  return '<div id="' + id + '" class="' + (who === 'ta' ? 'home-partner' : 'home-person') + '" style="left:' + pos.x + '%;top:' + pos.y + '%;width:' + size + '%;' + bg + '"' + title + '>' + inner + tag + '</div>';
+  var depthStyle = '';
+  if (state.home && state.home.activeRoom === 'living') {
+    var pd = Math.max(0, Math.min(100, pos.y)) / 100;
+    depthStyle = ';transform:translate(-50%,-100%) scale(' + (0.6 + pd * 0.8).toFixed(3) + ');transform-origin:50% 100%;animation:none;z-index:' + Math.round(20 + pos.y);
+  }
+  return '<div id="' + id + '" class="' + (who === 'ta' ? 'home-partner' : 'home-person') + '" style="left:' + pos.x + '%;top:' + pos.y + '%;width:' + size + '%;' + bg + depthStyle + '"' + title + '>' + inner + tag + '</div>';
 }
 function openHomeCharEdit(tab) {
   window._homeCharTab = (tab === 'ta') ? 'ta' : 'me';
@@ -5729,6 +5739,7 @@ function homeCoupleFx() {
 function furEmoji(fid) {
   var map = {
     'fur-sofa': '🛋️', 'fur-table': '🪑', 'fur-plant': '🌱', 'fur-tv': '📺', 'fur-tvcabinet': '📺',
+    'fur-shelf': '📚', 'fur-lamp': '💡', 'fur-pot': '🪴',
     'fur-desk': '📖', 'fur-fridge': '🧊', 'fur-coffee': '☕', 'fur-painting': '🖼️',
     'fur-bathtub': '🛁', 'fur-shower': '🚿', 'fur-sink': '🚿', 'fur-mirror': '🪞',
     'fur-toilet': '🚽', 'fur-towel': '🧺', 'fur-stool': '🪑', 'fur-candle': '🕯️',
@@ -5746,6 +5757,10 @@ function furArt(fid) {
 function livingRoomArt() {
   return ''
     + '<div class="lr-wall"></div>'
+    + '<div class="lr-wainscot"></div>'
+    + '<div class="lr-base"></div>'
+    + '<div class="lr-corner lr-corner-l"></div>'
+    + '<div class="lr-corner lr-corner-r"></div>'
     + '<div class="lr-floor"></div>'
     + '<div class="lr-window">'
       + '<div class="lr-sky"></div>'
@@ -5756,40 +5771,7 @@ function livingRoomArt() {
     + '</div>'
     + '<div class="lr-frame f1"></div>'
     + '<div class="lr-frame f2"></div>'
-    + '<div class="lr-shelf">'
-      + '<div class="lsh-frame"></div>'
-      + '<div class="lsh-shelf s1"></div>'
-      + '<div class="lsh-shelf s2"></div>'
-      + '<div class="lsh-book b1"></div><div class="lsh-book b2"></div><div class="lsh-book b3"></div><div class="lsh-book b4"></div><div class="lsh-book b5"></div>'
-      + '<div class="lsh-book b6"></div><div class="lsh-book b7"></div><div class="lsh-book b8"></div>'
-    + '</div>'
-    + '<div class="lr-sofa">'
-      + '<div class="ls-back"></div>'
-      + '<div class="ls-seat"></div>'
-      + '<div class="ls-arm-l"></div>'
-      + '<div class="ls-arm-r"></div>'
-      + '<div class="ls-cushion c1"></div>'
-      + '<div class="ls-cushion c2"></div>'
-    + '</div>'
-    + '<div class="lr-table">'
-      + '<div class="lt-top"></div>'
-      + '<div class="lt-leg-l"></div>'
-      + '<div class="lt-leg-r"></div>'
-      + '<div class="lt-cup"></div>'
-    + '</div>'
-    + '<div class="lr-lamp">'
-      + '<div class="ll-shade"></div>'
-      + '<div class="ll-pole"></div>'
-      + '<div class="ll-base"></div>'
-      + '<div class="ll-glow"></div>'
-    + '</div>'
-    + '<div class="lr-rug"></div>'
-    + '<div class="lr-pot">'
-      + '<div class="lp-pot"></div>'
-      + '<div class="lp-leaf l1"></div>'
-      + '<div class="lp-leaf l2"></div>'
-      + '<div class="lp-leaf l3"></div>'
-    + '</div>';
+    + '<div class="lr-rug"></div>';
 }
 function bathroomFurArt(fid) { return furArt(fid); }
 function spaceSwitchRole() {
