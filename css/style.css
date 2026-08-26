@@ -1661,7 +1661,13 @@ button { border: 0; cursor: pointer; }
   transform:translateY(-50%) rotate(45deg);
 }
 @keyframes tvPop{from{opacity:0;transform:translateX(5px) scale(.92)}to{opacity:1;transform:translateX(0) scale(1)}}
-.home-person{position:absolute;width:11%;aspect-ratio:1/1.6;background-size:contain;background-repeat:no-repeat;background-position:center bottom;font-size:26px;display:flex;align-items:flex-end;justify-content:center;transition:left .6s ease,top .6s ease;transform:translate(-50%,-100%);filter:drop-shadow(0 2px 2px rgba(0,0,0,.3));z-index:5;animation:homePersonBob 3.2s ease-in-out infinite}
+.home-person{position:absolute;width:11%;aspect-ratio:1/1.6;background-size:contain;background-repeat:no-repeat;background-position:center bottom;font-size:26px;display:flex;align-items:flex-end;justify-content:center;transition:left .6s ease,top .6s ease,width .15s ease,background-image .2s ease;transform:translate(-50%,-100%);filter:drop-shadow(0 2px 2px rgba(0,0,0,.3));z-index:5;animation:homePersonBob 3.2s ease-in-out infinite}
+.home-partner{position:absolute;width:11%;aspect-ratio:1/1.6;background-size:contain;background-repeat:no-repeat;background-position:center bottom;font-size:26px;display:flex;align-items:flex-end;justify-content:center;transition:left .6s ease,top .6s ease,width .15s ease,background-image .2s ease;transform:translate(-50%,-100%);filter:drop-shadow(0 2px 2px rgba(0,0,0,.3));z-index:6;cursor:pointer;animation:homePersonBob 3.2s ease-in-out infinite;animation-delay:.6s}
+.home-partner-tag{position:absolute;top:-8px;left:50%;transform:translateX(-50%);background:rgba(194,80,125,.92);color:#fff;font-size:9px;padding:1px 6px;border-radius:8px;white-space:nowrap;opacity:0;transition:opacity .2s;pointer-events:none}
+.home-partner:hover .home-partner-tag{opacity:1}
+.home-couple{position:absolute;inset:0;z-index:40;display:none;overflow-y:auto;padding:12px}
+.home-couple .space-wrap{max-width:520px;margin:0 auto}
+.home-couple-close{position:absolute;top:12px;right:12px;width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,.42);color:#fff;font-size:18px;display:grid;place-items:center;cursor:pointer;z-index:2;backdrop-filter:blur(4px)}
 
 /* ===== 家园 · 可爱卡通主题 ===== */
 /* 无背景图的房间用柔和马卡龙底色兜底 */
@@ -1671,6 +1677,61 @@ button { border: 0; cursor: pointer; }
 .home-fur:active{ transform:scale(.96); filter:brightness(1.06); }
 /* 家具名标签：马卡龙药丸 */
 .home-fur-name{ background:linear-gradient(135deg,#ffb3c8,#ffd0a8); color:#fff; border-radius:999px; padding:3px 9px; font-weight:700; box-shadow:0 2px 6px rgba(255,150,190,.4); }
+/* 换形象：第二个按钮=TA */
+.home-char-btn{ position:absolute; top:12px; right:58px; z-index:30; width:40px; height:40px; border-radius:50%; background:rgba(40,32,28,.46); color:#fff; display:grid; place-items:center; cursor:pointer; backdrop-filter:blur(4px); box-shadow:0 4px 12px rgba(0,0,0,.2); transition:transform .15s, background .15s; }
+.home-char-btn:hover{ background:rgba(40,32,28,.62); transform:scale(1.06); }
+.home-char-btn svg{ width:20px; height:20px; }
+.home-char-btn-ta{ right:104px; }
+/* 小人 emoji 脸 */
+.home-person-emoji{ font-size:30px; line-height:1; }
+/* 家具插画（无图时） */
+.home-fur.art{ background-color:rgba(255,255,255,.5); }
+.fur-art{ width:100%; height:100%; display:flex; align-items:center; justify-content:center; }
+.fur-emoji{ font-size:34px; filter:drop-shadow(0 2px 2px rgba(0,0,0,.15)); }
+/* 客厅装修（温暖木质 · 采光） */
+.lr-floor{ position:absolute; left:0; right:0; bottom:0; height:20%; z-index:0; background:linear-gradient(180deg,#d9b98c 0%,#c9a374 60%,#bb9466 100%); box-shadow:inset 0 8px 16px rgba(120,90,60,.25); }
+.lr-floor::before{ content:''; position:absolute; inset:0; background:repeating-linear-gradient(90deg, transparent 0 38px, rgba(150,110,70,.16) 38px 40px); }
+.lr-window{ position:absolute; top:9%; left:8%; width:30%; height:30%; z-index:0; border-radius:8px 8px 4px 4px; overflow:hidden; box-shadow:0 6px 18px rgba(120,150,200,.25), inset 0 0 0 4px #fff; background:#fff; }
+.lr-sky{ position:absolute; inset:0; background:linear-gradient(180deg,#bfe6ff 0%,#e9f6ff 60%,#fff6e0 100%); }
+.lr-sun{ position:absolute; right:14%; top:16%; width:24%; height:24%; border-radius:50%; background:radial-gradient(circle,#fff3c4,#ffe79a); box-shadow:0 0 18px rgba(255,224,140,.85); }
+.lr-mullion-v{ position:absolute; left:50%; top:0; bottom:0; width:4px; margin-left:-2px; background:#fff; }
+.lr-mullion-h{ position:absolute; left:0; right:0; top:50%; height:4px; margin-top:-2px; background:#fff; }
+.lr-curtain{ position:absolute; top:0; bottom:0; width:20%; background:linear-gradient(90deg,#f6d9e2,#eec4d2); opacity:.92; }
+.lr-curtain.left{ left:0; border-radius:8px 0 0 4px; }
+.lr-curtain.right{ right:0; border-radius:0 8px 4px 0; }
+.lr-sill{ position:absolute; left:-3%; right:-3%; bottom:-6px; height:8px; background:#e7d3b8; border-radius:3px; box-shadow:0 2px 4px rgba(0,0,0,.12); }
+.lr-painting{ position:absolute; z-index:0; border-radius:4px; background:#fff; box-shadow:0 4px 10px rgba(0,0,0,.12), inset 0 0 0 3px #d8c09c; }
+.lr-painting.p1{ top:12%; right:10%; width:14%; height:16%; background:linear-gradient(135deg,#ffd9a8,#ffb3a0); }
+.lr-painting.p2{ top:13%; right:26%; width:11%; height:13%; background:linear-gradient(135deg,#a8d8ff,#bff0d8); }
+.lr-rug{ position:absolute; left:16%; bottom:7%; width:68%; height:17%; z-index:0; border-radius:50%; background:radial-gradient(ellipse at center, #e8b79a 0%, #dcae8e 55%, rgba(220,174,142,0) 72%); box-shadow:inset 0 0 0 4px rgba(255,255,255,.5); }
+.lr-plant{ position:absolute; right:5%; bottom:5%; z-index:0; font-size:34px; filter:drop-shadow(0 3px 3px rgba(0,0,0,.15)); }
+.lr-plant span{ display:block; transform:translateY(4px); }
+.lr-lamp{ position:absolute; left:47%; top:0; width:80px; height:130px; z-index:0; background:radial-gradient(circle at 50% 0, rgba(255,224,150,.45), transparent 70%); pointer-events:none; }
+/* 换形象弹层（重做视觉 · 干净克制） */
+.home-char-edit{ position:absolute; inset:0; z-index:42; display:none; align-items:center; justify-content:center; background:rgba(38,38,42,.42); backdrop-filter:blur(4px); padding:18px; }
+.char-edit-card{ width:100%; max-width:320px; background:linear-gradient(180deg,#fbfaf7 0%,#f3f1ec 100%); border-radius:18px; box-shadow:0 14px 40px rgba(0,0,0,.20), inset 0 0 0 1px rgba(0,0,0,.04); padding:22px 20px 22px; text-align:center; font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif; color:#3a3632; position:relative; }
+.char-edit-close{ position:absolute; top:14px; right:14px; width:28px; height:28px; border:none; background:rgba(0,0,0,.04); border-radius:50%; color:#9a938b; cursor:pointer; display:grid; place-items:center; transition:all .15s; }
+.char-edit-close:hover{ background:rgba(0,0,0,.08); color:#6b655e; }
+.char-edit-close svg{ width:14px; height:14px; }
+.char-edit-tabs{ display:flex; width:100%; gap:4px; background:#e9e6e0; border-radius:12px; padding:3px; margin:2px auto 16px; }
+.char-tab{ flex:1; border:none; background:transparent; color:#8a837b; border-radius:9px; padding:7px 8px; font-size:14px; font-weight:600; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:all .18s; }
+.char-tab.on{ background:#fff; color:#5b6b63; box-shadow:0 1px 4px rgba(0,0,0,.1); }
+.char-edit-avatar{ width:100px; height:100px; border-radius:50%; margin:0 auto 10px; background:#fff; background-size:cover; background-position:center; display:flex; align-items:center; justify-content:center; box-shadow:inset 0 0 0 1px rgba(0,0,0,.06); }
+.char-face-emoji{ font-size:50px; line-height:1; }
+.char-edit-hint{ font-size:12px; color:#a39b92; margin-bottom:14px; }
+.char-edit-source{ display:flex; background:#e9e6e0; border-radius:12px; padding:3px; margin-bottom:16px; }
+.char-src{ flex:1; border:none; background:transparent; color:#8a837b; border-radius:9px; padding:9px 0; font-size:14px; font-weight:600; cursor:pointer; text-align:center; transition:all .18s; }
+.char-src.on{ background:#fff; color:#5b6b63; box-shadow:0 1px 4px rgba(0,0,0,.1); }
+.char-edit-size{ display:flex; align-items:center; gap:12px; font-size:14px; color:#3a3632; background:rgba(255,255,255,.5); border-radius:12px; padding:11px 15px; }
+.char-edit-size input{ flex:1; accent-color:#7c8f86; }
+.char-edit-size span:last-child{ min-width:42px; text-align:right; font-weight:700; color:#5b6b63; }
+/* 情侣面板奶油色（覆盖默认粉） */
+.home-couple .space-wrap{ background:transparent; }
+.home-couple .space-hero2{ background:linear-gradient(160deg,#fff7ee,#fdeede); border-radius:18px; box-shadow:0 6px 20px rgba(180,150,120,.18); }
+.home-couple .space-h2-sub{ color:#8a7a6a; }
+.home-couple .space-quote{ background:#fff; color:#6a5a4a; border-radius:12px; }
+.home-couple .space-btn{ background:linear-gradient(135deg,#f0b48a,#e89a72); }
+.home-couple .space-switch{ color:#b08968; }
 /* 底部房间切换：圆润马卡龙 */
 .home-tabs{ height:52px; border-radius:26px; background:rgba(255,255,255,.92); box-shadow:0 6px 18px rgba(200,160,210,.28); gap:6px; padding:0 8px; }
 .home-tab{ font-size:12px; font-weight:600; color:#b69bb5; border-radius:18px; padding:8px 10px; }

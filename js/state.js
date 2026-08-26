@@ -72,7 +72,7 @@ const defaultState = {
           { id: 'fur-desk', name: '📖书桌', img: '', x: 62, y: 30, w: 26, h: 26, actions: [{ label: '写日记', result: '小人趴在书桌前写了两行字，又删掉了。' }, { label: '发呆', result: '小人盯着桌面木纹看了十分钟。' }] },
           { id: 'fur-fridge', name: '🧊冰箱', img: '', x: 80, y: 64, w: 16, h: 30, actions: [{ label: '拿饮料', result: '小人拿出一瓶冰饮料，舒服地叹气。' }] },
           { id: 'fur-coffee', name: '☕咖啡机', img: '', x: 40, y: 24, w: 16, h: 18, actions: [{ label: '泡咖啡', result: '小人泡了杯热咖啡，香气飘满客厅。' }, { label: '往里放致死量糖', result: '小人往咖啡里倒了半袋糖……它裂开了。' }] },
-          { id: 'fur-sofa', name: '🛋️沙发', img: '', x: 36, y: 38, w: 44, h: 26, actions: [{ label: '瘫一会儿', result: '小人瘫在沙发上，像一颗被吸干的电池。' }, { label: '抱紧抱枕', result: '小人抱紧抱枕，获得了短暂的安全感。' }] }
+          { id: 'fur-sofa', name: '🛋️沙发', img: '', x: 36, y: 38, w: 44, h: 26, actions: [{ label: '瘫一会儿', result: '小人瘫在沙发上，像一颗被吸干的电池。' }, { label: '抱紧抱枕', result: '小人抱紧抱枕，获得了短暂的安全感。' }, { cid: 'couple', label: '和 TA 一起瘫', result: '小人靠在 TA 肩头，两个人什么都不用说，却很安心。', kiss: true }] }
         ]
       },
       bathroom: {
@@ -131,7 +131,11 @@ const defaultState = {
       }
     },
     activeRoom: 'living',
-    logs: []
+    char: { type: '', value: '' },
+    partnerChar: { type: '', value: '' },
+    mySize: 11,
+    taSize: 11,
+    partnerPos: { x: 66, y: 72 }
   },
   live: { viewer: 12, likes: 0, giftWorth: 0, gifts: 0, followers: 0, intimacy: 0, coins: 0, lastSign: '', giftLog: [], song: '', flirt: 0 },
   qq: null,
@@ -309,6 +313,10 @@ function ensureStateShape(next, saved) {
       }
     });
   }
+  if (!next.home.char || typeof next.home.char !== 'object') next.home.char = { type: '', value: '' };
+  if (!next.home.partnerChar || typeof next.home.partnerChar !== 'object') next.home.partnerChar = { type: '', value: '' };
+  next.home.mySize = Number(next.home.mySize) || 11;
+  next.home.taSize = Number(next.home.taSize) || 11;
   if (!Array.isArray(next.albums)) next.albums = [];
   if (Array.isArray(next.album) && next.album.length && !next.albums.length) {
     next.albums = [{ id: 'default', name: '默认相册', photos: next.album.map((p, i) => ({ id: 'p' + i, url: p.url, caption: p.caption || '', date: p.date || '' })) }];

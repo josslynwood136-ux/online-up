@@ -37,7 +37,7 @@ function openApp(name) {
       '家园': renderHome, '日记': renderDiary, '自习': renderStudy, '自习室': renderStudy,
       '养多肉': renderPlant, '多肉': renderPlant, '账本': renderLedger, '涂鸦': renderDoodle,
       '音乐': renderMusic, '啵啵': renderLiveHall, '啵啵间': renderLiveHall, '线下': renderOffline, '相册': renderAlbum, '表情包': renderStickerManager,
-      '许愿柳': renderWillow, '许愿流': renderWillow, '游戏': renderGame, '游戏房': renderGame, '空间': renderSpace, '情侣空间': renderSpace,
+      '许愿柳': renderWillow, '许愿流': renderWillow, '游戏': renderGame, '游戏房': renderGame,
       'QQ': renderIGProfile,
       'IG': renderIGProfile
     };
@@ -55,6 +55,8 @@ function closeApp() {
   }
   _willowFogShown = false;
   if (spaceFxTimer) { clearInterval(spaceFxTimer); spaceFxTimer = null; }
+  var hc = $('homeCouple'); if (hc) hc.style.display = 'none';
+  window._spaceTarget = 'app';
   if (_liveTimer) { clearInterval(_liveTimer); _liveTimer = null; }
   if (_liveBagTimer) { clearInterval(_liveBagTimer); _liveBagTimer = null; }
   studySoundStop();
@@ -1107,7 +1109,8 @@ const YARD_DEFAULT = {
     { id: 'fur-swing', name: '秋千', img: '', x: 2, y: 44, w: 22, h: 24, actions: [
       { label: '坐上去', result: '小人坐到秋千上，脚尖点着地面，慢慢地荡了起来。' },
       { label: '把它推高', result: '小人把秋千荡得老高，笑声顺着风传开。' },
-      { label: '躺着看云', result: '小人躺在秋千上，看着云朵慢慢挪窝。' }
+      { label: '躺着看云', result: '小人躺在秋千上，看着云朵慢慢挪窝。' },
+      { cid: 'couple', label: '和 TA 一起荡秋千', result: '小人拉着 TA 坐上秋千，脚尖点地，风把两个人的头发都吹得乱乱的。', kiss: true }
     ]},
     { id: 'fur-pond', name: '水池', img: '', x: 34, y: 60, w: 14, h: 14, actions: [
       { label: '捞月亮', result: '小人伸手去捞池里的月亮倒影，涟漪一圈圈荡开，月亮碎成了光点。' },
@@ -1472,26 +1475,47 @@ function renderHome() {
   var yd = yardState();
   var plotHtml = (activeId === 'yard' && yd) ? renderYardPlots(yd) : '';
   var bathHtml = (activeId === 'bathroom') ? '<div class="bath-floor"></div><div class="bath-light"></div><span class="bath-steam s1"></span><span class="bath-steam s2"></span><span class="bath-steam s3"></span><span class="bath-floatbub b1"></span><span class="bath-floatbub b2"></span>' : '';
+  var sceneHtml = (activeId === 'living') ? livingRoomArt() : '';
   var furHtml = (room.furniture || []).map(function (f) {
     var isYard = (activeId === 'yard');
     var imgUrl = isYard ? (f.img || YARD_FUR_IMG[f.id] || '') : (f.img || '');
-    var inner = (isYard && imgUrl) ? '<img class="yard-fur-img" src="' + escapeHTML(imgUrl) + '" alt="' + escapeHTML(f.id) + '">' : (isYard ? yardFurArt(f.id) : '');
-    return '<div class="home-fur" data-fid="' + f.id + '" style="left:' + f.x + '%;top:' + f.y + '%;width:' + f.w + '%;height:' + f.h + '%;background-image:' + (imgUrl && !isYard ? ('url(\'' + escapeHTML(imgUrl) + '\')') : 'none') + '">' + (inner ? '<div class="yard-fur-art">' + inner + '</div>' : '') + '<span class="home-fur-name">' + escapeHTML(f.name) + '</span></div>';
+    var inner = '';
+    if (isYard) {
+      inner = imgUrl ? '<img class="yard-fur-img" src="' + escapeHTML(imgUrl) + '" alt="' + escapeHTML(f.id) + '">' : yardFurArt(f.id);
+    } else if (imgUrl) {
+      inner = '';
+    } else {
+      inner = furArt(f.id);
+    }
+    var hasArt = (!isYard && !imgUrl && inner) ? ' art' : '';
+    return '<div class="home-fur' + hasArt + '" data-fid="' + f.id + '" style="left:' + f.x + '%;top:' + f.y + '%;width:' + f.w + '%;height:' + f.h + '%;background-image:' + (imgUrl && !isYard ? ('url(\'' + escapeHTML(imgUrl) + '\')') : 'none') + '">' + (inner ? '<div class="' + (isYard ? 'yard-fur-art' : 'fur-art') + '">' + inner + '</div>' : '') + '<span class="home-fur-name">' + escapeHTML(f.name) + '</span></div>';
   }).join('');
   var roomTabs = Object.keys(h.rooms).map(function(rid) {
     var r = h.rooms[rid];
     return '<div class="home-tab' + (rid === activeId ? ' active' : '') + '" onclick="switchRoom(\'' + rid + '\')">' + escapeHTML(r.name) + '</div>';
   }).join('');
+  var pp = room.personPos || { x: 50, y: 72 };
+  var mePersonHtml = homePersonHtml('homePerson', 'me', pp);
+  var partnerHtml = '';
+  var partner = activeRole();
+  if (partner) {
+    var pPos = h.partnerPos || { x: Math.min(94, pp.x + 16), y: pp.y };
+    partnerHtml = homePersonHtml('homePartner', 'ta', pPos);
+  }
+  ensureHomeCoupleActions();
   c().innerHTML = `
     <div class="stack" style="height:100%;margin:0;padding:0;position:relative">
       <div class="home-room${activeId === 'bathroom' ? ' bathroom' : ''}${activeId === 'yard' ? ' yard' : ''}">
         <div class="home-bg"${room.bg ? ` style="background-image:url('${escapeHTML(room.bg)}')"` : ''}></div>
+        ${sceneHtml}
         <div class="home-exit" onclick="closeApp()" title="退出">✕</div>
         <div class="home-log-btn" onclick="toggleHomeLog()" title="查看记录">📜</div>
+        <div class="home-char-btn" onclick="openHomeCharEdit('me')" title="换小人形象"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c0-3.6 3.1-5.5 7-5.5s7 1.9 7 5.5"/></svg></div>
         ${bathHtml}
         ${plotHtml}
         ${furHtml}
-        <div id="homePerson" class="home-person" style="left:${room.personPos.x}%;top:${room.personPos.y}%;background-image:url('${escapeHTML(room.person || DEFAULT_PERSON)}')"></div>
+        ${mePersonHtml}
+        ${partnerHtml}
         <div id="homeEffects" style="position:absolute;inset:0;pointer-events:none;z-index:6"></div>
         <div id="yardPop" class="yard-pop" style="display:none"></div>
         <div id="homePanel" class="home-panel" style="display:none">
@@ -1504,6 +1528,10 @@ function renderHome() {
           <h2 class="section-title">📜 互动记录</h2>
           ${h.logs && h.logs.length ? h.logs.map(l => `<div class="card subtle" style="margin-bottom:8px;padding:10px 12px">· ${escapeHTML(l)}</div>`).join('') : '<div class="card subtle">还没有互动记录，点家具试试吧。</div>'}
         </div>
+        <div id="homeCouple" class="home-couple" style="display:none">
+          <div class="home-couple-close" onclick="closeHomeCouple()">✕</div>
+        </div>
+        <div id="homeCharEdit" class="home-char-edit" style="display:none" onclick="if(event.target===this)closeHomeCharEdit()"></div>
       </div>
       <div class="home-tabs">${roomTabs}</div>
     </div>`;
@@ -1512,6 +1540,8 @@ function renderHome() {
     roomEl.onclick = function(ev) {
       const bubEl = ev.target.closest('.bath-bubble');
       if (bubEl) { doFurnitureAction(bubEl.dataset.fid, parseInt(bubEl.dataset.idx)); return; }
+      const partnerEl = ev.target.closest('.home-partner');
+      if (partnerEl) { openHomeCouple(); return; }
       const furEl = ev.target.closest('.home-fur');
       if (furEl) { const fid = furEl.dataset.fid; if (fid) { openFurniture(fid); return; } }
       const plotEl = ev.target.closest('.yard-plot');
@@ -1677,6 +1707,18 @@ function doFurnitureAction(furnitureId, idx) {
   const act = (f.actions || [])[idx]; if (!act) return;
   $('homePanelResult').innerText = act.result;
   if (act.effect) spawnRoomEffect(furnitureId, act.effect);
+  if (act.cid === 'couple' || act.kiss) {
+    var p = activeRole();
+    if (p) {
+      var sp = spaceFor(p.id);
+      sp.intimacy += 2;
+      sp.kisses += 1;
+      saveState();
+      homePartnerWalkTo(f);
+      homeCoupleFx();
+      showIGToast((SPACE_KISS_LINES[Math.floor(Math.random() * SPACE_KISS_LINES.length)]) + ' · 亲密度 +2');
+    }
+  }
   const time = new Date().toLocaleString();
   h.logs = h.logs || [];
   h.logs.unshift(time + ' · ' + f.name + '：' + act.label);
@@ -5427,7 +5469,7 @@ function spaceCurrDaily() {
   if (!sp.daily[k]) sp.daily[k] = {};
   return sp.daily[k];
 }
-function renderSpace() {
+function spaceInnerHtml() {
   const role = activeRole();
   const sp = spaceFor(role.id);
   const days = spaceDays(sp);
@@ -5441,7 +5483,7 @@ function renderSpace() {
   const lover = sp.loverName ? ' · ' + escapeHTML(sp.loverName) : '';
   const meAv = renderAvatar(state.myProfile && (state.myProfile.avatarImage || state.myProfile.avatar) || activeProfile().avatar, '我');
   const roleAv = renderAvatar(role.avatar, role.name);
-  c().innerHTML = `
+  return `
     <div class="space-wrap">
       <div class="space-hero2">
         <div class="space-hero2-glow"></div>
@@ -5483,6 +5525,10 @@ function renderSpace() {
         ${(sp.notes || []).length ? `<div class="space-note-list">${sp.notes.slice(0, 6).map(n => `<div class="space-note"><p>${escapeHTML(n.text)}</p><time>${escapeHTML(n.date || '')}</time></div>`).join('')}</div>` : ''}
       </div>
     </div>`;
+}
+function renderSpace() {
+  window._spaceTarget = 'app';
+  c().innerHTML = spaceInnerHtml();
   c().style.background = '#fdf6f7';
   const ah = document.querySelector('.app-header');
   if (ah) ah.style.background = '#fdf6f7';
@@ -5491,6 +5537,227 @@ function renderSpace() {
   clearInterval(spaceFxTimer);
   spaceFxTimer = setInterval(function () { spawnSpaceHearts(1 + (Math.random() < 0.5 ? 1 : 0)); }, 480);
 }
+function refreshSpaceView() {
+  if (window._spaceTarget === 'home') renderHomeCouple();
+  else renderSpace();
+}
+function openHomeCouple() {
+  var role = activeRole();
+  if (!role) { showIGToast('还没有伴侣可以互动哦'); return; }
+  window._spaceTarget = 'home';
+  renderHomeCouple();
+}
+function closeHomeCouple() {
+  var el = $('homeCouple');
+  if (el) el.style.display = 'none';
+  if (spaceFxTimer) { clearInterval(spaceFxTimer); spaceFxTimer = null; }
+  window._spaceTarget = 'app';
+}
+function renderHomeCouple() {
+  var el = $('homeCouple');
+  if (!el) return;
+  el.innerHTML = spaceInnerHtml();
+  el.style.display = 'block';
+  el.style.background = '#fdf6f7';
+  clearInterval(spaceFxTimer);
+  spaceFxTimer = setInterval(function () { spawnSpaceHearts(1 + (Math.random() < 0.5 ? 1 : 0)); }, 480);
+}
+
+// ===== 家园 · 换小人形象 / 装修 =====
+function homeCharDisplay(who) {
+  var h = state.home;
+  return (who === 'ta') ? (h.partnerChar || { type: '', value: '' }) : (h.char || { type: '', value: '' });
+}
+var HOME_DEFAULT_PERSON = 'https://img.facfox.com/imgs/2026/07/19/ea51598f7d0459ee.jpg';
+function resolveHomeChar(who) {
+  var f = homeCharDisplay(who);
+  if (f.type === 'image' && f.value) return { url: f.value };
+  if (f.type === 'emoji' && f.value) return { emoji: f.value };
+  if (f.type === 'avatar') {
+    var av = who === 'ta'
+      ? (activeRole() && activeRole().avatar)
+      : ((state.myProfile && (state.myProfile.avatarImage || state.myProfile.avatar)) || (activeProfile() && activeProfile().avatar));
+    if (typeof av === 'string' && /^(https?:|data:|\/)/.test(av)) return { url: av };
+    return { url: HOME_DEFAULT_PERSON };
+  }
+  if (who === 'ta') {
+    var rp = activeRole();
+    if (rp && rp.avatar && typeof rp.avatar === 'string' && /^(https?:|data:|\/)/.test(rp.avatar)) return { url: rp.avatar };
+  }
+  return { url: HOME_DEFAULT_PERSON };
+}
+function homeCharSize(who) { return who === 'ta' ? (state.home.taSize || 11) : (state.home.mySize || 11); }
+function homePersonHtml(id, who, pos) {
+  var face = resolveHomeChar(who);
+  var size = homeCharSize(who);
+  var bg = face.url ? "background-image:url('" + escapeHTML(face.url) + "')" : '';
+  var inner = face.emoji ? '<span class="home-person-emoji">' + escapeHTML(face.emoji) + '</span>' : '';
+  var tag = (who === 'ta') ? '<span class="home-partner-tag">❤ ' + escapeHTML((activeRole() && activeRole().name) || 'TA') + '</span>' : '';
+  var title = (who === 'ta') ? ' title="和 ' + escapeHTML((activeRole() && activeRole().name) || 'TA') + ' 互动"' : '';
+  return '<div id="' + id + '" class="' + (who === 'ta' ? 'home-partner' : 'home-person') + '" style="left:' + pos.x + '%;top:' + pos.y + '%;width:' + size + '%;' + bg + '"' + title + '>' + inner + tag + '</div>';
+}
+function openHomeCharEdit(tab) {
+  window._homeCharTab = (tab === 'ta') ? 'ta' : 'me';
+  renderHomeCharPanel();
+}
+function closeHomeCharEdit() { var el = $('homeCharEdit'); if (el) el.style.display = 'none'; }
+function switchHomeCharTab(tab) { window._homeCharTab = tab; renderHomeCharPanel(); }
+function applyHomeCharToPerson(who) {
+  var el = $(who === 'ta' ? 'homePartner' : 'homePerson');
+  if (!el) return;
+  var face = resolveHomeChar(who);
+  var ex = el.querySelector('.home-person-emoji');
+  if (face.emoji) {
+    el.style.backgroundImage = 'none';
+    if (!ex) { ex = document.createElement('span'); ex.className = 'home-person-emoji'; el.appendChild(ex); }
+    ex.textContent = face.emoji;
+  } else {
+    if (ex) ex.remove();
+    el.style.backgroundImage = (face && face.url) ? "url('" + face.url + "')" : 'none';
+  }
+  el.style.width = homeCharSize(who) + '%';
+}
+function homeCharPickFile(who, input) {
+  var file = input.files && input.files[0]; if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function (e) {
+    var url = e.target.result;
+    if (who === 'ta') state.home.partnerChar = { type: 'image', value: url };
+    else state.home.char = { type: 'image', value: url };
+    saveState(); applyHomeCharToPerson(who); renderHomeCharPanel();
+  };
+  reader.readAsDataURL(file);
+}
+function homeCharSetDefault(who) {
+  if (who === 'ta') state.home.partnerChar = { type: '', value: '' };
+  else state.home.char = { type: '', value: '' };
+  saveState(); applyHomeCharToPerson(who); renderHomeCharPanel();
+}
+function homeCharSetAvatar(who) {
+  if (who === 'ta') state.home.partnerChar = { type: 'avatar', value: '' };
+  else state.home.char = { type: 'avatar', value: '' };
+  saveState(); applyHomeCharToPerson(who); renderHomeCharPanel();
+}
+function homeCharResize(who, val) {
+  val = Math.max(6, Math.min(22, Number(val) || 11));
+  if (who === 'ta') state.home.taSize = val; else state.home.mySize = val;
+  saveState();
+  var el = $(who === 'ta' ? 'homePartner' : 'homePerson');
+  if (el) el.style.width = val + '%';
+  var lab = $('homeCharSizeVal'); if (lab) lab.textContent = val + '%';
+}
+function renderHomeCharPanel() {
+  var el = $('homeCharEdit'); if (!el) return;
+  var tab = window._homeCharTab || 'me';
+  var who = tab;
+  var hasPartner = !!activeRole();
+  if (tab === 'ta' && !hasPartner) { tab = 'me'; who = 'me'; window._homeCharTab = 'me'; }
+  var f = homeCharDisplay(who);
+  var face = resolveHomeChar(who);
+  var size = homeCharSize(who);
+  var usingImage = (f.type === 'image' && f.value);
+  var usingAvatar = (f.type === 'avatar');
+  var usingDefault = (!usingImage && !usingAvatar);
+  var faceInner = face.emoji ? '<span class="char-face-emoji">' + escapeHTML(face.emoji) + '</span>' : '';
+  var faceStyle = face.emoji ? '' : "background-image:url('" + escapeHTML(face.url) + "')";
+  var taTab = hasPartner ? '<button class="char-tab' + (tab === 'ta' ? ' on' : '') + '" onclick="switchHomeCharTab(\'ta\')">' + escapeHTML(activeRole().name) + '</button>' : '';
+  var sourceHtml = '<button class="char-src' + (usingDefault ? ' on' : '') + '" onclick="homeCharSetDefault(\'' + who + '\')">默认</button>'
+    + '<label class="char-src' + (usingImage ? ' on' : '') + '">上传<input type="file" accept="image/*" style="display:none" onchange="homeCharPickFile(\'' + who + '\', this)"></label>';
+  if (who !== 'ta') sourceHtml += '<button class="char-src' + (usingAvatar ? ' on' : '') + '" onclick="homeCharSetAvatar(\'' + who + '\')">头像</button>';
+  el.innerHTML = `
+    <div class="char-edit-card">
+      <button class="char-edit-close" onclick="closeHomeCharEdit()" aria-label="关闭"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <div class="char-edit-tabs">
+        <button class="char-tab${tab === 'me' ? ' on' : ''}" onclick="switchHomeCharTab('me')">我</button>
+        ${taTab}
+      </div>
+      <div class="char-edit-avatar" id="charFacePreview" style="${faceStyle}">${faceInner}</div>
+      <div class="char-edit-hint">${who === 'ta' ? 'TA' : '我'} · ${usingDefault ? (who === 'ta' ? '角色头像' : '默认形象') : (usingImage ? '已上传图片' : '我的头像')}</div>
+      <div class="char-edit-size">
+        <span>大小</span>
+        <input type="range" min="6" max="22" step="1" value="${size}" oninput="homeCharResize('${who}', this.value)">
+        <span id="homeCharSizeVal">${size}%</span>
+      </div>
+      <div class="char-edit-source">${sourceHtml}</div>
+    </div>`;
+  el.style.display = 'flex';
+}
+
+/* 给部分家具补上「和 TA 一起」的恋人互动（兼容旧存档） */
+function ensureHomeCoupleActions() {
+  var h = state.home; if (!h || !h.rooms) return;
+  var defs = [
+    { room: 'living', fid: 'fur-sofa', label: '和 TA 一起瘫', result: '小人靠在 TA 肩头，两个人什么都不用说，却很安心。' },
+    { room: 'yard', fid: 'fur-swing', label: '和 TA 一起荡秋千', result: '小人拉着 TA 坐上秋千，脚尖点地，风把两个人的头发都吹得乱乱的。' }
+  ];
+  defs.forEach(function (d) {
+    var room = h.rooms[d.room];
+    if (!room || !room.furniture) return;
+    var f = room.furniture.find(function (x) { return x.id === d.fid; });
+    if (f && f.actions && !f.actions.some(function (a) { return a.cid === 'couple'; })) {
+      f.actions.push({ cid: 'couple', label: d.label, result: d.result, kiss: true });
+      saveState();
+    }
+  });
+}
+
+/* TA 走到某件家具旁 */
+function homePartnerWalkTo(f) {
+  var h = state.home; if (!h) return;
+  h.partnerPos = { x: Math.min(94, Math.max(4, f.x + (f.w / 2) - 4)), y: Math.min(86, Math.max(4, f.y + f.h - 14)) };
+  saveState();
+  var p = $('homePartner');
+  if (p) { p.style.left = h.partnerPos.x + '%'; p.style.top = h.partnerPos.y + '%'; }
+}
+
+/* 恋人互动飘心特效 */
+function homeCoupleFx() {
+  for (var i = 0; i < 8; i++) {
+    (function () {
+      var h = document.createElement('div');
+      h.className = 'space-scene-heart';
+      h.textContent = '💗';
+      h.style.left = (Math.random() * window.innerWidth) + 'px';
+      h.style.top = (window.innerHeight * 0.6) + 'px';
+      h.style.position = 'fixed';
+      document.body.appendChild(h);
+      setTimeout(function () { h.remove(); }, 1800);
+    })();
+  }
+}
+function furEmoji(fid) {
+  var map = {
+    'fur-sofa': '🛋️', 'fur-table': '🪑', 'fur-plant': '🌱', 'fur-tv': '📺', 'fur-tvcabinet': '📺',
+    'fur-desk': '📖', 'fur-fridge': '🧊', 'fur-coffee': '☕', 'fur-painting': '🖼️',
+    'fur-bathtub': '🛁', 'fur-shower': '🚿', 'fur-sink': '🚿', 'fur-mirror': '🪞',
+    'fur-toilet': '🚽', 'fur-towel': '🧺', 'fur-stool': '🪑', 'fur-candle': '🕯️',
+    'fur-scale': '⚖️', 'fur-plant-bath': '🪴'
+  };
+  return map[fid] || '📦';
+}
+function furArt(fid) {
+  var em = furEmoji(fid);
+  return '<div class="fur-emoji">' + em + '</div>';
+}
+function livingRoomArt() {
+  return ''
+    + '<div class="lr-floor"></div>'
+    + '<div class="lr-window">'
+      + '<div class="lr-sky"></div>'
+      + '<div class="lr-sun"></div>'
+      + '<div class="lr-mullion-v"></div>'
+      + '<div class="lr-mullion-h"></div>'
+      + '<div class="lr-curtain left"></div>'
+      + '<div class="lr-curtain right"></div>'
+      + '<div class="lr-sill"></div>'
+    + '</div>'
+    + '<div class="lr-painting p1"></div>'
+    + '<div class="lr-painting p2"></div>'
+    + '<div class="lr-rug"></div>'
+    + '<div class="lr-plant"><span>🪴</span></div>'
+    + '<div class="lr-lamp"></div>';
+}
+function bathroomFurArt(fid) { return furArt(fid); }
 function spaceSwitchRole() {
   const roles = state.roles;
   if (!roles.length) return;
@@ -5498,7 +5765,7 @@ function spaceSwitchRole() {
   const next = roles[(idx + 1) % roles.length];
   state.activeRoleId = next.id;
   saveState();
-  renderSpace();
+  refreshSpaceView();
 }
 function saveSpace() {
   const sp = spaceFor(activeRole().id);
@@ -5507,7 +5774,7 @@ function saveSpace() {
   sp.notes.unshift({ text: t, date: new Date().toLocaleString() });
   sp.memo = '';
   saveState();
-  renderSpace();
+  refreshSpaceView();
   showIGToast('💌 悄悄话已寄出');
 }
 function spaceKiss() {
