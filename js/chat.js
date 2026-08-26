@@ -611,7 +611,7 @@ function showQuoteMenu(index) {
   if (replyOpt) replyOpt.onclick = function() { hideQuoteMenu(); quoteMessage(index); };
   var qMulti = el.querySelector('.q-multi');
   if (qMulti) qMulti.onclick = function() { hideQuoteMenu(); enterMultiSelect(index); };
-  if (voiceOpt) voiceOpt.onclick = function() { hideQuoteMenu(); if (typeof speakText === 'function') speakText((msg.content || (msg.media ? '[图片]' : '')), null); };
+  if (voiceOpt) voiceOpt.onclick = function() { hideQuoteMenu(); if (typeof speakText === 'function') speakText((msg.content || (msg.media ? '[图片]' : '')), null, document.querySelector('.msg[data-idx="' + index + '"]')); };
   el.querySelector('.q-del').onclick = function() { hideQuoteMenu(); deleteMessage(char.id, index); };
   el.style.display = 'flex';
   var mask = $('quoteMenuMask'); if (mask) mask.classList.add('show');
@@ -1150,26 +1150,32 @@ function sendChat() {
   }
 }
 
-// 重新生成：删掉最后一条角色回复，用当时的用户问题重新生成一条
+// 把一条用户消息还原成喂给模型的「用户文字」：表情包/图片按 buildAIMessages 的规则转成描述文字
+function userMsgTextForRegen(m) {
+  var text = (m && m.content) || '';
+  if (text) return text;
+  if (m && m.media) {
+    if (m.type === 'sticker') {
+      return '[用户发来一张表情包]' + (m.media.stickerName ? ('（名称：' + m.media.stickerName + (m.media.stickerMeaning ? '，含义：' + m.media.stickerMeaning : '') + '）') : '') + '——请把它当成一个表情包/贴图来回应，不要把它当成普通照片去描述画面';
+    }
+    return '[' + m.media.type + ']';
+  }
+  return text;
+}
+// 重新生成：找到我最后发的一条消息，把它之后对方当轮的整轮回复（含内心独白、多条气泡）全部删掉，用我那句话重新生成一个完整回复
 function regenerateReply() {
   var char = activeCharacter();
   if (!char) return;
   if (activeAbort) { try { activeAbort.abort(); } catch (e) {} }
   if (!state.api.key || !state.api.url || !state.api.model) { alert('还没连上，先去设置里连接一下。'); return; }
-  // 找到最后一条角色回复
-  var idx = -1, i;
-  for (i = char.chat.length - 1; i >= 0; i--) { if (char.chat[i].role === 'assistant') { idx = i; break; } }
-  if (idx < 0) { alert('没有可重新生成的回复'); return; }
-  // 找到这条回复之前最近的一条用户消息
+  // 找到最后一条「我发的消息」
   var uidx = -1, j;
-  for (j = idx - 1; j >= 0; j--) { if (char.chat[j].role === 'user') { uidx = j; break; } }
-  if (uidx < 0) return;
-  var userText = (char.chat[uidx].content || '').trim();
+  for (j = char.chat.length - 1; j >= 0; j--) { if (char.chat[j].role === 'user') { uidx = j; break; } }
+  if (uidx < 0) { alert('没有可重新生成的回复'); return; }
+  var userText = userMsgTextForRegen(char.chat[uidx]).trim();
   if (!userText) return;
-  // 只删最后这条角色回复，以及它前面紧邻的内心独白气泡；保留你发的用户消息
-  var start = idx;
-  while (start > 0 && char.chat[start - 1] && char.chat[start - 1].role === 'system' && char.chat[start - 1].type === 'think') start--;
-  char.chat.splice(start);
+  // 删掉这条消息之后对方当轮的全部内容（多条回复 + 内心独白），保留前面的对话
+  char.chat.splice(uidx + 1);
   saveState();
   renderChat();
   _manualAICall = true;

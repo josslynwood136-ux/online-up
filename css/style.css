@@ -560,7 +560,6 @@ button { border: 0; cursor: pointer; }
 .bubble.system { align-self: center; max-width: 100%; width: fit-content; background: transparent; color: #c4b5a8; font-size: 12px; box-shadow: none; white-space: nowrap; word-break: keep-all; }
 .bubble.retract-bubble { color: #b0a095; font-style: italic; }
 .voice-avatar { cursor: pointer; position: relative; }
-.voice-avatar::after { content: '☁'; position: absolute; right: -2px; bottom: -1px; font-size: 9px; color: #c9b8a5; background: #fff; border-radius: 50%; width: 13px; height: 13px; line-height: 13px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
 @keyframes innerVoiceIn { from { opacity: 0; transform: translateY(14px) scale(.94); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
 /* ===== 心声弹窗 · 正统美漫风 ===== */
@@ -705,6 +704,24 @@ button { border: 0; cursor: pointer; }
 .msg { display: flex; align-items: flex-end; gap: 6px; max-width: 90%; min-width: 0; position: relative; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .msg.left { align-self: flex-start; }
 .msg.right { align-self: flex-end; flex-direction: row-reverse; }
+.voice-spinner {
+  position: fixed; left: 0; top: 0; transform: translate(-50%, -100%);
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 3px 12px rgba(190,120,160,.35);
+  pointer-events: none; z-index: 9999; --p: 0%;
+}
+.voice-spinner-ring {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(#ff3d8b var(--p, 0%), rgba(150,120,140,.20) 0);
+  -webkit-mask: radial-gradient(transparent 56%, #000 57%);
+          mask: radial-gradient(transparent 56%, #000 57%);
+}
+.voice-spinner-pct {
+  position: relative; font-size: 9px; line-height: 1; font-weight: 700; color: #c0397a;
+  text-shadow: 0 1px 1px rgba(255,255,255,.9);
+}
 .msg.system { align-self: center; justify-content: center; max-width: 90%; width: fit-content; }
 .msg .avatar { width: 20px; height: 20px; border-radius: 50%; flex: 0 0 auto; font-size: 10px; box-shadow: 0 2px 6px rgba(200,170,160,.15); border: 1.5px solid rgba(255,255,255,.5); }
 .msg.pressing .bubble { transform: scale(.95); transition: transform .12s ease; box-shadow: 0 0 0 2px rgba(56,151,240,.45); }
@@ -3547,18 +3564,11 @@ button { border: 0; cursor: pointer; }
 #chatWindow.bubble-style-comic .msg:nth-child(even) .bubble.right { transform:rotate(-.9deg); }
 /* 格角装饰：左上角彩色小三角 */
 #chatWindow.bubble-style-comic .bubble::before {
-  content:''; position:absolute; left:-2px; top:-2px;
-  width:0; height:0; border-top:16px solid #ff5a5f; border-right:16px solid transparent;
+  content:none;
 }
-/* 漫画格编号印章 */
+/* 漫画格编号印章（已去除） */
 #chatWindow.bubble-style-comic .bubble::after {
-  content: counter(panel);
-  position:absolute; right:6px; top:-10px;
-  width:22px; height:22px; background:#1c1c1c; color:#ffd84d;
-  border-radius:50%; display:grid; place-items:center;
-  font-size:11px; font-weight:900; border:2px solid #fff;
-  box-shadow:2px 2px 0 rgba(28,28,28,.3);
-  opacity:1; pointer-events:none;
+  content:none;
 }
 #chatWindow.bubble-style-comic .bubble.system::after,
 #chatWindow.bubble-style-comic .bubble.typing::after { content:none; }

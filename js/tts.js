@@ -10,6 +10,7 @@ var _ttsCurBtn = null;
 var _ttsAudio = null;
 var _ttsAbort = null;
 var _ttsSeq = 0; // 播放序号：每次 speakText +1，用于识别"已被新的播放/停止取代"
+var _ttsCurSpinner = null; // 正在生成语音时挂在头像上的转圈 DOM 元素
 
 // 各平台预设：默认模型 / 默认音色 / 官方地址 / 可选模型 / 音色候选（value + 说明）
 var TTS_PRESETS = {
@@ -152,8 +153,50 @@ function _setBtnOff() {
     _ttsCurBtn = null;
   }
 }
+function _attachSpinner(bubbleEl) {
+  if (!bubbleEl || !bubbleEl.querySelector) return null;
+  var av = bubbleEl.querySelector('.avatar');
+  if (!av) return null;
+  // 若已挂着一个（理论上不会），先清掉
+  if (_ttsCurSpinner && _ttsCurSpinner.parentNode) _ttsCurSpinner.parentNode.removeChild(_ttsCurSpinner);
+  var sp = document.createElement('div');
+  sp.className = 'voice-spinner';
+  sp.innerHTML = '<span class="voice-spinner-ring"></span><span class="voice-spinner-pct">0%</span>';
+  document.body.appendChild(sp);
+  // 用头像真实位置固定到「头像正上方」，并跟随滚动/缩放，保证不被聊天区裁剪
+  function place() {
+    var r = av.getBoundingClientRect();
+    sp.style.left = (r.left + r.width / 2) + 'px';
+    sp.style.top = (r.top - 6) + 'px';
+  }
+  place();
+  sp._place = place;
+  window.addEventListener('scroll', place, true);
+  window.addEventListener('resize', place);
+  // 接口不返回真实进度，用平滑假进度先跑到 92%，生成完成/失败再归零移除
+  var pct = 0;
+  sp._timer = setInterval(function () {
+    if (pct < 92) {
+      pct = Math.min(92, pct + Math.random() * 7 + 1.5);
+      sp.style.setProperty('--p', pct.toFixed(0) + '%');
+      var pc = sp.querySelector('.voice-spinner-pct');
+      if (pc) pc.textContent = Math.floor(pct) + '%';
+    }
+  }, 280);
+  _ttsCurSpinner = sp;
+  return sp;
+}
+function _removeSpinner() {
+  if (_ttsCurSpinner) {
+    if (_ttsCurSpinner._timer) { try { clearInterval(_ttsCurSpinner._timer); } catch (e) {} _ttsCurSpinner._timer = null; }
+    if (_ttsCurSpinner._place) { try { window.removeEventListener('scroll', _ttsCurSpinner._place, true); window.removeEventListener('resize', _ttsCurSpinner._place); } catch (e) {} }
+    if (_ttsCurSpinner.parentNode) _ttsCurSpinner.parentNode.removeChild(_ttsCurSpinner);
+  }
+  _ttsCurSpinner = null;
+}
 function stopSpeak() {
   _ttsSeq++;
+  _removeSpinner();
   if (_ttsAudio) { try { _ttsAudio.pause(); _ttsAudio.src = ''; } catch (e) {} _ttsAudio = null; }
   if (_ttsAbort) { try { _ttsAbort.abort(); } catch (e) {} _ttsAbort = null; }
   _setBtnOff();
@@ -178,6 +221,7 @@ function _b64ToBlob(b64, mime) {
 }
 async function _playBlob(blob, btn, cancelled) {
   if (cancelled()) return;
+  _removeSpinner();
   var url = URL.createObjectURL(blob);
   var a = new Audio(url);
   _ttsAudio = a;
@@ -351,7 +395,8 @@ function browserSpeak(text, btn) {
   }
   u.rate = 1; u.pitch = 1.05; u.volume = 1;
   _setBtnOn(btn);
-  u.onend = function() { _setBtnOff(); };
+  u.onend = function() { _removeSpinner(); _setBtnOff(); };
+  u.onerror = function() { _removeSpinner(); _setBtnOff(); };
   u.onerror = u.onend;
   speechSynthesis.speak(u);
 }
@@ -367,7 +412,7 @@ function _ttsWarn(msg) {
 }
 
 // ---- 统一入口 ----
-function speakText(rawText, btn) {
+function speakText(rawText, btn, bubbleEl) {
   var text = cleanTextForTTS(rawText);
   if (!text) return;
   var wasThis = (_ttsCurBtn && btn && _ttsCurBtn === btn);
@@ -375,6 +420,7 @@ function speakText(rawText, btn) {
   if (wasThis) return; // 再点一次 = 停止
 
   var myToken = ++_ttsSeq;
+  _ttsCurSpinner = _attachSpinner(bubbleEl);
   function cancelled() { return myToken !== _ttsSeq; }
 
   var provider = _ttsCharProvider();
@@ -382,6 +428,7 @@ function speakText(rawText, btn) {
   if (engine) {
     _setBtnOn(btn);
     engine(text, btn, cancelled).catch(function(err) {
+      _removeSpinner();
       if (cancelled() || err.name === 'AbortError') return;
       _ttsWarn(err.message || String(err));
       _setBtnOff();
