@@ -1479,6 +1479,7 @@ function renderHome() {
   var furHtml = (room.furniture || []).map(function (f) {
     var isYard = (activeId === 'yard');
     var imgUrl = isYard ? (f.img || YARD_FUR_IMG[f.id] || '') : (f.img || '');
+    if (f.id === 'fur-plant') imgUrl = '';
     var inner = '';
     if (isYard) {
       inner = imgUrl ? '<img class="yard-fur-img" src="' + escapeHTML(imgUrl) + '" alt="' + escapeHTML(f.id) + '">' : yardFurArt(f.id);
@@ -5639,7 +5640,7 @@ function homeCharSetAvatar(who) {
   saveState(); applyHomeCharToPerson(who); renderHomeCharPanel();
 }
 function homeCharResize(who, val) {
-  val = Math.max(6, Math.min(22, Number(val) || 11));
+  val = Math.max(6, Math.min(40, Number(val) || 11));
   if (who === 'ta') state.home.taSize = val; else state.home.mySize = val;
   saveState();
   var el = $(who === 'ta' ? 'homePartner' : 'homePerson');
@@ -5675,7 +5676,7 @@ function renderHomeCharPanel() {
       <div class="char-edit-hint">${who === 'ta' ? 'TA' : '我'} · ${usingDefault ? (who === 'ta' ? '角色头像' : '默认形象') : (usingImage ? '已上传图片' : '我的头像')}</div>
       <div class="char-edit-size">
         <span>大小</span>
-        <input type="range" min="6" max="22" step="1" value="${size}" oninput="homeCharResize('${who}', this.value)">
+        <input type="range" min="6" max="40" step="1" value="${size}" oninput="homeCharResize('${who}', this.value)">
         <span id="homeCharSizeVal">${size}%</span>
       </div>
       <div class="char-edit-source">${sourceHtml}</div>
@@ -5736,26 +5737,59 @@ function furEmoji(fid) {
   return map[fid] || '📦';
 }
 function furArt(fid) {
+  if (fid === 'fur-plant') {
+    return '<div class="fur-plant-pot"><div class="fpp-pot"></div><div class="fpp-stem"></div><div class="fpp-leaf l1"></div><div class="fpp-leaf l2"></div><div class="fpp-leaf l3"></div></div>';
+  }
   var em = furEmoji(fid);
   return '<div class="fur-emoji">' + em + '</div>';
 }
 function livingRoomArt() {
   return ''
+    + '<div class="lr-wall"></div>'
     + '<div class="lr-floor"></div>'
     + '<div class="lr-window">'
       + '<div class="lr-sky"></div>'
       + '<div class="lr-sun"></div>'
-      + '<div class="lr-mullion-v"></div>'
-      + '<div class="lr-mullion-h"></div>'
-      + '<div class="lr-curtain left"></div>'
-      + '<div class="lr-curtain right"></div>'
-      + '<div class="lr-sill"></div>'
+      + '<div class="lr-mullion"></div>'
+      + '<div class="lr-curtain-l"></div>'
+      + '<div class="lr-curtain-r"></div>'
     + '</div>'
-    + '<div class="lr-painting p1"></div>'
-    + '<div class="lr-painting p2"></div>'
+    + '<div class="lr-frame f1"></div>'
+    + '<div class="lr-frame f2"></div>'
+    + '<div class="lr-shelf">'
+      + '<div class="lsh-frame"></div>'
+      + '<div class="lsh-shelf s1"></div>'
+      + '<div class="lsh-shelf s2"></div>'
+      + '<div class="lsh-book b1"></div><div class="lsh-book b2"></div><div class="lsh-book b3"></div><div class="lsh-book b4"></div><div class="lsh-book b5"></div>'
+      + '<div class="lsh-book b6"></div><div class="lsh-book b7"></div><div class="lsh-book b8"></div>'
+    + '</div>'
+    + '<div class="lr-sofa">'
+      + '<div class="ls-back"></div>'
+      + '<div class="ls-seat"></div>'
+      + '<div class="ls-arm-l"></div>'
+      + '<div class="ls-arm-r"></div>'
+      + '<div class="ls-cushion c1"></div>'
+      + '<div class="ls-cushion c2"></div>'
+    + '</div>'
+    + '<div class="lr-table">'
+      + '<div class="lt-top"></div>'
+      + '<div class="lt-leg-l"></div>'
+      + '<div class="lt-leg-r"></div>'
+      + '<div class="lt-cup"></div>'
+    + '</div>'
+    + '<div class="lr-lamp">'
+      + '<div class="ll-shade"></div>'
+      + '<div class="ll-pole"></div>'
+      + '<div class="ll-base"></div>'
+      + '<div class="ll-glow"></div>'
+    + '</div>'
     + '<div class="lr-rug"></div>'
-    + '<div class="lr-plant"><span>🪴</span></div>'
-    + '<div class="lr-lamp"></div>';
+    + '<div class="lr-pot">'
+      + '<div class="lp-pot"></div>'
+      + '<div class="lp-leaf l1"></div>'
+      + '<div class="lp-leaf l2"></div>'
+      + '<div class="lp-leaf l3"></div>'
+    + '</div>';
 }
 function bathroomFurArt(fid) { return furArt(fid); }
 function spaceSwitchRole() {

@@ -1475,7 +1475,11 @@ button { border: 0; cursor: pointer; }
 .home-log-view{position:absolute;inset:0;z-index:40;background:rgba(255,255,255,.96);overflow-y:auto;padding:54px 16px 16px;display:none}
 .home-log-view.show{display:block}
 .home-log-close{position:absolute;top:12px;right:12px;width:34px;height:34px;border-radius:50%;background:#eee;color:#333;font-size:16px;display:grid;place-items:center;cursor:pointer}
-.home-fur{position:absolute;background-size:contain;background-repeat:no-repeat;background-position:center;display:flex;align-items:flex-end;justify-content:center;border-radius:8px;transition:filter .15s;-webkit-tap-highlight-color:transparent;z-index:1;background-color:rgba(200,200,200,.15);border:1px dashed rgba(0,0,0,.12)}
+.home-fur{position:absolute;background-size:contain;background-repeat:no-repeat;background-position:center;display:flex;align-items:flex-end;justify-content:center;border-radius:8px;transition:filter .15s;-webkit-tap-highlight-color:transparent;z-index:1}
+.home-room.living .home-fur{ background:none !important; }
+.home-room.living .home-fur .fur-emoji{ display:none; }
+.home-room.living .home-fur .fur-plant-pot{ display:none; }
+.home-room.living .home-fur .fur-art{ display:none; }
 .home-fur:active{filter:brightness(1.15)}
 .home-fur-name{font-size:11px;background:rgba(0,0,0,.55);color:#fff;padding:3px 7px;border-radius:8px;margin:0 2px 3px;pointer-events:auto;white-space:nowrap;cursor:pointer}
 
@@ -1673,7 +1677,7 @@ button { border: 0; cursor: pointer; }
 /* 无背景图的房间用柔和马卡龙底色兜底 */
 .home-room:not(.yard):not(.bathroom){ background:linear-gradient(160deg,#fff1f6 0%,#fdeefb 40%,#eef3ff 100%); }
 /* 家具统一圆角+奶白描边+糖果柔影 */
-.home-fur{ border-radius:18px; border:2px solid rgba(255,255,255,.75); background-color:rgba(255,255,255,.38); box-shadow:0 5px 14px rgba(190,160,210,.2); }
+.home-fur{ border-radius:18px; }
 .home-fur:active{ transform:scale(.96); filter:brightness(1.06); }
 /* 家具名标签：马卡龙药丸 */
 .home-fur-name{ background:linear-gradient(135deg,#ffb3c8,#ffd0a8); color:#fff; border-radius:999px; padding:3px 9px; font-weight:700; box-shadow:0 2px 6px rgba(255,150,190,.4); }
@@ -1685,28 +1689,77 @@ button { border: 0; cursor: pointer; }
 /* 小人 emoji 脸 */
 .home-person-emoji{ font-size:30px; line-height:1; }
 /* 家具插画（无图时） */
-.home-fur.art{ background-color:rgba(255,255,255,.5); }
 .fur-art{ width:100%; height:100%; display:flex; align-items:center; justify-content:center; }
 .fur-emoji{ font-size:34px; filter:drop-shadow(0 2px 2px rgba(0,0,0,.15)); }
+.fur-plant-pot{ position:relative; width:100%; height:100%; }
+.fpp-pot{ position:absolute; bottom:0; left:50%; transform:translateX(-50%); width:60%; height:30%; background:linear-gradient(180deg,#d98a55,#c06a30); border-radius:4px 4px 12px 12px; box-shadow:inset 0 -2px 4px rgba(0,0,0,.15); z-index:2; }
+.fpp-stem{ position:absolute; bottom:28%; left:50%; transform:translateX(-50%); width:3px; height:24%; background:#4a7a3a; border-radius:2px; z-index:1; }
+.fpp-leaf{ position:absolute; background:#5a9a44; border-radius:50% 50% 50% 0; z-index:1; }
+.fpp-leaf.l1{ bottom:48%; left:30%; width:18%; height:10%; transform:rotate(-25deg); }
+.fpp-leaf.l2{ bottom:54%; right:30%; width:16%; height:9%; transform:rotate(25deg); }
+.fpp-leaf.l3{ bottom:62%; left:42%; width:14%; height:8%; transform:rotate(-10deg); }
 /* 客厅装修（温暖木质 · 采光） */
-.lr-floor{ position:absolute; left:0; right:0; bottom:0; height:20%; z-index:0; background:linear-gradient(180deg,#d9b98c 0%,#c9a374 60%,#bb9466 100%); box-shadow:inset 0 8px 16px rgba(120,90,60,.25); }
-.lr-floor::before{ content:''; position:absolute; inset:0; background:repeating-linear-gradient(90deg, transparent 0 38px, rgba(150,110,70,.16) 38px 40px); }
-.lr-window{ position:absolute; top:9%; left:8%; width:30%; height:30%; z-index:0; border-radius:8px 8px 4px 4px; overflow:hidden; box-shadow:0 6px 18px rgba(120,150,200,.25), inset 0 0 0 4px #fff; background:#fff; }
-.lr-sky{ position:absolute; inset:0; background:linear-gradient(180deg,#bfe6ff 0%,#e9f6ff 60%,#fff6e0 100%); }
-.lr-sun{ position:absolute; right:14%; top:16%; width:24%; height:24%; border-radius:50%; background:radial-gradient(circle,#fff3c4,#ffe79a); box-shadow:0 0 18px rgba(255,224,140,.85); }
-.lr-mullion-v{ position:absolute; left:50%; top:0; bottom:0; width:4px; margin-left:-2px; background:#fff; }
-.lr-mullion-h{ position:absolute; left:0; right:0; top:50%; height:4px; margin-top:-2px; background:#fff; }
-.lr-curtain{ position:absolute; top:0; bottom:0; width:20%; background:linear-gradient(90deg,#f6d9e2,#eec4d2); opacity:.92; }
-.lr-curtain.left{ left:0; border-radius:8px 0 0 4px; }
-.lr-curtain.right{ right:0; border-radius:0 8px 4px 0; }
-.lr-sill{ position:absolute; left:-3%; right:-3%; bottom:-6px; height:8px; background:#e7d3b8; border-radius:3px; box-shadow:0 2px 4px rgba(0,0,0,.12); }
-.lr-painting{ position:absolute; z-index:0; border-radius:4px; background:#fff; box-shadow:0 4px 10px rgba(0,0,0,.12), inset 0 0 0 3px #d8c09c; }
-.lr-painting.p1{ top:12%; right:10%; width:14%; height:16%; background:linear-gradient(135deg,#ffd9a8,#ffb3a0); }
-.lr-painting.p2{ top:13%; right:26%; width:11%; height:13%; background:linear-gradient(135deg,#a8d8ff,#bff0d8); }
-.lr-rug{ position:absolute; left:16%; bottom:7%; width:68%; height:17%; z-index:0; border-radius:50%; background:radial-gradient(ellipse at center, #e8b79a 0%, #dcae8e 55%, rgba(220,174,142,0) 72%); box-shadow:inset 0 0 0 4px rgba(255,255,255,.5); }
-.lr-plant{ position:absolute; right:5%; bottom:5%; z-index:0; font-size:34px; filter:drop-shadow(0 3px 3px rgba(0,0,0,.15)); }
-.lr-plant span{ display:block; transform:translateY(4px); }
-.lr-lamp{ position:absolute; left:47%; top:0; width:80px; height:130px; z-index:0; background:radial-gradient(circle at 50% 0, rgba(255,224,150,.45), transparent 70%); pointer-events:none; }
+.lr-wall{ position:absolute; inset:0; z-index:0; background:linear-gradient(180deg,#faf5ef 0%,#f3ece2 100%); }
+.lr-floor{ position:absolute; left:0; right:0; bottom:0; height:28%; z-index:0; background:linear-gradient(180deg,#dbb88a 0%,#c9a574 50%,#bd9868 100%); }
+.lr-floor::before{ content:''; position:absolute; inset:0; background:repeating-linear-gradient(90deg,transparent 0 44px,rgba(140,100,55,.12) 44px 46px); }
+
+.lr-window{ position:absolute; top:8%; left:6%; width:28%; height:32%; z-index:1; border-radius:6px 6px 3px 3px; overflow:hidden; background:#fff; }
+.lr-sky{ position:absolute; inset:0; background:linear-gradient(180deg,#c4e8ff 0%,#e8f4ff 70%,#fff8e8 100%); }
+.lr-sun{ position:absolute; right:12%; top:14%; width:22%; height:22%; border-radius:50%; background:radial-gradient(circle,#fff8d0,#ffe88a); }
+.lr-mullion{ position:absolute; left:50%; top:0; bottom:0; width:3px; margin-left:-1.5px; background:#fff; }
+.lr-mullion::after{ content:''; position:absolute; left:0; right:0; top:50%; height:3px; margin-top:-1.5px; background:#fff; }
+.lr-curtain-l,.lr-curtain-r{ position:absolute; top:0; bottom:0; width:18%; opacity:.88; }
+.lr-curtain-l{ left:0; background:linear-gradient(90deg,#f0d0da,#f5dce4); border-radius:6px 0 0 3px; }
+.lr-curtain-r{ right:0; background:linear-gradient(270deg,#f0d0da,#f5dce4); border-radius:0 6px 3px 0; }
+
+.lr-frame{ position:absolute; z-index:1; border:1.5px solid #5c5048; border-radius:3px; background:transparent; }
+.lr-frame.f1{ top:10%; right:24%; width:12%; height:14%; }
+.lr-frame.f2{ top:12%; right:8%; width:10%; height:11%; }
+
+.lr-shelf{ position:absolute; right:6%; top:10%; width:16%; height:40%; z-index:1; }
+.lsh-frame{ position:absolute; inset:0; border:1.5px solid #5c5048; border-radius:2px; }
+.lsh-shelf{ position:absolute; left:0; right:0; border-top:1.5px solid #5c5048; }
+.lsh-shelf.s1{ top:34%; }
+.lsh-shelf.s2{ top:67%; }
+.lsh-book{ position:absolute; border:1.5px solid #5c5048; border-bottom:none; }
+.lsh-book.b1{ left:8%; top:6%; width:11%; height:26%; }
+.lsh-book.b2{ left:21%; top:10%; width:9%; height:22%; }
+.lsh-book.b3{ left:33%; top:6%; width:10%; height:26%; }
+.lsh-book.b4{ left:46%; top:12%; width:9%; height:20%; }
+.lsh-book.b5{ left:58%; top:6%; width:11%; height:26%; }
+.lsh-book.b6{ left:8%; top:40%; width:10%; height:24%; }
+.lsh-book.b7{ left:21%; top:44%; width:12%; height:20%; }
+.lsh-book.b8{ left:37%; top:40%; width:9%; height:24%; }
+
+.lr-sofa{ position:absolute; bottom:22%; left:22%; width:48%; height:22%; z-index:2; }
+.ls-back{ position:absolute; left:0; right:0; top:0; height:42%; border:1.5px solid #5c5048; border-bottom:none; border-radius:8px 8px 0 0; }
+.ls-seat{ position:absolute; left:0; right:0; bottom:0; height:60%; border:1.5px solid #5c5048; border-radius:0 0 6px 6px; }
+.ls-arm-l{ position:absolute; left:0; top:8%; width:7%; height:85%; border:1.5px solid #5c5048; border-radius:5px; }
+.ls-arm-r{ position:absolute; right:0; top:8%; width:7%; height:85%; border:1.5px solid #5c5048; border-radius:5px; }
+.ls-cushion{ position:absolute; width:15%; height:24%; border:1.5px solid #5c5048; border-radius:50%; }
+.ls-cushion.c1{ left:18%; top:14%; }
+.ls-cushion.c2{ right:18%; top:16%; }
+
+.lr-table{ position:absolute; bottom:20%; left:34%; width:24%; height:10%; z-index:3; }
+.lt-top{ position:absolute; left:0; right:0; top:0; height:30%; border:1.5px solid #5c5048; border-radius:3px; }
+.lt-leg-l{ position:absolute; left:10%; top:30%; width:1.5px; height:70%; background:#5c5048; }
+.lt-leg-r{ position:absolute; right:10%; top:30%; width:1.5px; height:70%; background:#5c5048; }
+.lt-cup{ position:absolute; left:50%; top:-10%; width:10%; height:14%; border:1.5px solid #5c5048; border-radius:2px 2px 4px 4px; transform:translateX(-50%); }
+
+.lr-lamp{ position:absolute; bottom:22%; left:14%; z-index:2; width:40px; }
+.ll-shade{ width:36px; height:22px; border:1.5px solid #5c5048; border-bottom:none; border-radius:50% 50% 0 0; margin:0 auto; }
+.ll-pole{ width:1.5px; height:72px; background:#5c5048; margin:0 auto; }
+.ll-base{ width:20px; height:1.5px; background:#5c5048; margin:0 auto; }
+.ll-glow{ position:absolute; top:-20px; left:50%; transform:translateX(-50%); width:100px; height:100px; border-radius:50%; background:radial-gradient(circle,rgba(255,230,170,.30),transparent 70%); pointer-events:none; }
+
+.lr-rug{ position:absolute; left:20%; bottom:5%; width:56%; height:14%; z-index:1; border-radius:50%; border:1.5px solid rgba(92,80,72,.35); }
+
+.lr-pot{ position:absolute; right:4%; bottom:4%; z-index:2; }
+.lp-pot{ width:22px; height:18px; border:1.5px solid #5c5048; border-top:none; border-radius:0 0 4px 4px; margin:0 auto; }
+.lp-leaf{ position:absolute; border:1.5px solid #5c5048; border-radius:50% 0 50% 0; }
+.lp-leaf.l1{ top:-12px; left:-4px; width:14px; height:9px; transform:rotate(-30deg); }
+.lp-leaf.l2{ top:-18px; right:-6px; width:12px; height:8px; transform:rotate(25deg); }
+.lp-leaf.l3{ top:-22px; left:1px; width:10px; height:7px; transform:rotate(-10deg); }
 /* 换形象弹层（重做视觉 · 干净克制） */
 .home-char-edit{ position:absolute; inset:0; z-index:42; display:none; align-items:center; justify-content:center; background:rgba(38,38,42,.42); backdrop-filter:blur(4px); padding:18px; }
 .char-edit-card{ width:100%; max-width:320px; background:linear-gradient(180deg,#fbfaf7 0%,#f3f1ec 100%); border-radius:18px; box-shadow:0 14px 40px rgba(0,0,0,.20), inset 0 0 0 1px rgba(0,0,0,.04); padding:22px 20px 22px; text-align:center; font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif; color:#3a3632; position:relative; }

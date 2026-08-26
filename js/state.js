@@ -64,15 +64,11 @@ const defaultState = {
         person: 'https://img.facfox.com/imgs/2026/07/19/ea51598f7d0459ee.jpg',
         personPos: { x: 50, y: 72 },
         furniture: [
-          { id: 'fur-painting', name: '🖼️挂画', img: 'https://img.facfox.com/imgs/2026/07/19/fdf9f477504349c7.jpg', x: 54, y: 6, w: 22, h: 20, actions: [] },
-          { id: 'fur-tvcabinet', name: '📺电视柜', img: 'https://img.facfox.com/imgs/2026/07/19/a8d596cfd10afc97.jpg', x: 33, y: 80, w: 46, h: 24, actions: [] },
-          { id: 'fur-table', name: '🪑桌子', img: 'https://img.facfox.com/imgs/2026/07/19/fe76d6eb69100b4d.jpg', x: 34, y: 35, w: 40, h: 58, actions: [] },
-          { id: 'fur-plant', name: '🌱绿植', img: 'https://img.facfox.com/imgs/2026/07/19/c04f5b36f0772578.jpg', x: 4, y: 50, w: 14, h: 10, actions: [{ label: '浇点水', result: '小人给绿植浇了水，叶子抖了抖。' }] },
-          { id: 'fur-tv', name: '📺电视', img: 'https://img.facfox.com/imgs/2026/07/19/f85416dc3afd0f7e.jpg', x: 30, y: 72, w: 50, h: 17, actions: [{ label: '看动画', result: '小人盘腿看动画，笑得肩膀直抖。' }, { label: '看新闻', result: '小人看了三秒新闻，默默关掉。' }] },
-          { id: 'fur-desk', name: '📖书桌', img: '', x: 62, y: 30, w: 26, h: 26, actions: [{ label: '写日记', result: '小人趴在书桌前写了两行字，又删掉了。' }, { label: '发呆', result: '小人盯着桌面木纹看了十分钟。' }] },
-          { id: 'fur-fridge', name: '🧊冰箱', img: '', x: 80, y: 64, w: 16, h: 30, actions: [{ label: '拿饮料', result: '小人拿出一瓶冰饮料，舒服地叹气。' }] },
-          { id: 'fur-coffee', name: '☕咖啡机', img: '', x: 40, y: 24, w: 16, h: 18, actions: [{ label: '泡咖啡', result: '小人泡了杯热咖啡，香气飘满客厅。' }, { label: '往里放致死量糖', result: '小人往咖啡里倒了半袋糖……它裂开了。' }] },
-          { id: 'fur-sofa', name: '🛋️沙发', img: '', x: 36, y: 38, w: 44, h: 26, actions: [{ label: '瘫一会儿', result: '小人瘫在沙发上，像一颗被吸干的电池。' }, { label: '抱紧抱枕', result: '小人抱紧抱枕，获得了短暂的安全感。' }, { cid: 'couple', label: '和 TA 一起瘫', result: '小人靠在 TA 肩头，两个人什么都不用说，却很安心。', kiss: true }] }
+          { id: 'fur-sofa', name: '沙发', img: '', x: 22, y: 56, w: 48, h: 22, actions: [{ label: '瘫一会儿', result: '小人瘫在沙发上，像一颗被吸干的电池。' }, { label: '抱紧抱枕', result: '小人抱紧抱枕，获得了短暂的安全感。' }, { cid: 'couple', label: '和 TA 一起瘫', result: '小人靠在 TA 肩头，两个人什么都不用说，却很安心。', kiss: true }] },
+          { id: 'fur-table', name: '茶几', img: '', x: 34, y: 70, w: 24, h: 10, actions: [{ label: '喝茶', result: '小人端起茶杯抿了一口，暖意从手心传到心里。' }] },
+          { id: 'fur-shelf', name: '书架', img: '', x: 80, y: 10, w: 16, h: 40, actions: [{ label: '翻书', result: '小人抽出一本书翻了几页，又放了回去。' }] },
+          { id: 'fur-lamp', name: '落地灯', img: '', x: 14, y: 56, w: 8, h: 22, actions: [{ label: '开灯', result: '小人拧了一下开关，暖黄的光洒了下来。' }] },
+          { id: 'fur-pot', name: '绿植', img: '', x: 82, y: 86, w: 8, h: 12, actions: [{ label: '浇点水', result: '小人给绿植浇了水，叶子抖了抖。' }] }
         ]
       },
       bathroom: {
