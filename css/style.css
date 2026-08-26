@@ -1715,25 +1715,25 @@ button { border: 0; cursor: pointer; }
 /* 客厅装修（温暖木质 · 采光） */
 .lr-wall{ position:absolute; left:0; right:0; top:0; height:38%; z-index:0;
   background:
-    linear-gradient(180deg, rgba(255,255,255,.35), rgba(180,140,100,.05) 72%, rgba(150,110,70,.14)),
-    repeating-linear-gradient(90deg, rgba(190,150,110,.07) 0 2px, transparent 2px 28px),
-    linear-gradient(180deg,#fdf8f1 0%,#f3e9db 100%);
+    radial-gradient(135% 105% at 50% -22%, #fffdf9 0%, rgba(255,248,240,.22) 42%, transparent 68%),
+    linear-gradient(180deg,#fcf5ee 0%,#f7ece0 52%,#f2e6d6 100%);
+  box-shadow: inset 0 -12px 24px rgba(196,168,138,.10);
 }
-.lr-wall::after{ content:''; position:absolute; left:0; right:0; top:0; height:6px; background:linear-gradient(180deg,#fff,#e9dccb); }
+.lr-backcorner{ position:absolute; left:16%; top:0; height:38%; width:2px; z-index:2; background:linear-gradient(180deg, rgba(160,130,100,.05) 0%, rgba(160,130,100,.32) 80%, rgba(150,120,90,.4) 100%); }
+.lr-wall::after{ content:''; position:absolute; left:0; right:0; top:0; height:7px; background:linear-gradient(180deg,#fffefb,#f0e3d4); }
 .lr-wainscot{ position:absolute; left:0; right:0; top:22%; height:15.4%; z-index:0;
   background:
-    linear-gradient(180deg, rgba(255,255,255,.25), rgba(150,110,70,.10)),
-    repeating-linear-gradient(90deg, rgba(150,110,70,.10) 0 1.5px, transparent 1.5px 40px),
-    linear-gradient(180deg,#efe2cf,#e3d2b8);
-  border-top:2px solid #d8c3a3; border-bottom:2px solid #cdb793;
+    linear-gradient(180deg,#f4e9db 0%,#ecdcc8 100%);
+  border-top:1px solid rgba(214,190,162,.5); border-bottom:1px solid rgba(202,176,146,.45);
+  box-shadow: inset 0 2px 6px rgba(255,255,255,.6), inset 0 -5px 10px rgba(196,168,138,.13);
 }
-.lr-base{ position:absolute; left:0; right:0; top:37.2%; height:1.6%; z-index:1; background:linear-gradient(180deg,#cdb086,#b8966a); box-shadow:0 2px 5px rgba(120,90,60,.25); }
-.lr-floor{ position:absolute; left:0; right:0; top:38%; bottom:0; height:auto; z-index:0; background:linear-gradient(180deg,#dab487 0%,#cba776 50%,#bd9868 100%); clip-path:polygon(24% 0,76% 0,100% 100%,0 100%); }
-.lr-floor::before{ content:''; position:absolute; inset:0; background:repeating-linear-gradient(0deg, rgba(120,80,40,.06) 0 2px, transparent 2px 54px); }
-.lr-floor::after{ content:''; position:absolute; inset:0; pointer-events:none; background:radial-gradient(120% 80% at 50% 0%, rgba(255,255,255,.16), transparent 55%); }
+.lr-base{ position:absolute; left:0; right:0; top:37.2%; height:1.8%; z-index:1; background:linear-gradient(180deg,#e8d7c3,#d9c3a9); box-shadow:0 3px 6px rgba(160,130,100,.20); }
+.lr-floor{ position:absolute; left:0; right:0; top:38%; bottom:0; height:auto; z-index:0; background:linear-gradient(180deg,#ecdcc4 0%,#e2cdb0 50%,#d7c1a0 100%); clip-path:polygon(16% 0,100% 0,100% 100%,-8% 100%); box-shadow: inset 0 14px 26px rgba(180,150,120,.10); }
+.lr-floor::before{ content:''; position:absolute; inset:0; background:repeating-linear-gradient(0deg, rgba(150,120,90,.05) 0 2px, transparent 2px 56px); }
+.lr-floor::after{ content:''; position:absolute; inset:0; pointer-events:none; background:radial-gradient(120% 80% at 50% 0%, rgba(255,255,255,.22), transparent 55%); }
 .lr-corner{ position:absolute; top:38%; bottom:0; z-index:0; }
-.lr-corner-l{ left:0; width:24%; clip-path:polygon(0 0,100% 0,0 100%); background:linear-gradient(155deg,#ecdcc6 0%,#d3b793 100%); }
-.lr-corner-r{ right:0; width:24%; clip-path:polygon(100% 0,0 0,100% 100%); background:linear-gradient(205deg,#ecdcc6 0%,#d3b793 100%); }
+.lr-corner-l{ left:0; top:0; bottom:0; width:16%; clip-path:polygon(0 0,100% 0,100% 38%,-8% 100%); background:linear-gradient(155deg,#f1e7d7 0%,#e3d3bc 100%); }
+.lr-corner-r{ right:0; width:24%; clip-path:polygon(100% 0,0 0,100% 100%); background:linear-gradient(205deg,#f1e7d7 0%,#e3d3bc 100%); }
 
 .lr-window{ position:absolute; top:5%; left:6%; width:26%; height:27%; z-index:1; border-radius:6px 6px 3px 3px; overflow:hidden; background:#fff; }
 .lr-sky{ position:absolute; inset:0; background:linear-gradient(180deg,#c4e8ff 0%,#e8f4ff 70%,#fff8e8 100%); }
@@ -1744,7 +1744,7 @@ button { border: 0; cursor: pointer; }
 .lr-curtain-l{ left:0; background:linear-gradient(90deg,#f0d0da,#f5dce4); border-radius:6px 0 0 3px; }
 .lr-curtain-r{ right:0; background:linear-gradient(270deg,#f0d0da,#f5dce4); border-radius:0 6px 3px 0; }
 
-.lr-frame{ position:absolute; z-index:1; border:1.5px solid #5c5048; border-radius:3px; background:transparent; }
+.lr-frame{ position:absolute; z-index:1; border:1.5px solid rgba(190,168,142,.7); border-radius:3px; background:rgba(255,251,245,.5); box-shadow: inset 0 0 6px rgba(196,168,138,.18); }
 .lr-frame.f1{ top:10%; right:24%; width:12%; height:14%; }
 .lr-frame.f2{ top:12%; right:8%; width:10%; height:11%; }
 

@@ -5757,20 +5757,9 @@ function furArt(fid) {
 function livingRoomArt() {
   return ''
     + '<div class="lr-wall"></div>'
-    + '<div class="lr-wainscot"></div>'
-    + '<div class="lr-base"></div>'
     + '<div class="lr-corner lr-corner-l"></div>'
-    + '<div class="lr-corner lr-corner-r"></div>'
+    + '<div class="lr-backcorner"></div>'
     + '<div class="lr-floor"></div>'
-    + '<div class="lr-window">'
-      + '<div class="lr-sky"></div>'
-      + '<div class="lr-sun"></div>'
-      + '<div class="lr-mullion"></div>'
-      + '<div class="lr-curtain-l"></div>'
-      + '<div class="lr-curtain-r"></div>'
-    + '</div>'
-    + '<div class="lr-frame f1"></div>'
-    + '<div class="lr-frame f2"></div>'
     + '<div class="lr-rug"></div>';
 }
 function bathroomFurArt(fid) { return furArt(fid); }
