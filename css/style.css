@@ -1714,13 +1714,10 @@ button { border: 0; cursor: pointer; }
 .fpp-leaf.l3{ bottom:62%; left:42%; width:14%; height:8%; transform:rotate(-10deg); }
 /* 客厅装修（温暖木质 · 采光） */
 .lr-wall{ position:absolute; left:0; right:0; top:0; height:38%; z-index:0;
-  background:
-    radial-gradient(135% 105% at 50% -22%, #fffdf9 0%, rgba(255,248,240,.22) 42%, transparent 68%),
-    linear-gradient(180deg,#fcf5ee 0%,#f7ece0 52%,#f2e6d6 100%);
-  box-shadow: inset 0 -12px 24px rgba(196,168,138,.10);
+  background:#f4ebde;
+  box-shadow: inset 0 -5px 12px rgba(150,120,90,.06);
 }
-.lr-backcorner{ position:absolute; left:16%; top:0; height:38%; width:2px; z-index:2; background:linear-gradient(180deg, rgba(160,130,100,.05) 0%, rgba(160,130,100,.32) 80%, rgba(150,120,90,.4) 100%); }
-.lr-wall::after{ content:''; position:absolute; left:0; right:0; top:0; height:7px; background:linear-gradient(180deg,#fffefb,#f0e3d4); }
+.lr-wall::after{ content:''; position:absolute; left:0; right:0; bottom:0; height:0; border-top:2px solid rgba(122,86,64,.5); }
 .lr-wainscot{ position:absolute; left:0; right:0; top:22%; height:15.4%; z-index:0;
   background:
     linear-gradient(180deg,#f4e9db 0%,#ecdcc8 100%);
@@ -1728,11 +1725,15 @@ button { border: 0; cursor: pointer; }
   box-shadow: inset 0 2px 6px rgba(255,255,255,.6), inset 0 -5px 10px rgba(196,168,138,.13);
 }
 .lr-base{ position:absolute; left:0; right:0; top:37.2%; height:1.8%; z-index:1; background:linear-gradient(180deg,#e8d7c3,#d9c3a9); box-shadow:0 3px 6px rgba(160,130,100,.20); }
-.lr-floor{ position:absolute; left:0; right:0; top:38%; bottom:0; height:auto; z-index:0; background:linear-gradient(180deg,#ecdcc4 0%,#e2cdb0 50%,#d7c1a0 100%); clip-path:polygon(16% 0,100% 0,100% 100%,-8% 100%); box-shadow: inset 0 14px 26px rgba(180,150,120,.10); }
-.lr-floor::before{ content:''; position:absolute; inset:0; background:repeating-linear-gradient(0deg, rgba(150,120,90,.05) 0 2px, transparent 2px 56px); }
-.lr-floor::after{ content:''; position:absolute; inset:0; pointer-events:none; background:radial-gradient(120% 80% at 50% 0%, rgba(255,255,255,.22), transparent 55%); }
+.lr-floor{ position:absolute; left:0; right:0; top:38%; bottom:0; height:auto; z-index:0;
+  background:#e3d4ba;
+  clip-path:polygon(16% 0,100% 0,100% 100%,-8% 100%);
+}
+.lr-floor::before{ content:none; }
+.lr-floor::after{ content:none; }
 .lr-corner{ position:absolute; top:38%; bottom:0; z-index:0; }
-.lr-corner-l{ left:0; top:0; bottom:0; width:16%; clip-path:polygon(0 0,100% 0,100% 38%,-8% 100%); background:linear-gradient(155deg,#f1e7d7 0%,#e3d3bc 100%); }
+.lr-corner-l{ left:0; top:0; bottom:0; width:16%; clip-path:polygon(0 0,100% 0,100% 38%,-8% 100%); background:rgba(110,78,58,.85); }
+.lr-corner-l::before{ content:''; position:absolute; inset:0; background:#f4ebde; clip-path:polygon(0 0,100% 0,100% 38%,-8% 100%); transform:translateY(-3px); }
 .lr-corner-r{ right:0; width:24%; clip-path:polygon(100% 0,0 0,100% 100%); background:linear-gradient(205deg,#f1e7d7 0%,#e3d3bc 100%); }
 
 .lr-window{ position:absolute; top:5%; left:6%; width:26%; height:27%; z-index:1; border-radius:6px 6px 3px 3px; overflow:hidden; background:#fff; }
@@ -1771,6 +1772,83 @@ button { border: 0; cursor: pointer; }
 .ls-cushion{ position:absolute; width:15%; height:24%; border:1.5px solid #5c5048; border-radius:50%; }
 .ls-cushion.c1{ left:18%; top:14%; }
 .ls-cushion.c2{ right:18%; top:16%; }
+
+/* 客厅沙发（fur-sofa · 圆润卡通） */
+.fur-sofa{ position:relative; width:100%; height:100%; box-sizing:border-box; filter:drop-shadow(0 5px 5px rgba(190,140,150,.28)); }
+.fur-sofa > div{ position:absolute; box-sizing:border-box; }
+.fs-shadow{ left:12%; right:12%; bottom:0; height:8%; background:radial-gradient(ellipse at 50% 50%, rgba(150,110,120,.22), transparent 72%); filter:blur(2px); }
+.fs-back{ left:2%; right:2%; top:2%; height:48%; background:#f7b9c4; border:2px solid #e69aa6; border-radius:26px 26px 16px 16px; }
+.fs-seat{ left:6%; right:6%; bottom:6%; height:50%; background:#f9c4ce; border:2px solid #e69aa6; border-radius:16px 16px 20px 20px; }
+.fs-arm{ top:26%; width:15%; height:64%; background:#f7b9c4; border:2px solid #e69aa6; border-radius:16px; }
+.fs-arm-l{ left:0; }
+.fs-arm-r{ right:0; }
+.fs-cushion{ width:19%; height:30%; border:2px solid #e69aa6; border-radius:12px; background:#fff3f6; }
+.fs-c1{ left:18%; top:36%; transform:rotate(-8deg); }
+.fs-c2{ right:18%; top:38%; transform:rotate(8deg); }
+.fs-leg{ bottom:0; width:6%; height:9%; background:#e0a7b2; border-radius:0 0 4px 4px; }
+.fs-leg-l{ left:16%; }
+.fs-leg-r{ right:16%; }
+
+/* 客厅茶几（fur-table 画出来的版本） */
+.fur-table{ position:relative; width:100%; height:100%; box-sizing:border-box; filter:drop-shadow(0 4px 4px rgba(170,150,120,.22)); }
+.fur-table > div{ position:absolute; box-sizing:border-box; }
+.ft-top{ left:0; right:0; top:0; height:42%; background:#f3d9a6; border:2px solid #e0bf86; border-radius:10px; }
+.ft-leg{ top:38%; width:6%; height:62%; background:#eccb94; border:2px solid #e0bf86; border-radius:0 0 5px 5px; }
+.ft-leg-l{ left:10%; }
+.ft-leg-r{ right:10%; }
+.ft-cup{ left:50%; top:-24%; width:16%; height:30%; transform:translateX(-50%); background:#ffffff; border:2px solid #e0bf86; border-radius:6px 6px 8px 8px; }
+
+/* 客厅落地灯（fur-lamp 画出来的版本） */
+.fur-lamp{ position:relative; width:100%; height:100%; box-sizing:border-box; }
+.fur-lamp > div{ position:absolute; box-sizing:border-box; }
+.fl-glow{ left:-55%; right:-55%; top:-16%; bottom:-8%; background:radial-gradient(ellipse at 50% 18%, rgba(255,224,160,.5) 0%, transparent 68%); pointer-events:none; }
+.fl-shade{ left:14%; right:14%; top:0; height:30%; background:#ffe6a8; border:2px solid #e8c879; border-bottom:none; border-radius:80% 80% 14px 14px; }
+.fl-pole{ left:50%; top:28%; width:4px; height:66%; transform:translateX(-50%); background:#e0bf86; border-radius:2px; }
+.fl-base{ left:30%; right:30%; bottom:0; height:6%; background:#e0bf86; border-radius:4px; }
+
+/* 客厅绿植（fur-pot 画出来的版本） */
+.fur-pot{ position:relative; width:100%; height:100%; box-sizing:border-box; }
+.fur-pot > div{ position:absolute; box-sizing:border-box; }
+.fp-stem{ left:50%; top:12%; width:3px; height:42%; transform:translateX(-50%); background:#8fbf7a; border-radius:2px; }
+.fp-pot{ left:22%; right:22%; bottom:0; height:46%; background:#f4c39c; border:2px solid #e0a87f; border-radius:0 0 12px 12px; }
+.fp-pot::before{ content:''; position:absolute; left:-8%; right:-8%; top:-16%; height:24%; background:#f7d3b4; border:2px solid #e0a87f; border-radius:6px; }
+.fp-leaf{ width:34%; height:46%; border:2px solid #7fae6a; border-radius:50% 0 50% 0; background:#a9d68f; }
+.fp-leaf-l1{ left:10%; top:8%; transform:rotate(-30deg); }
+.fp-leaf-l2{ right:10%; top:2%; transform:rotate(26deg); }
+.fp-leaf-l3{ left:32%; top:0; transform:rotate(-6deg); }
+
+/* 客厅咖啡机（fur-coffee · 圆润卡通） */
+.fur-coffee{ position:relative; width:100%; height:100%; box-sizing:border-box; filter:drop-shadow(0 4px 5px rgba(150,140,160,.22)); }
+.fur-coffee > div{ position:absolute; box-sizing:border-box; }
+.fcm-top{ left:16%; right:16%; top:0; height:18%; background:#b8c8d6; border:2px solid #8fa5b4; border-radius:6px; }
+.fcm-body{ left:10%; right:10%; top:14%; bottom:16%; background:#c4d4e0; border:2px solid #8fa5b4; border-radius:10px; }
+.fcm-nozzle{ left:36%; right:36%; top:36%; height:14%; background:#8fa5b4; border-radius:0 0 5px 5px; }
+.fcm-cup{ left:26%; right:26%; bottom:0; height:22%; background:#f7f0e6; border:2px solid #d6c4a8; border-radius:4px 4px 8px 8px; }
+.fcm-btn{ width:8%; height:8%; background:#8fa5b4; border-radius:50%; }
+.fcm-btn.b1{ left:20%; top:26%; }
+.fcm-btn.b2{ left:20%; top:38%; }
+.fcm-steam{ left:38%; right:38%; top:-14%; height:16%; border:2px solid rgba(180,160,140,.30); border-bottom:none; border-radius:50% 50% 0 0; }
+
+/* 客厅书架（fur-shelf 画出来的版本） */
+.fur-shelf{ position:relative; width:100%; height:100%; box-sizing:border-box; filter:drop-shadow(0 4px 5px rgba(170,150,120,.2)); }
+.fur-shelf > div{ position:absolute; box-sizing:border-box; }
+.fsh-frame{ left:0; right:0; top:0; bottom:0; background:#f0d6a8; border:2px solid #e0bf86; border-radius:8px; }
+.fsh-shelf{ left:6%; right:6%; height:3px; background:#e0bf86; border-radius:2px; }
+.fsh-shelf.s1{ top:34%; }
+.fsh-shelf.s2{ top:66%; }
+.fsh-book{ border:2px solid rgba(0,0,0,.10); border-bottom:none; border-radius:3px 3px 0 0; }
+
+/* 客厅壁柜（fur-cabinet 画出来的版本） */
+.fur-cabinet{ position:relative; width:100%; height:100%; box-sizing:border-box; filter:drop-shadow(0 4px 5px rgba(150,140,170,.2)); }
+.fur-cabinet > div{ position:absolute; box-sizing:border-box; }
+.fc-top{ left:-3%; right:-3%; top:0; height:14%; background:#cfe4f2; border:2px solid #a9c6dd; border-radius:6px; }
+.fc-body{ left:0; right:0; top:12%; bottom:0; background:#dceefa; border:2px solid #a9c6dd; border-radius:0 0 8px 8px; }
+.fc-door{ top:24%; bottom:10%; width:45%; background:#e9f4fc; border:2px solid #a9c6dd; border-radius:5px; }
+.fc-door.d1{ left:3%; }
+.fc-door.d2{ right:3%; }
+.fc-handle{ top:46%; width:4%; height:14%; background:#a9c6dd; border-radius:3px; }
+.fc-handle.h1{ left:45%; }
+.fc-handle.h2{ right:45%; }
 
 .lr-table{ position:absolute; bottom:20%; left:34%; width:24%; height:10%; z-index:3; }
 .lt-top{ position:absolute; left:0; right:0; top:0; height:30%; border:1.5px solid #5c5048; border-radius:3px; }

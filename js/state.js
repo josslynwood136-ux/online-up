@@ -68,7 +68,9 @@ const defaultState = {
           { id: 'fur-table', name: '茶几', img: '', x: 34, y: 70, w: 24, h: 10, actions: [{ label: '喝茶', result: '小人端起茶杯抿了一口，暖意从手心传到心里。' }] },
           { id: 'fur-shelf', name: '书架', img: '', x: 80, y: 10, w: 16, h: 40, actions: [{ label: '翻书', result: '小人抽出一本书翻了几页，又放了回去。' }] },
           { id: 'fur-lamp', name: '落地灯', img: '', x: 14, y: 56, w: 8, h: 22, actions: [{ label: '开灯', result: '小人拧了一下开关，暖黄的光洒了下来。' }] },
-          { id: 'fur-pot', name: '绿植', img: '', x: 82, y: 86, w: 8, h: 12, actions: [{ label: '浇点水', result: '小人给绿植浇了水，叶子抖了抖。' }] }
+          { id: 'fur-pot', name: '绿植', img: '', x: 82, y: 86, w: 8, h: 12, actions: [{ label: '浇点水', result: '小人给绿植浇了水，叶子抖了抖。' }] },
+          { id: 'fur-cabinet', name: '壁柜', img: '', x: 36, y: 9, w: 28, h: 15, actions: [{ label: '整理一下', result: '小人把柜子里的东西摆整齐了。' }] },
+          { id: 'fur-coffee', name: '咖啡机', img: '', x: 24, y: 62, w: 10, h: 14, actions: [{ label: '来杯咖啡', result: '小人按下按钮，浓郁的咖啡香飘了出来。☕' }] }
         ]
       },
       bathroom: {
@@ -372,7 +374,7 @@ function ensureStateShape(next, saved) {
   next.willow.date = typeof next.willow.date === 'string' ? next.willow.date : '';
   next.willow.text = typeof next.willow.text === 'string' ? next.willow.text : '';
   next.willow.rule = typeof next.willow.rule === 'string' ? next.willow.rule : '';
-  next.settings = Object.assign({ ai: true, pinned: false, bubbleStyle: 'default', musicMode: 'loop', translateProvider: 'google', deeplKey: '', autoVoice: false, ttsProvider: 'minimax', ttsUrls: {}, ttsKeys: {}, ttsModels: {}, ttsVoices: {}, ttsGroups: {}, streamReply: true }, next.settings || {});
+  next.settings = Object.assign({ ai: true, pinned: false, bubbleStyle: 'default', musicMode: 'loop', translateProvider: 'google', deeplKey: '', autoVoice: false, ttsProvider: 'minimax', ttsUrls: {}, ttsKeys: {}, ttsModels: {}, ttsVoices: {}, ttsGroups: {}, streamReply: true, cloudAuto: true }, next.settings || {});
   if (['minimax', 'mimo', 'elevenlabs'].indexOf(next.settings.ttsProvider) < 0) next.settings.ttsProvider = 'minimax';
   next.settings.relayUrl = typeof next.settings.relayUrl === 'string' ? next.settings.relayUrl : '';
   return next;

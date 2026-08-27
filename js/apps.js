@@ -5751,6 +5751,86 @@ function furArt(fid) {
   if (fid === 'fur-plant') {
     return '<div class="fur-plant-pot"><div class="fpp-pot"></div><div class="fpp-stem"></div><div class="fpp-leaf l1"></div><div class="fpp-leaf l2"></div><div class="fpp-leaf l3"></div></div>';
   }
+  if (fid === 'fur-sofa') {
+    return '<div class="fur-sofa">'
+      + '<div class="fs-shadow"></div>'
+      + '<div class="fs-back"></div>'
+      + '<div class="fs-seat"></div>'
+      + '<div class="fs-arm fs-arm-l"></div>'
+      + '<div class="fs-arm fs-arm-r"></div>'
+      + '<div class="fs-cushion fs-c1"></div>'
+      + '<div class="fs-cushion fs-c2"></div>'
+      + '<div class="fs-leg fs-leg-l"></div>'
+      + '<div class="fs-leg fs-leg-r"></div>'
+      + '</div>';
+  }
+  if (fid === 'fur-table') {
+    return '<div class="fur-table">'
+      + '<div class="ft-top"></div>'
+      + '<div class="ft-cup"></div>'
+      + '<div class="ft-leg ft-leg-l"></div>'
+      + '<div class="ft-leg ft-leg-r"></div>'
+      + '</div>';
+  }
+  if (fid === 'fur-lamp') {
+    return '<div class="fur-lamp">'
+      + '<div class="fl-glow"></div>'
+      + '<div class="fl-shade"></div>'
+      + '<div class="fl-pole"></div>'
+      + '<div class="fl-base"></div>'
+      + '</div>';
+  }
+  if (fid === 'fur-pot') {
+    return '<div class="fur-pot">'
+      + '<div class="fp-leaf fp-leaf-l1"></div>'
+      + '<div class="fp-leaf fp-leaf-l2"></div>'
+      + '<div class="fp-leaf fp-leaf-l3"></div>'
+      + '<div class="fp-stem"></div>'
+      + '<div class="fp-pot"></div>'
+      + '</div>';
+  }
+  if (fid === 'fur-shelf') {
+    var bookColors = ['#f6a8c0', '#f9c98a', '#a9d68f', '#9fc9e8', '#c9a9e8', '#f0d27a'];
+    var shelfRows = [{ sl: 34, h: 27 }, { sl: 66, h: 25 }, { sl: 100, h: 23 }];
+    var books = '';
+    shelfRows.forEach(function (r, ri) {
+      var n = (ri === 1) ? 5 : 4;
+      var gap = 84 / n;
+      for (var i = 0; i < n; i++) {
+        var cw = gap * 0.68;
+        var left = 9 + i * gap + (gap - cw) / 2;
+        var col = bookColors[(i + ri) % bookColors.length];
+        books += '<div class="fsh-book" style="left:' + left.toFixed(1) + '%;top:' + (r.sl - r.h) + '%;height:' + r.h + '%;width:' + cw.toFixed(1) + '%;background:' + col + '"></div>';
+      }
+    });
+    return '<div class="fur-shelf">'
+      + '<div class="fsh-frame"></div>'
+      + '<div class="fsh-shelf s1"></div>'
+      + '<div class="fsh-shelf s2"></div>'
+      + books
+      + '</div>';
+  }
+  if (fid === 'fur-cabinet') {
+    return '<div class="fur-cabinet">'
+      + '<div class="fc-top"></div>'
+      + '<div class="fc-body"></div>'
+      + '<div class="fc-door d1"></div>'
+      + '<div class="fc-door d2"></div>'
+      + '<div class="fc-handle h1"></div>'
+      + '<div class="fc-handle h2"></div>'
+      + '</div>';
+  }
+  if (fid === 'fur-coffee') {
+    return '<div class="fur-coffee">'
+      + '<div class="fcm-steam"></div>'
+      + '<div class="fcm-top"></div>'
+      + '<div class="fcm-body"></div>'
+      + '<div class="fcm-nozzle"></div>'
+      + '<div class="fcm-btn b1"></div>'
+      + '<div class="fcm-btn b2"></div>'
+      + '<div class="fcm-cup"></div>'
+      + '</div>';
+  }
   var em = furEmoji(fid);
   return '<div class="fur-emoji">' + em + '</div>';
 }

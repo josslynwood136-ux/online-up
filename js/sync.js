@@ -16,6 +16,10 @@ function setCloudBackend(b) {
 
 // 同步模式：true = 本地保存即自动推云端；false = 仅手动点「上传」
 const AUTO_SYNC = true;
+// 是否启用「自动同步」：由设置里的开关控制（默认开，关掉即纯手动：只在点「上传」时推、点「加载」时拉）
+function autoSync() {
+  return AUTO_SYNC && state && state.settings && state.settings.cloudAuto !== false;
+}
 
 // ---- Supabase 配置（填你自己的）----
 const SUPABASE_URL = 'https://hgjhfbwqefcvtgwkwhgy.supabase.co';        // 你的项目网址
@@ -89,7 +93,7 @@ function withTimeout(promise, ms, label) {
 }
 
 function cloudOnSave() {
-  if (AUTO_SYNC) {
+  if (autoSync()) {
     if (!cloudLogged()) return;
     _localTs = Date.now();
     writeLocalTs(_localTs);
@@ -101,6 +105,19 @@ function cloudOnSave() {
 function schedulePush() {
   if (_pushTimer) clearTimeout(_pushTimer);
   _pushTimer = setTimeout(pushCloud, 1500);
+}
+
+// 页面切后台 / 关闭前尽快把改动推上去，缩小「本机已存、云端还没收到」的窗口，避免刷新后丢消息
+function flushPushOnHide() {
+  if (!autoSync() || !cloudLogged()) return;
+  if (_pushTimer) { clearTimeout(_pushTimer); _pushTimer = null; }
+  try { pushCloud(); } catch (e) {}
+}
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') flushPushOnHide();
+  });
+  window.addEventListener('pagehide', flushPushOnHide);
 }
 
 // ============================================================
@@ -123,7 +140,7 @@ function initSbSupabase() {
     _sb.auth.onAuthStateChange(function (_event, session) {
       _sbUser = session ? session.user : null;
       _sbPulled = true;
-      if (AUTO_SYNC && _sbUser) setTimeout(pullCloud, 0);
+      if (autoSync() && _sbUser) setTimeout(pullCloud, 0);
     });
     _sbDisableReason = '';
     return true;
@@ -164,7 +181,7 @@ async function sbAuthImpl() {
       throw r1.error;
     }
     sbSetStatus('登录成功，正在拉取云端数据…', true);
-    setTimeout(function () { pullCloud(); }, 300);
+    setTimeout(function () { if (autoSync()) pullCloud(); }, 300);
   } catch (e) {
     sbSetStatus('登录失败：' + (e.message || e), false);
   }
@@ -223,13 +240,13 @@ async function sbPullImpl(forceArg) {
     }
     var row = res.data;
     if (!row || !row.data) {
-      if (AUTO_SYNC) schedulePush();
-      sbSetStatus(AUTO_SYNC ? ('云端暂无该账号数据，已把本机数据上传（约 ' + estimateStateSize() + 'KB）') : '云端暂无该账号数据，请点「上传」把本机数据备份到云端', true);
+      if (autoSync()) schedulePush();
+      sbSetStatus(autoSync() ? ('云端暂无该账号数据，已把本机数据上传（约 ' + estimateStateSize() + 'KB）') : '云端暂无该账号数据，请点「上传」把本机数据备份到云端', true);
       return;
     }
     var remote = new Date(row.updated_at || 0).getTime() || 0;
     var local = readLocalTs();
-    var force = forceArg === true || !window.__sbAppliedOnce;
+    var force = forceArg === true || (!window.__sbAppliedOnce && isStateTrivial());
     if (force) window.__sbAppliedOnce = true;
     var sizeKB = 0;
     try { sizeKB = Math.round(JSON.stringify(row.data).length / 1024); } catch (e) {}
@@ -241,7 +258,7 @@ async function sbPullImpl(forceArg) {
       cloudToast('已从云端恢复最新数据', true);
       applyCloudStateInPlace();
     } else if (local > remote) {
-      if (AUTO_SYNC) schedulePush();
+      if (autoSync()) schedulePush();
       else sbSetStatus('本机数据比云端新，如需备份请点「上传」', true);
     } else {
       sbSetStatus('云端与本机一致，已是最新', true);
@@ -269,6 +286,8 @@ function sbBlockImpl() {
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
       '<button class="ghost-btn" onclick="sbUpload()" style="justify-content:center">⬆️ 上传</button>' +
       '<button class="ghost-btn" onclick="sbDownload()" style="justify-content:center">⬇️ 加载</button></div>' +
+      '<label style="display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#4a3f35">自动同步（关 = 仅手动上传/加载）' +
+      '<span class="switch' + (autoSync() ? ' on' : '') + '" onclick="toggleCloudAuto()" id="cloudAutoSwitch"></span></label>' +
       '<button class="ghost-btn" onclick="sbCloudLogout()" style="justify-content:center;color:#c0392b">退出登录</button>' +
       '<div id="sbStatus" style="font-size:11px;color:#27ae60"></div></div>';
   }
@@ -435,7 +454,7 @@ async function ghPullImpl(forceArg) {
     }
     var remote = new Date(gist.updated_at || 0).getTime() || 0;
     var local = readLocalTs();
-    var force = forceArg === true || !window.__sbAppliedOnce;
+    var force = forceArg === true || (!window.__sbAppliedOnce && isStateTrivial());
     if (force) window.__sbAppliedOnce = true;
     var data;
     try { data = JSON.parse(file.content); } catch (e2) {
@@ -512,6 +531,16 @@ async function sbCloudAuth() {
 async function sbCloudLogout() {
   if (CLOUD_BACKEND === 'supabase') return sbLogoutImpl();
   return ghLogoutImpl();
+}
+function toggleCloudAuto() {
+  try {
+    state.settings.cloudAuto = !autoSync();
+    saveState();
+  } catch (e) {}
+  var sw = document.getElementById('cloudAutoSwitch');
+  if (sw) sw.classList.toggle('on', autoSync());
+  if (typeof renderApiSettings === 'function') renderApiSettings();
+  sbSetStatus(autoSync() ? '已开启自动同步（本地保存即推云端、加载时自动拉取）' : '已关闭自动同步，仅在你点「上传 / 加载」时才与云端交互', true);
 }
 function sbSyncNow() {
   if (!cloudLogged()) { sbSetStatus('请先登录 / 连接', false); return; }
