@@ -1967,7 +1967,7 @@ async function callAI(text, shortTest = false, proactive = false, forChar = null
     if (!shortTest && document.visibilityState !== 'visible') {
       try { var _s3 = await callAIServer(window.__genPayload.char, window.__genPayload.messages, window.__genPayload.modelBody, pushEnabled()); window.__genActive = false; if (_s3) return _s3; } catch (_e2) {}
     }
-    if (window.__genHandedOff) { window.__genActive = false; throw Object.assign(new Error('已转交服务器生成'), { name: 'AbortError' }); }
+    if (window.__genHandedOff) { window.__genActive = false; return ''; }
     if (activeAbort) try { activeAbort.abort(); } catch(e) {}
     const controller = new AbortController();
     activeAbort = controller;
