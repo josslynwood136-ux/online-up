@@ -1465,7 +1465,6 @@ function drainPendingToChat(pending) {
   saveState();
   var ac = activeCharacter();
   if (ac && touched[ac.id]) renderChat();
-  if (typeof quickNotice === 'function') quickNotice('收到 ' + pending.length + ' 条角色主动消息');
 }
 window.drainPendingToChat = drainPendingToChat;
 
@@ -2143,13 +2142,9 @@ var TRANSLATE_PROVIDERS = {
   google: googleTranslate,
   libre: libreTranslate,
   lingva: lingvaTranslate,
-  deepl: deeplTranslate,
   deeplweb: deeplWebTranslate,
   mymemory: mymemoryTranslate,
-  yandex: yandexTranslate,
-  bing: bingTranslate,
-  modernmt: modernmtTranslate,
-  papago: papagoTranslate
+  yandex: yandexTranslate
 };
 
 async function aiTranslate(text, srcLang) {
@@ -2191,7 +2186,7 @@ async function translateText(text, srcLang) {
   // 默认优先用免费机翻（不消耗聊天 API）；LLM 只作为最后的兜底
   var pref = (state.settings && state.settings.translateProvider) || 'deeplweb';
   if (pref === 'ai') pref = 'deeplweb';
-  var mt = ['deeplweb', 'mymemory', 'yandex', 'deepl', 'bing', 'modernmt', 'papago', 'google', 'libre', 'lingva'];
+  var mt = ['deeplweb', 'mymemory', 'yandex', 'google', 'libre', 'lingva'];
   var order = [];
   if (pref) order.push(pref);
   mt.forEach(function (p) { if (order.indexOf(p) === -1) order.push(p); });
@@ -2269,34 +2264,6 @@ async function lingvaTranslate(text) {
   }
 }
 
-async function deeplTranslate(text) {
-  var key = ((state.settings && state.settings.translateKeys && state.settings.translateKeys.deepl) || '').trim();
-  if (!key) return null;
-  var ctrl = new AbortController();
-  var tmr = setTimeout(function() { try { ctrl.abort(); } catch(e) {} }, 10000);
-  try {
-    // Free 版的 key 以 :fx 结尾，走 api-free 域名；其余走 api 正式域名
-    var endpoint = (key.indexOf(':fx') > -1) ? 'https://api-free.deepl.com/v2/translate' : 'https://api.deepl.com/v2/translate';
-    var form = new URLSearchParams();
-    form.set('text', text.slice(0, 1000));
-    form.set('target_lang', 'ZH');
-    var res = await aiRequest(endpoint, {
-      method: 'POST',
-      headers: { 'Authorization': 'DeepL-Auth-Key ' + key, 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: form.toString(),
-      signal: ctrl.signal
-    });
-    if (!res.ok) return null;
-    var data = await res.json().catch(function() { return null; });
-    if (!data || !Array.isArray(data.translations) || !data.translations[0] || !data.translations[0].text) return null;
-    return String(data.translations[0].text).trim() || null;
-  } catch (e) {
-    return null;
-  } finally {
-    clearTimeout(tmr);
-  }
-}
-
 // 免密 DeepL：调用网页版非官方接口（LMT_handle_texts），质量等同官方，但接口可能被 DeepL 改而失效
 async function deeplWebTranslate(text) {
   var ctrl = new AbortController();
@@ -2358,70 +2325,6 @@ async function yandexTranslate(text) {
     if (!res.ok) return null;
     var data = await res.json().catch(function() { return null; });
     if (data && Array.isArray(data.text) && data.text[0]) return String(data.text[0]).trim() || null;
-    return null;
-  } catch (e) { return null; } finally { clearTimeout(tmr); }
-}
-
-async function bingTranslate(text) {
-  var key = ((state.settings && state.settings.translateKeys && state.settings.translateKeys.bing) || '').trim();
-  if (!key) return null;
-  var region = (state.settings && state.settings.translateKeys && state.settings.translateKeys.bingRegion) || '';
-  var ctrl = new AbortController();
-  var tmr = setTimeout(function() { try { ctrl.abort(); } catch (e) {} }, 10000);
-  try {
-    var url = 'https://api.cognitive.microsofttranslator.com/translate?api-version=3.0&to=zh-Hans';
-    var res = await aiRequest(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Ocp-Apim-Subscription-Key': key, 'Ocp-Apim-Subscription-Region': region },
-      body: JSON.stringify([{ Text: text.slice(0, 1000) }]),
-      signal: ctrl.signal
-    });
-    if (!res.ok) return null;
-    var data = await res.json().catch(function() { return null; });
-    if (Array.isArray(data) && data[0] && data[0].translations && data[0].translations[0]) return String(data[0].translations[0].text).trim() || null;
-    return null;
-  } catch (e) { return null; } finally { clearTimeout(tmr); }
-}
-
-async function modernmtTranslate(text) {
-  var key = ((state.settings && state.settings.translateKeys && state.settings.translateKeys.modernmt) || '').trim();
-  if (!key) return null;
-  var ctrl = new AbortController();
-  var tmr = setTimeout(function() { try { ctrl.abort(); } catch (e) {} }, 10000);
-  try {
-    var url = 'https://api.modernmt.com/translate?target=zh&q=' + encodeURIComponent(text.slice(0, 1000));
-    var res = await aiRequest(url, { method: 'GET', headers: { Authorization: 'Bearer ' + key }, signal: ctrl.signal });
-    if (!res.ok) return null;
-    var data = await res.json().catch(function() { return null; });
-    if (data && data.data && data.data.translation) return String(data.data.translation).trim() || null;
-    return null;
-  } catch (e) { return null; } finally { clearTimeout(tmr); }
-}
-
-async function papagoTranslate(text) {
-  var keys = (state.settings && state.settings.translateKeys) || {};
-  var combo = (keys.papago || '').trim();
-  var parts = combo.split('|');
-  var id = (parts[0] || '').trim();
-  var secret = (parts[1] || '').trim();
-  if (!id || !secret) return null;
-  var ctrl = new AbortController();
-  var tmr = setTimeout(function() { try { ctrl.abort(); } catch (e) {} }, 10000);
-  try {
-    var url = 'https://papago.naver.com/apis/n2mt/translate';
-    var form = new URLSearchParams();
-    form.set('source', 'en');
-    form.set('target', 'zh-CN');
-    form.set('text', text.slice(0, 1000));
-    var res = await aiRequest(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'X-NCP-APIGW-API-KEY-ID': id, 'X-NCP-APIGW-API-KEY': secret },
-      body: form.toString(),
-      signal: ctrl.signal
-    });
-    if (!res.ok) return null;
-    var data = await res.json().catch(function() { return null; });
-    if (data && data.message && data.message.result && data.message.result.translatedText) return String(data.message.result.translatedText).trim() || null;
     return null;
   } catch (e) { return null; } finally { clearTimeout(tmr); }
 }
@@ -3282,7 +3185,7 @@ function toggleTranslate() {
   saveState();
   $('translateSwitch').classList.toggle('on', char.translate);
 }
-var KEYED_PROVIDERS = { deepl: 'DeepL API Key（Free 版以 :fx 结尾）', bing: '微软翻译 Key', modernmt: 'ModernMT API Key', papago: 'Papago：客户端ID|客户端密钥' };
+var KEYED_PROVIDERS = {};
 
 function updateTranslateKeyUI() {
   var sel = $('translateProviderSelect');
@@ -3810,7 +3713,7 @@ function idleProactiveTick() {
   for (var i = 0; i < chars.length; i++) {
     var char = chars[i];
     if (!char) continue;
-    if (char.idleProactive === false) continue;
+    if (char.idleProactive === false || char.proactivePush === false) continue;
     if (char.chat && char.chat.length === 0) continue;
     // 找最后一条用户消息时间
     var lastUserTs = 0;

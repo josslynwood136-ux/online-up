@@ -353,8 +353,7 @@ async function ghAuthImpl() {
     var found = await findGistId();
     if (found) { try { localStorage.setItem(GH_GIST_KEY, found); } catch (e) {} }
   } catch (e) {}
-  sbSetStatus('已连接' + (_ghUser ? '（@' + _ghUser + '）' : '') + '，正在拉取云端数据…', true);
-  setTimeout(function () { pullCloud(); }, 200);
+  sbSetStatus('已连接' + (_ghUser ? '（@' + _ghUser + '）' : '') + '，请在需要时点「加载」取回云端数据', true);
 }
 
 async function ghLogoutImpl() {
