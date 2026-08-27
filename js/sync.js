@@ -14,11 +14,9 @@ function setCloudBackend(b) {
   if (typeof renderApiSettings === 'function') renderApiSettings();
 }
 
-// 同步模式：true = 本地保存即自动推云端；false = 仅手动点「上传」
-const AUTO_SYNC = true;
-// 是否启用「自动同步」：由设置里的开关控制（默认开，关掉即纯手动：只在点「上传」时推、点「加载」时拉）
+// 同步模式：本应用已关闭「自动备份」，只能通过手动点「上传 / 加载」与云端交互
 function autoSync() {
-  return AUTO_SYNC && state && state.settings && state.settings.cloudAuto !== false;
+  return false;
 }
 
 // ---- Supabase 配置（填你自己的）----
@@ -93,13 +91,7 @@ function withTimeout(promise, ms, label) {
 }
 
 function cloudOnSave() {
-  if (autoSync()) {
-    if (!cloudLogged()) return;
-    _localTs = Date.now();
-    writeLocalTs(_localTs);
-    schedulePush();
-  }
-  // 仅手动模式：本地保存不再自动推云端，需用户主动点「上传」
+  // 已关闭自动备份：本地保存不再推云端，需用户主动点「上传」
 }
 
 function schedulePush() {
@@ -107,11 +99,8 @@ function schedulePush() {
   _pushTimer = setTimeout(pushCloud, 1500);
 }
 
-// 页面切后台 / 关闭前尽快把改动推上去，缩小「本机已存、云端还没收到」的窗口，避免刷新后丢消息
+// 页面切后台 / 关闭前不再自动推云端（已关闭自动备份，仅手动「上传」才推）
 function flushPushOnHide() {
-  if (!autoSync() || !cloudLogged()) return;
-  if (_pushTimer) { clearTimeout(_pushTimer); _pushTimer = null; }
-  try { pushCloud(); } catch (e) {}
 }
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', function () {
@@ -140,7 +129,6 @@ function initSbSupabase() {
     _sb.auth.onAuthStateChange(function (_event, session) {
       _sbUser = session ? session.user : null;
       _sbPulled = true;
-      if (autoSync() && _sbUser) setTimeout(pullCloud, 0);
     });
     _sbDisableReason = '';
     return true;
@@ -180,8 +168,7 @@ async function sbAuthImpl() {
       }
       throw r1.error;
     }
-    sbSetStatus('登录成功，正在拉取云端数据…', true);
-    setTimeout(function () { if (autoSync()) pullCloud(); }, 300);
+    sbSetStatus('登录成功，请在需要时点「加载」取回云端数据', true);
   } catch (e) {
     sbSetStatus('登录失败：' + (e.message || e), false);
   }
@@ -241,7 +228,7 @@ async function sbPullImpl(forceArg) {
     var row = res.data;
     if (!row || !row.data) {
       if (autoSync()) schedulePush();
-      sbSetStatus(autoSync() ? ('云端暂无该账号数据，已把本机数据上传（约 ' + estimateStateSize() + 'KB）') : '云端暂无该账号数据，请点「上传」把本机数据备份到云端', true);
+      sbSetStatus(autoSync() ? ('云端暂无该账号数据，已把本机数据上传（约 ' + estimateStateSize() + 'KB）') : '云端暂无该账号数据（若你刚上传过，多半是 Supabase 的 RLS 没开放 SELECT 策略，请到控制台给 user_data 加一条 for select using (auth.uid()=id) 的策略）', true);
       return;
     }
     var remote = new Date(row.updated_at || 0).getTime() || 0;
@@ -283,12 +270,10 @@ function sbBlockImpl() {
       '<div style="font-size:13px;font-weight:600;color:#4a3f35">云同步</div>' +
       '<span style="font-size:11px;color:#27ae60">✓ 已登录 ' + em + '</span></div>' +
       '<div style="font-size:11px;color:#b8a99a;line-height:1.6">「上传」把当前设备数据存到云端；在任何设备点「加载」，都会取回最后上传的那一份。建议：先在 A 设备上传，再到 B 设备加载。</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
-      '<button class="ghost-btn" onclick="sbUpload()" style="justify-content:center">⬆️ 上传</button>' +
-      '<button class="ghost-btn" onclick="sbDownload()" style="justify-content:center">⬇️ 加载</button></div>' +
-      '<label style="display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#4a3f35">自动同步（关 = 仅手动上传/加载）' +
-      '<span class="switch' + (autoSync() ? ' on' : '') + '" onclick="toggleCloudAuto()" id="cloudAutoSwitch"></span></label>' +
-      '<button class="ghost-btn" onclick="sbCloudLogout()" style="justify-content:center;color:#c0392b">退出登录</button>' +
+       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+       '<button class="ghost-btn" onclick="sbUpload()" style="justify-content:center">⬆️ 上传</button>' +
+       '<button class="ghost-btn" onclick="sbDownload()" style="justify-content:center">⬇️ 加载</button></div>' +
+       '<button class="ghost-btn" onclick="sbCloudLogout()" style="justify-content:center;color:#c0392b">退出登录</button>' +
       '<div id="sbStatus" style="font-size:11px;color:#27ae60"></div></div>';
   }
   return '<div style="background:#fff;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px">' +
@@ -531,16 +516,6 @@ async function sbCloudAuth() {
 async function sbCloudLogout() {
   if (CLOUD_BACKEND === 'supabase') return sbLogoutImpl();
   return ghLogoutImpl();
-}
-function toggleCloudAuto() {
-  try {
-    state.settings.cloudAuto = !autoSync();
-    saveState();
-  } catch (e) {}
-  var sw = document.getElementById('cloudAutoSwitch');
-  if (sw) sw.classList.toggle('on', autoSync());
-  if (typeof renderApiSettings === 'function') renderApiSettings();
-  sbSetStatus(autoSync() ? '已开启自动同步（本地保存即推云端、加载时自动拉取）' : '已关闭自动同步，仅在你点「上传 / 加载」时才与云端交互', true);
 }
 function sbSyncNow() {
   if (!cloudLogged()) { sbSetStatus('请先登录 / 连接', false); return; }
