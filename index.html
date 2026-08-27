@@ -316,6 +316,7 @@
                 <div style="font-size:11px;color:#b8a99a;margin-bottom:6px">克隆音色（MiMo）</div>
                 <input type="file" accept="audio/*,.mp3,.wav,.m4a,video/mp4,video/webm,video/quicktime,video/*,.mp4,.mov,.webm,.m4v" id="charCloneInput" onchange="uploadCloneVoice(event)" style="display:none;">
                 <button type="button" onclick="document.getElementById('charCloneInput').click()" style="width:100%;border:1.5px dashed #d8cfc4;background:#faf8f5;color:#8a7a6a;border-radius:10px;padding:9px 0;font-size:13px;cursor:pointer;">🎙 上传录音或视频 · mp3 / wav / mp4 均可</button>
+                <div style="font-size:11px;color:#b8a99a;margin-top:6px;line-height:1.5">想克隆得更像：用 <b>10~30 秒、单人清晰说话、无背景音乐/噪音</b> 的录音（WAV 比压缩 MP3 更保真）；太短、太杂或带笑声/唱歌会让音色发飘、失真。</div>
                 <div style="display:flex;gap:8px;margin-top:8px">
                   <button type="button" onclick="previewCloneVoice()" style="flex:1;border:none;background:#b8a99a;color:#fff;border-radius:8px;padding:8px 0;font-size:12px;cursor:pointer;">▶ 试听</button>
                   <button type="button" onclick="clearCloneVoice()" style="flex:1;border:none;background:#e8e2da;color:#a08a80;border-radius:8px;padding:8px 0;font-size:12px;cursor:pointer;">清除</button>

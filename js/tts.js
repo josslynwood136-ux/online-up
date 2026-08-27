@@ -315,6 +315,8 @@ async function mimoSpeak(text, btn, cancelled) {
   // 克隆稳定度：temperature 越低越贴样本，越高越有情绪；top_p 按比例联动
   var _temp = 0.6;
   try { var _tc = _activeChar(); if (_tc && typeof _tc.ttsTemp === 'number') _temp = _tc.ttsTemp; } catch (e) {}
+  // 克隆模式默认更贴样本（减少音色漂移）；仅当用户没手动动过滑杆（仍是 0.6）时才生效
+  if (hasCloneSample && _temp === 0.6) _temp = 0.4;
   var u = cfg.url;
   if (/\/chat\/completions$/i.test(u)) {
     // 已是完整地址

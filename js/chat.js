@@ -1341,12 +1341,12 @@ async function streamDeliver(text, opts) {
     frequency_penalty: cfg.frequencyPenalty ?? 0,
     stream: true
   };
-  if (window.__genHandedOff) { window.__genActive = false; return ''; }
+  if (window.__genHandedOff) { window.__genActive = false; setChatTyping(false); return ''; }
   if (document.visibilityState !== 'visible' && window.__genPayload) {
     try {
       var _srvText = await callAIServer(window.__genPayload.char, window.__genPayload.messages, window.__genPayload.modelBody, pushEnabled());
       window.__genActive = false;
-      if (_srvText) return _srvText;
+      if (_srvText) { setChatTyping(false); return _srvText; }
     } catch (_e) { /* 后台生成失败则继续走前台路径（若页面还活着） */ }
   }
   if (activeAbort) try { activeAbort.abort(); } catch (e) {}
@@ -1465,6 +1465,8 @@ function drainPendingToChat(pending) {
   saveState();
   var ac = activeCharacter();
   if (ac && touched[ac.id]) renderChat();
+  // 兜底：从服务器队列取回后台生成的消息后，清掉可能残留的"正在输入"（仅当此刻没有前台生成在进行）
+  if (!window.__genActive) setChatTyping(false);
 }
 window.drainPendingToChat = drainPendingToChat;
 
@@ -3713,7 +3715,7 @@ function idleProactiveTick() {
   for (var i = 0; i < chars.length; i++) {
     var char = chars[i];
     if (!char) continue;
-    if (char.idleProactive === false || char.proactivePush === false) continue;
+    if (char.proactivePush !== true) continue;
     if (char.chat && char.chat.length === 0) continue;
     // 找最后一条用户消息时间
     var lastUserTs = 0;
@@ -3740,7 +3742,22 @@ function idleProactiveTick() {
 function fireProactive(char) {
   _manualAICall = true;
   setChatTyping(true);
+  var done = false;
+  // 兜底：无论如何到点强制清掉"正在输入"，避免请求卡死时气泡一直转圈
+  var safety = setTimeout(function () {
+    if (done) return;
+    done = true;
+    try { if (activeAbort) activeAbort.abort(); } catch (e) {}
+    setChatTyping(false);
+    if (!char.chat) char.chat = [];
+    char.chat.push({ role: 'system', content: '（' + char.name + ' 来找过你，但刚才网有点卡，没能说出话来 🥺）', time: new Date().toLocaleString(), ts: Date.now() });
+    saveState();
+    if (state.activeRoleId === char.id) renderChat();
+  }, 60000);
   callAI('', false, true, char).then(async function(reply) {
+    if (done) return;
+    clearTimeout(safety);
+    done = true;
     setChatTyping(false);
     var txt = reply || '……';
     var parts = splitReply(txt);
@@ -3766,10 +3783,13 @@ function fireProactive(char) {
     saveState();
     if (state.activeRoleId === char.id) renderChat();
   }).catch(function(err) {
+    if (done) return;
+    clearTimeout(safety);
+    done = true;
     setChatTyping(false);
     if (err.name === 'AbortError') return;
     if (!char.chat) char.chat = [];
-    char.chat.push({ role: 'system', content: '（' + char.name + ' 想找你，但信号不太好。）', time: new Date().toLocaleString(), ts: Date.now() });
+    char.chat.push({ role: 'system', content: '（' + char.name + ' 想找你，但信号不太好 🥺）', time: new Date().toLocaleString(), ts: Date.now() });
     saveState();
     if (state.activeRoleId === char.id) renderChat();
   });
