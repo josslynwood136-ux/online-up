@@ -194,6 +194,8 @@ async function initPush() {
       await subscribePush();
     }
   }
+  // 不论是否开启推送，都尝试拉取一次后台生成的待收消息（用 deviceId 暂存，无需订阅）
+  fetchPendingMessages();
   refreshPushUI();
 }
 
@@ -227,15 +229,17 @@ async function uploadPushConfig() {
 
 // 拉取后台生成的待收消息，写入对应角色聊天（服务器生成时已推过通知）
 async function fetchPendingMessages() {
-  if (!pushEnabled()) return;
-  var sub = await getCurrentSub();
-  if (!sub) return;
+  var sub = null;
+  if (typeof getCurrentSub === 'function') { try { sub = await getCurrentSub(); } catch (e) {} }
+  var endpoint = sub ? sub.endpoint : '';
+  var deviceId = (typeof getDeviceId === 'function') ? getDeviceId() : '';
+  var q = endpoint ? ('endpoint=' + encodeURIComponent(endpoint)) : ('deviceId=' + encodeURIComponent(deviceId));
   try {
-    var r = await fetch('push/pending?endpoint=' + encodeURIComponent(sub.endpoint), { credentials: 'same-origin' });
+    var r = await fetch('push/pending?' + q, { credentials: 'same-origin' });
     var j = await r.json();
     if (j && j.pending && j.pending.length) {
       if (typeof drainPendingToChat === 'function') drainPendingToChat(j.pending);
-      await fetch('push/drain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ endpoint: sub.endpoint }) });
+      await fetch('push/drain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ endpoint: endpoint || undefined, deviceId: deviceId }) });
     }
   } catch (e) {}
 }

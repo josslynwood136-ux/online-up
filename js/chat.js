@@ -1342,9 +1342,9 @@ async function streamDeliver(text, opts) {
     stream: true
   };
   if (window.__genHandedOff) { window.__genActive = false; return ''; }
-  if (document.visibilityState !== 'visible' && pushEnabled() && window.__genPayload) {
+  if (document.visibilityState !== 'visible' && window.__genPayload) {
     try {
-      var _srvText = await callAIServer(window.__genPayload.char, window.__genPayload.messages, window.__genPayload.modelBody, true);
+      var _srvText = await callAIServer(window.__genPayload.char, window.__genPayload.messages, window.__genPayload.modelBody, pushEnabled());
       window.__genActive = false;
       if (_srvText) return _srvText;
     } catch (_e) { /* 后台生成失败则继续走前台路径（若页面还活着） */ }
@@ -1471,6 +1471,15 @@ window.drainPendingToChat = drainPendingToChat;
 
 // 把回复生成交给自己的服务器（sever/server.js 的 /push/reply），使其在后台/冻结时也能完成：
 // 服务端只中转 AI 请求（key 不留存，与 /relay 同级别），notify 时再发系统推送 + 写待收队列。
+function getDeviceId() {
+  try {
+    var d = localStorage.getItem('deviceId');
+    if (!d) { d = 'dev-' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('deviceId', d); }
+    return d;
+  } catch (e) { return 'dev-anon'; }
+}
+window.getDeviceId = getDeviceId;
+
 async function callAIServer(char, messages, modelBody, notify) {
   var cfg = activeAIConfig();
   if (!cfg || !cfg.url || !cfg.key || !cfg.model) throw new Error('AI 未配置');
@@ -1483,7 +1492,7 @@ async function callAIServer(char, messages, modelBody, notify) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'same-origin',
-    body: JSON.stringify({ target: target, headers: headers, messages: messages, modelBody: modelBody, endpoint: endpoint, notify: !!notify, charId: char.id, charName: char.name, charAvatar: char.avatar })
+    body: JSON.stringify({ target: target, headers: headers, messages: messages, modelBody: modelBody, endpoint: endpoint, subscription: sub || undefined, deviceId: getDeviceId(), notify: !!notify, charId: char.id, charName: char.name, charAvatar: char.avatar })
   });
   var j = await res.json().catch(function () { return {}; });
   if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
@@ -1519,12 +1528,12 @@ async function generateAndDeliver(text, opts) {
 (function bindGenHandoff() {
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'hidden') {
-      if (window.__genActive && pushEnabled() && window.__genPayload) {
+      if (window.__genActive && window.__genPayload) {
         if (activeAbort) { try { activeAbort.abort(); } catch (e) {} }
         window.__genActive = false;
         window.__genHandedOff = true;
         var _p = window.__genPayload; window.__genPayload = null;
-        callAIServer(_p.char, _p.messages, _p.modelBody, true).catch(function () {});
+        callAIServer(_p.char, _p.messages, _p.modelBody, pushEnabled()).catch(function () {});
       }
     } else {
       if (typeof fetchPendingMessages === 'function') fetchPendingMessages();
@@ -1955,9 +1964,10 @@ async function callAI(text, shortTest = false, proactive = false, forChar = null
     if (thinkNote) {
       userContent += '\n\n（参考你刚才的内心活动：' + thinkNote + '）现在只输出要发给用户的正式回复，紧扣对方刚才那句话来接，保持角色语气，不要出现任何内心活动文字。';
     }
-    if (!shortTest && document.visibilityState !== 'visible' && pushEnabled()) {
-      try { var _s3 = await callAIServer(window.__genPayload.char, window.__genPayload.messages, window.__genPayload.modelBody, true); window.__genActive = false; if (_s3) return _s3; } catch (_e2) {}
+    if (!shortTest && document.visibilityState !== 'visible') {
+      try { var _s3 = await callAIServer(window.__genPayload.char, window.__genPayload.messages, window.__genPayload.modelBody, pushEnabled()); window.__genActive = false; if (_s3) return _s3; } catch (_e2) {}
     }
+    if (window.__genHandedOff) { window.__genActive = false; return ''; }
     if (activeAbort) try { activeAbort.abort(); } catch(e) {}
     const controller = new AbortController();
     activeAbort = controller;

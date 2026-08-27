@@ -97,6 +97,8 @@ try { pushConfigs = JSON.parse(fs.readFileSync(PUSH_CFG_FILE, 'utf8')) } catch (
 function saveConfigs() {
   try { fs.writeFileSync(PUSH_CFG_FILE, JSON.stringify(pushConfigs)) } catch (e) {}
 }
+// 设备级待收队列：不依赖 Web Push 订阅，用客户端生成的 deviceId 暂存后台生成的回复
+const devicePending = {}
 function inQuiet(now, quiet) {
   if (!quiet || !Array.isArray(quiet) || quiet.length !== 2) return false
   var h = new Date(now).getHours()
@@ -247,15 +249,17 @@ app.post('/push/config', function (req, res) {
 // 拉取待收消息（app 打开时调用，把后台生成的消息补进聊天）
 app.get('/push/pending', function (req, res) {
   const ep = req.query && req.query.endpoint
-  if (!ep) return res.json({ pending: [] })
-  const cfg = pushConfigs[ep]
-  if (!cfg || !cfg.pending) return res.json({ pending: [] })
-  res.json({ pending: cfg.pending })
+  const did = req.query && req.query.deviceId
+  if (ep && pushConfigs[ep] && pushConfigs[ep].pending) return res.json({ pending: pushConfigs[ep].pending })
+  if (did && devicePending[did]) return res.json({ pending: devicePending[did] })
+  res.json({ pending: [] })
 })
 // 清空待收队列（拉取并写入聊天后调用）
 app.post('/push/drain', function (req, res) {
   const ep = req.body && req.body.endpoint
+  const did = req.body && req.body.deviceId
   if (ep && pushConfigs[ep]) { pushConfigs[ep].pending = []; saveConfigs() }
+  if (did && devicePending[did]) { devicePending[did] = [] }
   res.json({ ok: true })
 })
 // 按需生成回复：网页把已拼好的模型请求发来，服务端代为调用 AI（与 /relay 同样只中转、key 不留存），
@@ -283,9 +287,11 @@ app.post('/push/reply', async function (req, res) {
   if (!text) return res.status(502).json({ error: 'AI 返回为空' })
   const endpoint = b.endpoint
   const notify = b.notify
+  const deviceId = b.deviceId
   const charId = b.charId || ''
   const charName = b.charName || '美乐地'
   const charAvatar = b.charAvatar || ''
+  // 已开启推送：发系统通知 + 写入该订阅的待收队列
   if (notify && endpoint) {
     const sub = pushSubs.find(function (s) { return s.endpoint === endpoint })
     if (sub && VAPID_KEYS) {
@@ -297,6 +303,12 @@ app.post('/push/reply', async function (req, res) {
     cfg.pending.push({ charId: charId, text: text, ts: Date.now() })
     if (cfg.pending.length > 50) cfg.pending = cfg.pending.slice(-50)
     saveConfigs()
+  }
+  // 设备级待收：即使没开启/没配好推送，也能暂存，回来后倒进聊天（核心需求，不依赖 Web Push）
+  if (deviceId && !endpoint) {
+    devicePending[deviceId] = devicePending[deviceId] || []
+    devicePending[deviceId].push({ charId: charId, text: text, ts: Date.now() })
+    if (devicePending[deviceId].length > 50) devicePending[deviceId] = devicePending[deviceId].slice(-50)
   }
   res.json({ ok: true, text: text })
 })
