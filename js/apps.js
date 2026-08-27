@@ -1474,8 +1474,9 @@ function renderHome() {
   if (!room) { activeId = 'living'; room = h.rooms.living; h.activeRoom = 'living'; saveState(); }
   var yd = yardState();
   var plotHtml = (activeId === 'yard' && yd) ? renderYardPlots(yd) : '';
-  var bathHtml = (activeId === 'bathroom') ? '<div class="bath-floor"></div><div class="bath-light"></div><span class="bath-steam s1"></span><span class="bath-steam s2"></span><span class="bath-steam s3"></span><span class="bath-floatbub b1"></span><span class="bath-floatbub b2"></span>' : '';
-  var sceneHtml = (activeId === 'living') ? livingRoomArt() : '';
+  var bathHtml = '';
+  var sceneHtml = (activeId === 'living' || activeId === 'bathroom') ? livingRoomArt() : '';
+  var isBath = (activeId === 'bathroom');
   var furHtml = (room.furniture || []).map(function (f) {
     var isYard = (activeId === 'yard');
     var imgUrl = isYard ? (f.img || YARD_FUR_IMG[f.id] || '') : (f.img || '');
@@ -1490,7 +1491,7 @@ function renderHome() {
     }
     var hasArt = (!isYard && !imgUrl && inner) ? ' art' : '';
     var depthStyle = '';
-    if (activeId === 'living') {
+    if (activeId === 'living' || isBath) {
       var d = Math.max(0, Math.min(100, f.y)) / 100;
       depthStyle = ';transform:scale(' + (0.6 + d * 0.8).toFixed(3) + ');transform-origin:50% 100%;z-index:' + Math.round(20 + f.y);
     }
@@ -1511,7 +1512,7 @@ function renderHome() {
   ensureHomeCoupleActions();
   c().innerHTML = `
     <div class="stack" style="height:100%;margin:0;padding:0;position:relative">
-      <div class="home-room${activeId === 'bathroom' ? ' bathroom' : ''}${activeId === 'yard' ? ' yard' : ''}">
+      <div class="home-room${activeId === 'yard' ? ' yard' : ''}">
         <div class="home-bg"${room.bg ? ` style="background-image:url('${escapeHTML(room.bg)}')"` : ''}></div>
         ${sceneHtml}
         <div class="home-exit" onclick="closeApp()" title="退出">✕</div>
@@ -1524,10 +1525,10 @@ function renderHome() {
         ${partnerHtml}
         <div id="homeEffects" style="position:absolute;inset:0;pointer-events:none;z-index:6"></div>
         <div id="yardPop" class="yard-pop" style="display:none"></div>
-        <div id="homePanel" class="home-panel" style="display:none">
-          <div class="home-panel-head"><b id="homePanelTitle"></b><span onclick="closeHomePanel()" style="cursor:pointer;color:#9aa3af">✕</span></div>
-          <div id="homePanelActions" class="home-panel-actions"></div>
-          <div id="homePanelResult" class="home-panel-result"></div>
+<div id="homePanel" class="home-panel" style="display:none">
+            <div class="home-panel-head"><b id="homePanelTitle"></b><button class="home-panel-close" onclick="closeHomePanel()" aria-label="关闭">✕</button></div>
+            <div id="homePanelActions" class="home-panel-actions"></div>
+            <div id="homePanelResult" class="home-panel-result"></div>
         </div>
         <div id="homeLogView" class="home-log-view">
           <div class="home-log-close" onclick="toggleHomeLog()">✕</div>
@@ -1590,12 +1591,12 @@ function openFurniture(id) {
   if (!room) return;
   const panel = $('homePanel'); if (!panel) return;
   if (id === 'fur-tvcabinet' || id === 'fur-table' || id === 'fur-painting') return;
-  if (room.personPos) {
-    room.personPos.x = Math.min(92, Math.max(4, f.x + (f.w / 2) - 6));
-    room.personPos.y = Math.min(82, Math.max(4, f.y + f.h - 12));
-    const p = $('homePerson');
-    if (p) { p.style.left = room.personPos.x + '%'; p.style.top = room.personPos.y + '%'; }
-  }
+    if (room.personPos) {
+      room.personPos.x = Math.min(92, Math.max(4, f.x + (f.w / 2) - 6));
+      room.personPos.y = Math.min(82, Math.max(4, f.y + f.h - 12));
+      const p = $('homePerson');
+      if (p) { p.style.left = room.personPos.x + '%'; p.style.top = room.personPos.y + '%'; }
+    }
   /* 厕所：泡泡选项漂浮在家具周围 */
   if (document.querySelector('.home-room.bathroom')) {
     panel.style.display = 'none';
@@ -5084,30 +5085,38 @@ function cakeRenderStep() {
   if (!items) return;
 
   const stepNum = cakeStepIdx + 1;
-  chooser.innerHTML = `<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+  let html = `<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
     <span style="background:#ec407a;color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">${stepNum}</span>
     <span style="font-weight:700;font-size:14px;color:#444">${icon} ${label}</span>
     <span style="margin-left:auto;font-size:11px;color:#aaa">${stepNum}/5</span>
   </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      ${items.map(item => {
-        const isDeco = step === 'deco';
-        const selected = isDeco ? (cakeChoices.deco || []).includes(item.name) : cakeChoices[step] === item.name;
-        const maxed = isDeco && (cakeChoices.deco || []).length >= 2 && !selected;
-        return `<button style="padding:12px 10px;text-align:left;display:flex;align-items:center;gap:10px;background:${selected ? '#fce4ec' : '#fff'};border:${selected ? '2px solid #ec407a' : '1.5px solid #f0e0e6'};border-radius:14px;cursor:pointer;font-family:inherit;transition:all .15s;${maxed ? 'opacity:.35' : ''}"
-          onclick="cakePick('${step}','${item.name}')" ${maxed ? 'disabled' : ''}
-          onmouseenter="this.style.borderColor='#ec407a'" onmouseleave="this.style.borderColor='${selected ? '#ec407a' : '#f0e0e6'}'">
-          <span style="font-size:22px">${item.emoji}</span>
-          <div><div style="font-weight:600;font-size:13px;color:#333">${item.name}</div><div style="font-size:11px;color:#999">${item.desc}</div></div>
-          ${selected ? '<span style="margin-left:auto;color:#ec407a;font-size:14px">✓</span>' : ''}
-        </button>`;
-      }).join('')}
-    </div>`;
-  if (step === 'deco' && (cakeChoices.deco || []).length > 0) {
-    chooser.innerHTML += `<div style="text-align:center;margin-top:10px"><button class="primary-btn" style="background:#ec407a;border:none;padding:12px 24px;font-size:14px" onclick="cakeNextStep()">✓ 选好了，下一步</button></div>`;
-  }
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">`;
+  html += items.map(item => {
+    const isDeco = step === 'deco';
+    const selected = isDeco ? (cakeChoices.deco || []).includes(item.name) : cakeChoices[step] === item.name;
+    const maxed = isDeco && (cakeChoices.deco || []).length >= 2 && !selected;
+    return `<button style="padding:12px 10px;text-align:left;display:flex;align-items:center;gap:10px;background:${selected ? '#fce4ec' : '#fff'};border:${selected ? '2px solid #ec407a' : '1.5px solid #f0e0e6'};border-radius:14px;cursor:pointer;font-family:inherit;transition:all .15s;box-shadow:0 2px 8px rgba(236,64,122,.08);${maxed ? 'opacity:.35' : ''}"
+      onclick="cakePick('${step}','${item.name}')" ${maxed ? 'disabled' : ''}>
+      <span style="font-size:22px">${item.emoji}</span>
+      <div><div style="font-weight:600;font-size:13px;color:#333">${item.name}</div><div style="font-size:11px;color:#999">${item.desc}</div></div>
+      ${selected ? '<span style="margin-left:auto;color:#ec407a;font-size:14px">✓</span>' : ''}
+    </button>`;
+  }).join('');
+  html += `</div>`;
+
+  const isLast = cakeStepIdx === cakeSteps.length - 1;
+  const canFinish = !isLast || (cakeChoices.deco || []).length === 2;
+  const nextBtn = isLast
+    ? `<button class="primary-btn" style="background:#ec407a;border:none;padding:12px 20px;font-size:14px" ${canFinish ? '' : 'disabled'} onclick="cakeFinishCake()">🎂 完成蛋糕</button>`
+    : `<button class="primary-btn" style="background:#ec407a;border:none;padding:12px 20px;font-size:14px" onclick="cakeNextStep()">下一步 →</button>`;
+  html += `<div style="display:flex;gap:8px;margin-top:12px">
+    <button class="ghost-btn" style="${cakeStepIdx === 0 ? 'opacity:.4' : ''}" ${cakeStepIdx === 0 ? 'disabled' : ''} onclick="cakePrevStep()">← 上一步</button>
+    ${nextBtn}
+  </div>`;
+  chooser.innerHTML = html;
+
   if (tip) {
-    const hints = { base:'选一个蛋糕胚作为基底', cream:'选择奶油涂抹在蛋糕上', filling:'在中间加一层夹心', topping:'在表面撒上装饰', deco:'选2种装饰点缀蛋糕' };
+    const hints = { base:'选一个蛋糕胚作为基底', cream:'选择奶油涂抹在蛋糕上', filling:'在中间加一层夹心', topping:'在表面撒上装饰', deco:(cakeChoices.deco || []).length >= 2 ? '已选好2种装饰，可以完成了' : '选2种装饰点缀蛋糕' };
     tip.innerText = hints[step] || '';
   }
 }
@@ -5126,15 +5135,17 @@ function cakePick(step, name) {
     return;
   }
   cakeChoices[step] = name;
+  cakeRenderStep();
   cakeRenderStage();
-  const tip = document.getElementById('cakeTip');
-  if (tip) tip.innerText = `✅ ${name} 已选`;
-  setTimeout(() => { if (!cakeDone) cakeNextStep(); }, 400);
 }
 
 function cakeNextStep() {
   if (cakeStepIdx < cakeSteps.length - 1) { cakeStepIdx++; cakeRenderStep(); }
   else cakeFinishCake();
+}
+
+function cakePrevStep() {
+  if (cakeStepIdx > 0) { cakeStepIdx--; cakeRenderStep(); }
 }
 
 function cakeRenderStage() {
@@ -5144,19 +5155,26 @@ function cakeRenderStage() {
   const filling = cakeChoices.filling ? CAKE_FILLINGS.find(f => f.name === cakeChoices.filling) : null;
   const topping = cakeChoices.topping ? CAKE_TOPPINGS.find(t => t.name === cakeChoices.topping) : null;
   const decos = (cakeChoices.deco || []).map(d => CAKE_DECOS.find(dc => dc.name === d)).filter(Boolean);
-  const hasAny = base || cream || filling || topping || decos.length;
-  pad.innerHTML = '';
-  if (!hasAny) return;
-  const rows = [];
-  if (base) rows.push(`· 蛋糕胚：${base.name}`);
-  if (filling && filling.name !== '无夹心') rows.push(`· 夹心：${filling.name}`);
-  if (cream) rows.push(`· 奶油：${cream.name}`);
-  if (topping) rows.push(`· 顶饰：${topping.name}`);
-  if (decos.length) rows.push(`· 装饰：${decos.map(d => d.name).join('、')}`);
-  pad.innerHTML = '<div style="font-size:13px;line-height:1.8;color:#555;padding:10px 0">✅ 已选：<br>' + rows.join('<br>') + '</div>';
-  pad.style.background = '#fafafe';
-  pad.style.padding = '8px 12px';
-  pad.style.borderRadius = '10px';
+  if (!(base || cream || filling || topping || decos.length)) {
+    pad.innerHTML = '<div style="font-size:48px;opacity:.25">🍰</div>';
+    pad.style.background = 'radial-gradient(circle at 50% 35%, #fff, #faf3f7)';
+    return;
+  }
+  const creamColor = cream ? cream.color : '#fffafc';
+  const baseColor = base ? base.color : '#f0e0e6';
+  let html = '<div style="position:relative;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:4px">';
+  if (decos.length) html += '<div style="font-size:20px;margin-bottom:4px;letter-spacing:3px;filter:drop-shadow(0 2px 2px rgba(120,80,100,.25))">' + decos.map(function (d) { return d.emoji; }).join(' ') + '</div>';
+  if (topping) html += '<div style="font-size:26px;margin-bottom:-6px;z-index:3;filter:drop-shadow(0 2px 2px rgba(120,80,100,.25))">' + topping.emoji + '</div>';
+  html += '<div style="position:relative;width:160px;height:72px;border-radius:18px 18px 14px 14px;background:linear-gradient(180deg, rgba(255,255,255,.55), rgba(0,0,0,.05)), ' + creamColor + ';box-shadow:0 8px 18px rgba(80,40,60,.2), inset 0 -6px 10px rgba(0,0,0,.06);border:3px solid ' + baseColor + ';overflow:hidden">';
+  html += '<div style="position:absolute;top:0;left:0;right:0;height:24px;background:linear-gradient(180deg,#ffffff,' + creamColor + ');border-radius:18px 18px 45% 45%/18px 18px 22px 22px;box-shadow:inset 0 -3px 6px rgba(0,0,0,.05)"></div>';
+  html += '<div style="position:absolute;top:20px;left:20%;width:11px;height:15px;background:' + creamColor + ';border-radius:0 0 9px 9px"></div>';
+  html += '<div style="position:absolute;top:22px;left:56%;width:9px;height:13px;background:' + creamColor + ';border-radius:0 0 9px 9px"></div>';
+  if (filling && filling.name !== '无夹心') html += '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:26px;z-index:2">' + filling.emoji + '</div>';
+  html += '</div>';
+  html += '<div style="width:192px;height:14px;margin-top:2px;background:linear-gradient(180deg,#ffffff,#e9dccb);border-radius:50%;box-shadow:0 6px 10px rgba(0,0,0,.12)"></div>';
+  html += '</div>';
+  pad.innerHTML = html;
+  pad.style.background = 'radial-gradient(circle at 50% 30%, #ffffff, #faf3f7)';
 }
 
 function cakeFinishCake() {

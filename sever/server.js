@@ -85,7 +85,102 @@ function removeSub(sub) {
   if (!sub || !sub.endpoint) return
   pushSubs = pushSubs.filter(function (s) { return s.endpoint !== sub.endpoint })
   saveSubs()
+  // 订阅删除时一并清掉它的配置/待收
+  if (pushConfigs[sub.endpoint]) { delete pushConfigs[sub.endpoint]; saveConfigs() }
 }
+
+// ===== 主动推送配置（含 AI 凭证 + 角色人设 + 发送计划，存服务器用于后台生成）=====
+// ⚠️ 注意：这里会以明文保存用户的 AI key，仅适用于你自己部署、信任该服务器的场景。
+const PUSH_CFG_FILE = path.join(__dirname, 'push-config.json')
+let pushConfigs = {}
+try { pushConfigs = JSON.parse(fs.readFileSync(PUSH_CFG_FILE, 'utf8')) } catch (e) { pushConfigs = {} }
+function saveConfigs() {
+  try { fs.writeFileSync(PUSH_CFG_FILE, JSON.stringify(pushConfigs)) } catch (e) {}
+}
+function inQuiet(now, quiet) {
+  if (!quiet || !Array.isArray(quiet) || quiet.length !== 2) return false
+  var h = new Date(now).getHours()
+  var s = Number(quiet[0]), e = Number(quiet[1])
+  if (isNaN(s) || isNaN(e)) return false
+  if (s <= e) return h >= s && h < e
+  return h >= s || h < e // 跨午夜，如 23~7
+}
+function joinUrl(base, p) {
+  base = String(base || '').replace(/\/+$/, '')
+  if (!p) return base
+  return base + '/' + String(p).replace(/^\/+/, '')
+}
+// 用订阅里存的凭证调 AI，生成一条角色主动消息；失败返回 null
+async function genCharacterMessage(char, creds) {
+  if (!creds || !creds.url || !creds.key) return null
+  var sys = '你是' + (char.name || '角色') + '。'
+  if (char.persona && char.persona.trim()) sys += '设定：' + char.persona.trim() + '。'
+  if (char.relation && char.relation.trim()) sys += '与用户关系：' + char.relation.trim() + '。'
+  sys += '请用' + (char.name || '角色') + '的口吻，主动给用户发一条自然的消息：像真人会突然发来的——可以分享当下在做的事、或突然想起的小事，一两句口语，自然带情绪，不要问号轰炸，不要自我总结，不要提 AI、不要提"消息"二字。只输出这条消息正文，不要任何解释或引号。'
+  var messages = [
+    { role: 'system', content: sys },
+    { role: 'user', content: '（你现在主动给用户发一条消息）' }
+  ]
+  try {
+    var r = await fetch(joinUrl(creds.url, 'chat/completions'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + creds.key },
+      body: JSON.stringify({ model: creds.model || 'gpt-3.5-turbo', messages: messages, max_tokens: 120, temperature: 0.85, stream: false })
+    })
+    if (!r.ok) return null
+    var j = await r.json()
+    var txt = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content || '').trim()
+    if (!txt) return null
+    txt = txt.replace(/^["'「『]|["'」』]$/g, '').trim()
+    return txt
+  } catch (e) { return null }
+}
+// 定时器：每分钟扫一遍，给"到点"的订阅生成并推送主动消息
+async function scheduleTick() {
+  var now = Date.now()
+  for (var ep in pushConfigs) {
+    var cfg = pushConfigs[ep]
+    if (!cfg || !cfg.plan || !cfg.plan.enabled) continue
+    if (!cfg.creds || !cfg.creds.url || !cfg.creds.key) continue
+    if (!cfg.subscription) continue
+    if (inQuiet(now, cfg.plan.quiet)) continue
+    var chars = cfg.chars || []
+    if (!chars.length) continue
+    var interval = (Number(cfg.plan.intervalMin) || 180) * 60000
+    // 挑"最 overdue"的角色，每轮最多发一条，摊开负载
+    var best = null, bestOver = -1
+    for (var i = 0; i < chars.length; i++) {
+      var c = chars[i]
+      if (!c.proactive) continue // 该角色未开启后台主动发消息
+      var last = cfg.lastSent && cfg.lastSent[c.id] ? cfg.lastSent[c.id] : 0
+      var over = now - last - interval
+      if (over >= 0 && over > bestOver) { best = c; bestOver = over }
+    }
+    if (!best) continue
+    var text = await genCharacterMessage(best, cfg.creds)
+    if (!text) continue
+    var payload = {
+      title: best.name || '美乐地',
+      body: text.slice(0, 200),
+      url: '/',
+      tag: 'proactive-' + (best.id || 'all'),
+      avatar: best.avatar || '',
+      charId: best.id || ''
+    }
+    try { await webpush.sendNotification(cfg.subscription, JSON.stringify(payload)) } catch (err) {
+      if (err && (err.statusCode === 404 || err.statusCode === 410)) { delete pushConfigs[ep]; saveConfigs() }
+      continue
+    }
+    // 写入待收队列，app 打开时倒进聊天
+    cfg.lastSent = cfg.lastSent || {}
+    cfg.lastSent[best.id] = now
+    cfg.pending = cfg.pending || []
+    cfg.pending.push({ charId: best.id || '', text: text, ts: now })
+    if (cfg.pending.length > 50) cfg.pending = cfg.pending.slice(-50)
+    saveConfigs()
+  }
+}
+setInterval(scheduleTick, 60000)
 
 app.use('/push', express.json())
 // 前端拿公钥用于订阅
@@ -128,6 +223,40 @@ app.post('/push/send', function (req, res) {
   Promise.all(tasks).then(function () {
     res.json({ ok: true, sent: sent, failed: failed, total: pushSubs.length })
   }).catch(function () { res.json({ ok: true, sent: sent, failed: failed }) })
+})
+// 上报/更新主动推送配置（凭证 + 角色人设 + 计划）
+app.post('/push/config', function (req, res) {
+  const sub = req.body && req.body.subscription
+  if (!sub || !sub.endpoint) return res.status(400).json({ error: '缺少 subscription' })
+  const creds = req.body.creds || null
+  const chars = Array.isArray(req.body.chars) ? req.body.chars : []
+  const plan = req.body.plan || { enabled: false }
+  const ep = sub.endpoint
+  const old = pushConfigs[ep] || {}
+  pushConfigs[ep] = {
+    subscription: sub,
+    creds: creds,
+    chars: chars,
+    plan: plan,
+    lastSent: old.lastSent || {},
+    pending: old.pending || []
+  }
+  saveConfigs()
+  res.json({ ok: true })
+})
+// 拉取待收消息（app 打开时调用，把后台生成的消息补进聊天）
+app.get('/push/pending', function (req, res) {
+  const ep = req.query && req.query.endpoint
+  if (!ep) return res.json({ pending: [] })
+  const cfg = pushConfigs[ep]
+  if (!cfg || !cfg.pending) return res.json({ pending: [] })
+  res.json({ pending: cfg.pending })
+})
+// 清空待收队列（拉取并写入聊天后调用）
+app.post('/push/drain', function (req, res) {
+  const ep = req.body && req.body.endpoint
+  if (ep && pushConfigs[ep]) { pushConfigs[ep].pending = []; saveConfigs() }
+  res.json({ ok: true })
 })
 
 // AI 对话通用转发：访客填哪个网址就转发到哪，密钥留在访客浏览器里

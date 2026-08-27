@@ -68,6 +68,7 @@ async function subscribePush() {
     _pushReady = true;
     refreshPushUI();
     quickNotice('已开启推送通知 ✓');
+    uploadPushConfig();
     return true;
   } catch (e) {
     console.error(e);
@@ -185,12 +186,58 @@ async function initPush() {
         credentials: 'same-origin',
         body: JSON.stringify({ subscription: sub })
       }).catch(function () {});
+      // 拉取后台生成的待收消息，补进聊天；并刷新主动推送配置（角色可能变过）
+      fetchPendingMessages();
+      uploadPushConfig();
     } else {
       // 订阅丢失（如重装 SW），重新订阅
       await subscribePush();
     }
   }
   refreshPushUI();
+}
+
+// 上报主动推送配置：把 AI 凭证 + 角色人设 + 计划发给服务器，由服务器后台生成消息
+async function uploadPushConfig() {
+  if (!pushEnabled()) return;
+  var sub = await getCurrentSub();
+  if (!sub) return;
+  var s = (typeof state !== 'undefined' && state.settings) || {};
+  var api = (typeof state !== 'undefined' && state.api) || {};
+  var chars = (state.roles || []).map(function (r) {
+    return { id: r.id, name: r.name, persona: r.persona || '', relation: r.relation || '', style: r.style || '', lang: r.lang || '中文', mode: r.mode || 'offline', proactive: !!(r.proactivePush) };
+  });
+  var anyOn = chars.some(function (c) { return c.proactive; });
+  if (!api.url || !api.key || !api.model) {
+    // 没填 AI 三件套：仍上报（清掉凭证、禁用），避免服务器用旧 key 继续生成
+    if (typeof quickNotice === 'function') quickNotice('主动推送需先在「连接」填好 AI 地址/密钥/模型');
+    try { await fetch('push/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ subscription: sub, creds: null, chars: chars, plan: { enabled: false } }) }); } catch (e) {}
+    return;
+  }
+  var plan = { enabled: anyOn, intervalMin: Number(s.proactiveInterval) || 180, quiet: s.proactiveQuiet || [23, 7] };
+  try {
+    await fetch('push/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ subscription: sub, creds: { url: api.url, key: api.key, model: api.model }, chars: chars, plan: plan })
+    });
+  } catch (e) {}
+}
+
+// 拉取后台生成的待收消息，写入对应角色聊天（服务器生成时已推过通知）
+async function fetchPendingMessages() {
+  if (!pushEnabled()) return;
+  var sub = await getCurrentSub();
+  if (!sub) return;
+  try {
+    var r = await fetch('push/pending?endpoint=' + encodeURIComponent(sub.endpoint), { credentials: 'same-origin' });
+    var j = await r.json();
+    if (j && j.pending && j.pending.length) {
+      if (typeof drainPendingToChat === 'function') drainPendingToChat(j.pending);
+      await fetch('push/drain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ endpoint: sub.endpoint }) });
+    }
+  } catch (e) {}
 }
 
 // 导出
@@ -200,5 +247,7 @@ window.togglePush = togglePush;
 window.notifyCharacterMessage = notifyCharacterMessage;
 window.testPush = testPush;
 window.initPush = initPush;
+window.uploadPushConfig = uploadPushConfig;
+window.fetchPendingMessages = fetchPendingMessages;
 window.refreshPushUI = refreshPushUI;
 window.pushSupported = pushSupported;

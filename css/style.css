@@ -1383,7 +1383,7 @@ button { border: 0; cursor: pointer; }
     repeating-linear-gradient(-8deg, transparent, transparent 40px, rgba(195,175,150,.03) 40px, rgba(195,175,150,.03) 42px);
   background-size: 54px 54px, 82px 82px;
   pointer-events: none;
-  z-index: 1;
+  z-index: 0;
 }
 
 /* 蒸汽粒子 */
@@ -1440,12 +1440,12 @@ button { border: 0; cursor: pointer; }
   75% { opacity: .7; transform: scale(1.02); }
 }
 
-/* 浴室 - 湿润地板 */
+/* 浴室 - 湿润地板（侧视：地面带踢脚线） */
 .bath-floor {
-  position: absolute; left: 0; right: 0; bottom: 0; height: 15%; z-index: 0; pointer-events: none;
+  position: absolute; left: 0; right: 0; bottom: 0; height: 18%; z-index: 0; pointer-events: none;
   background: linear-gradient(180deg, #d9cbb6 0%, #c2b198 100%);
-  border-top: 3px solid #efe3d0;
-  box-shadow: inset 0 10px 16px rgba(150,120,80,.16);
+  border-top: 4px solid #efe3d0;
+  box-shadow: inset 0 12px 18px rgba(150,120,80,.18);
 }
 .bath-floor::before {
   content: ''; position: absolute; inset: 0;
@@ -1468,9 +1468,9 @@ button { border: 0; cursor: pointer; }
   background: rgba(255,255,255,.42); pointer-events: none; z-index: 6;
   animation: steamRise 4.5s ease-out infinite;
 }
-.bath-steam.s1 { left: 58%; bottom: 56%; }
-.bath-steam.s2 { left: 63%; bottom: 59%; animation-delay: 1.3s; }
-.bath-steam.s3 { left: 66%; bottom: 52%; animation-delay: 2.2s; }
+.bath-steam.s1 { left: 62%; bottom: 46%; }
+.bath-steam.s2 { left: 67%; bottom: 48%; animation-delay: 1.3s; }
+.bath-steam.s3 { left: 71%; bottom: 44%; animation-delay: 2.2s; }
 /* 浴室 - 漂浮泡泡 */
 .bath-floatbub {
   position: absolute; width: 12px; height: 12px; border-radius: 50%;
@@ -1478,8 +1478,8 @@ button { border: 0; cursor: pointer; }
   border: 1px solid rgba(255,255,255,.38); pointer-events: none; z-index: 6;
   animation: bubbleFloat 5s ease-in infinite;
 }
-.bath-floatbub.b1 { left: 64%; bottom: 50%; animation-delay: .6s; }
-.bath-floatbub.b2 { left: 70%; bottom: 45%; animation-delay: 2.1s; }
+.bath-floatbub.b1 { left: 64%; bottom: 44%; animation-delay: .6s; }
+.bath-floatbub.b2 { left: 70%; bottom: 40%; animation-delay: 2.1s; }
 
 .home-tabs{position:absolute;bottom:20px;left:20px;right:20px;height:46px;background:rgba(255,255,245,.9);backdrop-filter:blur(12px);border-radius:23px;display:flex;justify-content:center;align-items:center;gap:4px;z-index:10;box-shadow:0 2px 12px rgba(0,0,0,.06);padding:0 6px}
 .home-tab{flex:1;text-align:center;padding:6px 8px;font-size:12px;color:#b8a99a;border-radius:16px;cursor:pointer;transition:all .2s;white-space:nowrap}
@@ -1504,6 +1504,11 @@ button { border: 0; cursor: pointer; }
   box-shadow: none !important;
   border-radius: 0;
 }
+/* 侧视图改用 emoji 卡通造型，关闭旧的手绘伪元素 */
+.home-room.bathroom .home-fur::before,
+.home-room.bathroom .home-fur::after { content: none !important; }
+.home-room.bathroom .home-fur .fur-art { align-items: flex-end; justify-content: center; }
+.home-room.bathroom .home-fur .fur-emoji { font-size: clamp(24px, 7vw, 44px); filter: drop-shadow(0 3px 4px rgba(120,90,60,.25)); }
 .home-room.bathroom .home-fur-name {
   position: absolute;
   bottom: -4px; left: 50%; transform: translateX(-50%);
@@ -1735,6 +1740,7 @@ button { border: 0; cursor: pointer; }
 .lr-corner-l{ left:0; top:0; bottom:0; width:16%; clip-path:polygon(0 0,100% 0,100% 38%,-8% 100%); background:rgba(110,78,58,.85); }
 .lr-corner-l::before{ content:''; position:absolute; inset:0; background:#f4ebde; clip-path:polygon(0 0,100% 0,100% 38%,-8% 100%); transform:translateY(-3px); }
 .lr-corner-r{ right:0; width:24%; clip-path:polygon(100% 0,0 0,100% 100%); background:linear-gradient(205deg,#f1e7d7 0%,#e3d3bc 100%); }
+.lr-backcorner{ position:absolute; top:0; right:0; bottom:0; width:9%; z-index:0; background:linear-gradient(270deg, rgba(170,140,110,.12), transparent); }
 
 .lr-window{ position:absolute; top:5%; left:6%; width:26%; height:27%; z-index:1; border-radius:6px 6px 3px 3px; overflow:hidden; background:#fff; }
 .lr-sky{ position:absolute; inset:0; background:linear-gradient(180deg,#c4e8ff 0%,#e8f4ff 70%,#fff8e8 100%); }
@@ -1773,21 +1779,40 @@ button { border: 0; cursor: pointer; }
 .ls-cushion.c1{ left:18%; top:14%; }
 .ls-cushion.c2{ right:18%; top:16%; }
 
-/* 客厅沙发（fur-sofa · 圆润卡通） */
-.fur-sofa{ position:relative; width:100%; height:100%; box-sizing:border-box; filter:drop-shadow(0 5px 5px rgba(190,140,150,.28)); }
+/* 客厅沙发（fur-sofa · 圆润卡通 · 真实感落地沙发） */
+.fur-sofa{ position:relative; width:100%; height:100%; box-sizing:border-box; filter:drop-shadow(0 8px 16px rgba(170,140,110,.22)); }
 .fur-sofa > div{ position:absolute; box-sizing:border-box; }
-.fs-shadow{ left:12%; right:12%; bottom:0; height:8%; background:radial-gradient(ellipse at 50% 50%, rgba(150,110,120,.22), transparent 72%); filter:blur(2px); }
-.fs-back{ left:2%; right:2%; top:2%; height:48%; background:#f7b9c4; border:2px solid #e69aa6; border-radius:26px 26px 16px 16px; }
-.fs-seat{ left:6%; right:6%; bottom:6%; height:50%; background:#f9c4ce; border:2px solid #e69aa6; border-radius:16px 16px 20px 20px; }
-.fs-arm{ top:26%; width:15%; height:64%; background:#f7b9c4; border:2px solid #e69aa6; border-radius:16px; }
-.fs-arm-l{ left:0; }
-.fs-arm-r{ right:0; }
-.fs-cushion{ width:19%; height:30%; border:2px solid #e69aa6; border-radius:12px; background:#fff3f6; }
-.fs-c1{ left:18%; top:36%; transform:rotate(-8deg); }
-.fs-c2{ right:18%; top:38%; transform:rotate(8deg); }
-.fs-leg{ bottom:0; width:6%; height:9%; background:#e0a7b2; border-radius:0 0 4px 4px; }
-.fs-leg-l{ left:16%; }
-.fs-leg-r{ right:16%; }
+
+/* 座框：底盘、稳重、大圆角 */
+.fs-base{ left:2%; right:2%; bottom:0; height:70%; background:#f5e6d3; border:1.5px solid #d4b896; border-radius:22px 22px 18px 18px; }
+
+/* 坐垫：略软、顶面微拱、前缘圆润 */
+.fs-seat{ left:4%; right:4%; bottom:4%; top:18%; background:#fdf8f3; border:1.5px solid #d4b896; border-radius:16px 16px 12px 12px;
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.6), inset 0 -2px 4px rgba(180,150,120,.1); }
+
+/* 靠背：贴墙、比坐垫略高、顶部大圆角 */
+.fs-back{ left:4%; right:4%; top:2%; bottom:52%; background:#fdf8f3; border:1.5px solid #d4b896; border-radius:20px 20px 10px 10px;
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.5), inset 0 -1px 2px rgba(180,150,120,.1); }
+
+/* 扶手：一体式、外圆内直、宽实用 */
+.fs-arm{ top:10%; bottom:10%; width:12%; background:#f5e6d3; border:1.5px solid #d4b896; border-radius:18px; }
+.fs-arm.l{ left:2%; }
+.fs-arm.r{ right:2%; }
+
+/* 抱枕：两只、大小错落、软圆 */
+.fs-cushion{ background:#fffef8; border:1.5px solid #d4b896; border-radius:14px; }
+.fs-c1{ left:12%; top:14%; width:22%; height:26%; transform:rotate(-6deg); }
+.fs-c2{ right:10%; top:10%; width:18%; height:22%; transform:rotate(5deg); }
+
+/* 腿：四只短粗圆脚，稳 */
+.fs-leg{ bottom:0; width:7%; height:9%; background:#d4b896; border-radius:0 0 8px 8px; }
+.fs-leg.l1{ left:6%; }
+.fs-leg.r1{ right:6%; }
+.fs-leg.l2{ left:86%; }
+.fs-leg.r2{ right:6%; } /* 实际用 l1/r1 即可，保留占位 */
+
+/* 阴影：落地感 */
+.fs-shadow{ left:6%; right:6%; bottom:0; height:7%; background:radial-gradient(ellipse at 50% 50%, rgba(170,140,110,.18), transparent 70%); filter:blur(2px); }
 
 /* 客厅茶几（fur-table 画出来的版本） */
 .fur-table{ position:relative; width:100%; height:100%; box-sizing:border-box; filter:drop-shadow(0 4px 4px rgba(170,150,120,.22)); }
@@ -1838,17 +1863,39 @@ button { border: 0; cursor: pointer; }
 .fsh-shelf.s2{ top:66%; }
 .fsh-book{ border:2px solid rgba(0,0,0,.10); border-bottom:none; border-radius:3px 3px 0 0; }
 
-/* 客厅壁柜（fur-cabinet 画出来的版本） */
-.fur-cabinet{ position:relative; width:100%; height:100%; box-sizing:border-box; filter:drop-shadow(0 4px 5px rgba(150,140,170,.2)); }
+/* 客厅落地边柜（fur-cabinet · 圆润卡通 · Sideboard） */
+.fur-cabinet{ position:relative; width:100%; height:100%; box-sizing:border-box; filter:drop-shadow(0 6px 14px rgba(170,140,110,.18)); }
 .fur-cabinet > div{ position:absolute; box-sizing:border-box; }
-.fc-top{ left:-3%; right:-3%; top:0; height:14%; background:#cfe4f2; border:2px solid #a9c6dd; border-radius:6px; }
-.fc-body{ left:0; right:0; top:12%; bottom:0; background:#dceefa; border:2px solid #a9c6dd; border-radius:0 0 8px 8px; }
-.fc-door{ top:24%; bottom:10%; width:45%; background:#e9f4fc; border:2px solid #a9c6dd; border-radius:5px; }
+
+/* 台面：略厚、平整、大圆角，能稳稳放台灯/相框/花瓶 */
+.fc-top{ left:0; right:0; top:0; height:14%; background:#f5e6d3; border:1.5px solid #d4b896; border-radius:16px 16px 0 0; }
+
+/* 柜身：容纳两排抽屉/门，比例黄金 */
+.fc-body{ left:0; right:0; top:12%; bottom:12%; background:#f9efe0; border:1.5px solid #d4b896; border-radius:0 0 16px 16px; }
+
+/* 上排：两个抽屉面板（薄、横长） */
+.fc-drawer{ top:16%; height:30%; width:45%; background:#fdf8f3; border:1.5px solid #d4b896; border-radius:8px; }
+.fc-drawer.d1{ left:3%; }
+.fc-drawer.d2{ right:3%; }
+.fc-drawer::before{ content:''; position:absolute; left:50%; top:50%; width:18%; height:3px; transform:translate(-50%,-50%); background:#d4b896; border-radius:2px; }
+
+/* 下排：两扇柜门 */
+.fc-door{ top:50%; bottom:8%; width:45%; background:#fdf8f3; border:1.5px solid #d4b896; border-radius:10px; }
 .fc-door.d1{ left:3%; }
 .fc-door.d2{ right:3%; }
-.fc-handle{ top:46%; width:4%; height:14%; background:#a9c6dd; border-radius:3px; }
-.fc-handle.h1{ left:45%; }
-.fc-handle.h2{ right:45%; }
+.fc-door::before{ content:''; position:absolute; left:50%; top:20%; bottom:20%; width:1px; background:rgba(180,150,120,.25); transform:translateX(-50%); }
+
+/* 把手：统一规格，抽屉用条形、柜门用方形 */
+.fc-handle{ background:#d4b896; border-radius:2px; }
+.fc-handle.h1{ left:50%; margin-left:-2.5%; }
+.fc-handle.h2{ right:50%; margin-right:-2.5%; }
+.fc-handle.drawer{ top:50%; width:14%; height:4%; transform:translateY(-50%); }
+.fc-handle.door{ top:50%; width:5%; height:14%; transform:translateY(-50%); }
+
+/* 腿：微高离地，便于扫地/扫地机 */
+.fc-leg{ bottom:0; width:9%; height:11%; background:#d4b896; border-radius:0 0 8px 8px; }
+.fc-leg.l{ left:5%; }
+.fc-leg.r{ right:5%; }
 
 .lr-table{ position:absolute; bottom:20%; left:34%; width:24%; height:10%; z-index:3; }
 .lt-top{ position:absolute; left:0; right:0; top:0; height:30%; border:1.5px solid #5c5048; border-radius:3px; }
@@ -1862,7 +1909,8 @@ button { border: 0; cursor: pointer; }
 .ll-base{ width:20px; height:1.5px; background:#5c5048; margin:0 auto; }
 .ll-glow{ position:absolute; top:-20px; left:50%; transform:translateX(-50%); width:100px; height:100px; border-radius:50%; background:radial-gradient(circle,rgba(255,230,170,.30),transparent 70%); pointer-events:none; }
 
-.lr-rug{ position:absolute; left:20%; bottom:5%; width:56%; height:14%; z-index:1; border-radius:50%; border:1.5px solid rgba(92,80,72,.35); }
+.lr-rug{ position:absolute; left:20%; bottom:5%; width:56%; height:14%; z-index:1; background:#faf6f0; border:2px solid #e8e0d0; border-radius:50%; box-shadow:inset 0 0 0 4px rgba(255,255,255,.5), 0 4px 8px rgba(170,140,110,.12); background-image: radial-gradient(circle at 20% 22%, rgba(200,180,160,.08) 2px, transparent 2px), radial-gradient(circle at 70% 35%, rgba(200,180,160,.06) 1.5px, transparent 1.5px), radial-gradient(circle at 40% 70%, rgba(200,180,160,.07) 2px, transparent 2px), radial-gradient(circle at 85% 60%, rgba(200,180,160,.06) 1.5px, transparent 1.5px); background-size: 60px 60px; }
+.lr-rug::before{ content:''; position:absolute; inset:18%; border:2px dashed rgba(255,255,255,.55); border-radius:50%; }
 
 .lr-pot{ position:absolute; right:4%; bottom:4%; z-index:2; }
 .lp-pot{ width:22px; height:18px; border:1.5px solid #5c5048; border-top:none; border-radius:0 0 4px 4px; margin:0 auto; }
@@ -1871,7 +1919,7 @@ button { border: 0; cursor: pointer; }
 .lp-leaf.l2{ top:-18px; right:-6px; width:12px; height:8px; transform:rotate(25deg); }
 .lp-leaf.l3{ top:-22px; left:1px; width:10px; height:7px; transform:rotate(-10deg); }
 /* 换形象弹层（重做视觉 · 干净克制） */
-.home-char-edit{ position:absolute; inset:0; z-index:42; display:none; align-items:center; justify-content:center; background:rgba(38,38,42,.42); backdrop-filter:blur(4px); padding:18px; }
+.home-char-edit{ position:absolute; inset:0; z-index:200; display:none; align-items:center; justify-content:center; background:rgba(38,38,42,.42); backdrop-filter:blur(4px); padding:18px; }
 .char-edit-card{ width:100%; max-width:320px; background:linear-gradient(180deg,#fbfaf7 0%,#f3f1ec 100%); border-radius:18px; box-shadow:0 14px 40px rgba(0,0,0,.20), inset 0 0 0 1px rgba(0,0,0,.04); padding:22px 20px 22px; text-align:center; font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif; color:#3a3632; position:relative; }
 .char-edit-close{ position:absolute; top:14px; right:14px; width:28px; height:28px; border:none; background:rgba(0,0,0,.04); border-radius:50%; color:#9a938b; cursor:pointer; display:grid; place-items:center; transition:all .15s; }
 .char-edit-close:hover{ background:rgba(0,0,0,.08); color:#6b655e; }
@@ -1911,8 +1959,10 @@ button { border: 0; cursor: pointer; }
 /* 小人轻轻呼吸浮动 */
 @keyframes homePersonBob{ 0%,100%{ transform:translate(-50%,-100%) translateY(0); } 50%{ transform:translate(-50%,-100%) translateY(-3px); } }
 @keyframes homePanelPop{ from{ opacity:0; transform:translate(-50%,-50%) scale(.9); } to{ opacity:1; transform:translate(-50%,-50%) scale(1); } }
-.home-panel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:60%;max-width:260px;background:rgba(255,255,255,.97);border-radius:14px;box-shadow:0 4px 16px rgba(0,0,0,.12);padding:10px 12px;z-index:20;font-size:13px}
+.home-panel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:60%;max-width:260px;background:rgba(255,255,255,.97);border-radius:14px;box-shadow:0 4px 16px rgba(0,0,0,.12);padding:10px 12px;z-index:200;font-size:13px}
 .home-panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;font-size:13px}
+.home-panel-close{width:28px;height:28px;border:none;background:rgba(0,0,0,.04);border-radius:50%;color:#9a938b;cursor:pointer;display:grid;place-items:center;transition:all .15s;font-size:13px;line-height:1}
+.home-panel-close:hover{background:rgba(0,0,0,.08);color:#6b655e}
 .home-panel-actions{display:flex;flex-direction:column;gap:0}
 .home-panel .primary-btn{width:100%;margin-top:6px;font-size:13px;padding:7px 10px;border-radius:9px;box-shadow:none}
 .home-panel-result{margin-top:6px;font-size:12px;color:#2b6;background:#eafaf0;border-radius:8px;padding:5px 8px;min-height:16px}

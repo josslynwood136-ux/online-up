@@ -12,7 +12,7 @@ const defaultState = {
   api: { key: '', url: 'https://api.openai.com/v1', model: 'gpt-4.1-mini', preset: '', temp: 0.85, topP: 0.9, maxTokens: 800, presencePenalty: 0.6, frequencyPenalty: 0.4 },
   apiProfiles: [],
   activeApiProfile: '',
-  settings: { ai: true, pinned: false, bubbleStyle: 'default', musicMode: 'loop', translateProvider: 'google', deeplKey: '', autoVoice: false, ttsProvider: 'minimax', ttsUrls: {}, ttsKeys: {}, ttsModels: {}, ttsVoices: {}, ttsGroups: {}, streamReply: true },
+  settings: { ai: true, pinned: false, bubbleStyle: 'default', musicMode: 'loop', translateProvider: 'google', deeplKey: '', autoVoice: false, ttsProvider: 'minimax', ttsUrls: {}, ttsKeys: {}, ttsModels: {}, ttsVoices: {}, ttsGroups: {}, streamReply: true, replySplit: 'auto', proactiveInterval: 180, proactiveQuiet: [23, 7] },
   activeRoleId: 'role-default',
   roles: [
     {
@@ -36,7 +36,8 @@ const defaultState = {
       myZone: '',
       charZone: '',
       ttsProvider: '',
-      ttsVoice: ''
+      ttsVoice: '',
+      proactivePush: false
     }
   ],
   moments: [],
@@ -69,59 +70,59 @@ const defaultState = {
           { id: 'fur-shelf', name: '书架', img: '', x: 80, y: 10, w: 16, h: 40, actions: [{ label: '翻书', result: '小人抽出一本书翻了几页，又放了回去。' }] },
           { id: 'fur-lamp', name: '落地灯', img: '', x: 14, y: 56, w: 8, h: 22, actions: [{ label: '开灯', result: '小人拧了一下开关，暖黄的光洒了下来。' }] },
           { id: 'fur-pot', name: '绿植', img: '', x: 82, y: 86, w: 8, h: 12, actions: [{ label: '浇点水', result: '小人给绿植浇了水，叶子抖了抖。' }] },
-          { id: 'fur-cabinet', name: '壁柜', img: '', x: 36, y: 9, w: 28, h: 15, actions: [{ label: '整理一下', result: '小人把柜子里的东西摆整齐了。' }] },
+          { id: 'fur-cabinet', name: '落地边柜', img: '', x: 18, y: 42, w: 55, h: 18, actions: [{ label: '整理一下', result: '小人把柜子里的东西摆整齐了。' }] },
           { id: 'fur-coffee', name: '咖啡机', img: '', x: 24, y: 62, w: 10, h: 14, actions: [{ label: '来杯咖啡', result: '小人按下按钮，浓郁的咖啡香飘了出来。☕' }] }
         ]
       },
       bathroom: {
-        name: '厕所',
+        name: '浴室',
         bg: '',
         person: 'https://img.facfox.com/imgs/2026/07/19/ea51598f7d0459ee.jpg',
         personPos: { x: 30, y: 68 },
         effects: ['steam', 'bubble'],
         furniture: [
-          { id: 'fur-bathtub', name: '🛁 浴缸', img: '', x: 42, y: 18, w: 54, h: 52, actions: [
+          { id: 'fur-bathtub', name: '🛁 浴缸', img: '', x: 30, y: 28, w: 40, h: 36, actions: [
             { label: '放热水泡澡', result: '小人拧开水龙头，热水哗哗涌出，蒸汽升腾。钻进水里的一瞬间，整个人都化了。🫧', effect: 'steam' },
             { label: '撒泡泡浴盐', result: '小人扔了一块浴盐进去，水里咕嘟嘟冒出粉色泡泡，整个浴室都是香甜的味道。', effect: 'bubble' },
             { label: '泡着唱歌', result: '小人泡在水里，开始哼歌，声音在浴室里回荡……还挺好听。🎵' }
           ]},
-          { id: 'fur-shower', name: '🚿 淋浴', img: '', x: 3, y: 6, w: 24, h: 40, actions: [
+          { id: 'fur-shower', name: '🚿 淋浴', img: '', x: 2, y: 8, w: 20, h: 38, actions: [
             { label: '冲个热水澡', result: '花洒喷出热水，蒸汽弥漫。小人站在水下，闭上眼睛，浑身都放松了。', effect: 'steam' },
             { label: '冲个冷水澡', result: '冷水浇下来——小人打了个激灵，瞬间清醒了！💦' },
             { label: '边洗边唱', result: '淋浴间里传来跑调的歌声和哗哗水声……幸好没人听见。🎤' }
           ]},
-          { id: 'fur-sink', name: '🚿 洗手台', img: '', x: 72, y: 58, w: 26, h: 28, actions: [
+          { id: 'fur-sink', name: '🚿 洗手台', img: '', x: 66, y: 54, w: 18, h: 22, actions: [
             { label: '洗手', result: '小人挤了点洗手液，慢悠悠搓出泡沫，冲干净，甩了甩手上的水。' },
             { label: '刷牙', result: '小人对着镜子刷牙，左边刷刷右边刷刷，咕噜咕噜吐掉泡沫。🪥' },
             { label: '洗把脸', result: '小人捧了把凉水泼在脸上，拍了拍脸颊，清醒多了。💧' }
           ]},
-          { id: 'fur-mirror', name: '🪞 镜子', img: '', x: 72, y: 0, w: 26, h: 30, actions: [
+          { id: 'fur-mirror', name: '🪞 镜子', img: '', x: 66, y: 4, w: 18, h: 24, actions: [
             { label: '照镜子', result: '小人看着镜子里自己的脸，眨了眨眼，做了个鬼脸。😜' },
             { label: '整理头发', result: '小人用手指理了理头发，左看右看，满意地点了点头。💇' },
             { label: '在镜子上画画', result: '小人用手指在起雾的镜子上画了一个笑脸，然后又默默擦掉了。😶' }
           ]},
-          { id: 'fur-toilet', name: '🚽 马桶', img: '', x: 2, y: 55, w: 22, h: 30, actions: [
+          { id: 'fur-toilet', name: '🚽 马桶', img: '', x: 4, y: 56, w: 20, h: 26, actions: [
             { label: '坐下', result: '小人坐下来，终于可以安静一会儿了……📖' },
             { label: '冲水', result: '哗——水流声在安静的浴室里格外清晰。' },
             { label: '玩手机', result: '小人坐在马桶上刷手机，十分钟过去了……📱' }
           ]},
-          { id: 'fur-towel', name: '🧺 毛巾架', img: '', x: 30, y: 0, w: 16, h: 14, actions: [
+          { id: 'fur-towel', name: '🧺 毛巾架', img: '', x: 4, y: 5, w: 12, h: 12, actions: [
             { label: '拿干毛巾', result: '小人取了一条干净柔软的白毛巾，闻了闻，有洗衣液的清香。' },
             { label: '换毛巾', result: '小人把旧毛巾收走，挂上一条新毛巾，整整齐齐。' }
           ]},
-          { id: 'fur-stool', name: '🪑 小木凳', img: '', x: 22, y: 70, w: 12, h: 14, actions: [
+          { id: 'fur-stool', name: '🪑 小木凳', img: '', x: 26, y: 70, w: 10, h: 12, actions: [
             { label: '坐着发呆', result: '小人坐在小木凳上，托着腮，看着浴室地板上的水纹发呆。' },
             { label: '踩着够东西', result: '小人踩上小木凳，伸手去够高处柜子里的东西，刚好能够着！' }
           ]},
-          { id: 'fur-candle', name: '🕯️ 香薰', img: '', x: 86, y: 48, w: 12, h: 16, actions: [
+          { id: 'fur-candle', name: '🕯️ 香薰', img: '', x: 74, y: 40, w: 8, h: 12, actions: [
             { label: '点燃', result: '小人划燃火柴，点亮蜡烛。暖黄色的火光摇曳，淡淡的薰衣草香弥漫开来。🕯️✨', effect: 'candle' },
             { label: '吹灭', result: '小人轻轻吹了一口气，烛火熄灭，一缕细烟袅袅升起。' }
           ]},
-          { id: 'fur-plant-bath', name: '🪴 绿植', img: '', x: 85, y: 68, w: 14, h: 18, actions: [
+          { id: 'fur-plant-bath', name: '🪴 绿植', img: '', x: 88, y: 58, w: 8, h: 16, actions: [
             { label: '浇水', result: '小人给浴室的小绿植浇了点水，水珠挂在叶子上，青翠欲滴。🌿' },
             { label: '跟它说话', result: '小人蹲下来对绿植说：「你要好好长大哦。」叶子轻轻摇了摇，好像在回应。' }
           ]},
-          { id: 'fur-scale', name: '⚖️ 体重秤', img: '', x: 38, y: 74, w: 14, h: 14, actions: [
+          { id: 'fur-scale', name: '⚖️ 体重秤', img: '', x: 44, y: 68, w: 10, h: 12, actions: [
             { label: '称体重', result: '小人站上体重秤，低头看了一眼数字，面无表情地走下来了。⚖️' },
             { label: '把它藏起来', result: '小人把体重秤塞到角落眼不见心不烦，舒服了。😌' }
           ]}
@@ -300,7 +301,7 @@ function ensureStateShape(next, saved) {
         var defFur = defRooms[rid].furniture;
         next.home.rooms[rid].furniture = (next.home.rooms[rid].furniture || []).map(function(f) {
           var d = defFur.find(function(x) { return x.id === f.id; });
-          if (d) { f.x = d.x; f.y = d.y; f.w = d.w; f.h = d.h; f.img = d.img; }
+          if (d) { f.x = d.x; f.y = d.y; f.w = d.w; f.h = d.h; f.img = d.img; f.name = d.name; }
           return f;
         });
         defFur.forEach(function(d) {
@@ -374,7 +375,7 @@ function ensureStateShape(next, saved) {
   next.willow.date = typeof next.willow.date === 'string' ? next.willow.date : '';
   next.willow.text = typeof next.willow.text === 'string' ? next.willow.text : '';
   next.willow.rule = typeof next.willow.rule === 'string' ? next.willow.rule : '';
-  next.settings = Object.assign({ ai: true, pinned: false, bubbleStyle: 'default', musicMode: 'loop', translateProvider: 'google', deeplKey: '', autoVoice: false, ttsProvider: 'minimax', ttsUrls: {}, ttsKeys: {}, ttsModels: {}, ttsVoices: {}, ttsGroups: {}, streamReply: true, cloudAuto: true }, next.settings || {});
+  next.settings = Object.assign({ ai: true, pinned: false, bubbleStyle: 'default', musicMode: 'loop', translateProvider: 'google', deeplKey: '', autoVoice: false, ttsProvider: 'minimax', ttsUrls: {}, ttsKeys: {}, ttsModels: {}, ttsVoices: {}, ttsGroups: {}, streamReply: true, replySplit: 'auto', proactiveInterval: 180, proactiveQuiet: [23, 7], cloudAuto: true }, next.settings || {});
   if (['minimax', 'mimo', 'elevenlabs'].indexOf(next.settings.ttsProvider) < 0) next.settings.ttsProvider = 'minimax';
   next.settings.relayUrl = typeof next.settings.relayUrl === 'string' ? next.settings.relayUrl : '';
   return next;

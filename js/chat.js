@@ -1252,11 +1252,22 @@ async function deliverReply(reply) {
 }
 
 // 完全按 AI 主动插入的分隔符拆（‖ / | / ｜）；AI 不分段就整段作为一条。
+// replySplit 设置可硬性限制最大条数：auto=不限(由模型决定 2~4)，1/2/3=最多这么多条
 function splitReply(txt) {
   txt = (txt || '').trim();
   if (!txt) return [''];
   var parts = txt.split(/\s*[‖|｜]+\s*/).map(function (s) { return s.trim(); }).filter(Boolean);
-  return parts.length ? parts : [txt];
+  if (!parts.length) return [txt];
+  var cap = (state.settings && state.settings.replySplit);
+  if (cap === '1' || cap === '2' || cap === '3') {
+    var n = parseInt(cap, 10);
+    if (parts.length > n) {
+      var head = parts.slice(0, n - 1);
+      var tail = parts.slice(n - 1).join('‖');
+      parts = head.concat([tail]);
+    }
+  }
+  return parts;
 }
 
 function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
@@ -1348,6 +1359,10 @@ async function streamDeliver(text, opts) {
       var decoder = new TextDecoder('utf-8');
       var buf = '';
       var rawText = '';
+      var _capMode = (state.settings && state.settings.replySplit);
+      var _capN = (_capMode === '1' || _capMode === '2' || _capMode === '3') ? parseInt(_capMode, 10) : 0;
+      var _emitted = 0;
+      var _tailBuf = '';
       while (true) {
         var rr = await reader.read();
         if (rr.done) break;
@@ -1373,7 +1388,10 @@ async function streamDeliver(text, opts) {
         if (segs.length > 1) {
           for (var k = 0; k < segs.length - 1; k++) {
             var seg = segs[k].trim();
-            if (seg) await emitStreamSegment(seg, char);
+            if (!seg) continue;
+            if (_capN === 0) { await emitStreamSegment(seg, char); _emitted++; }
+            else if (_emitted < _capN - 1) { await emitStreamSegment(seg, char); _emitted++; }
+            else { _tailBuf = _tailBuf ? _tailBuf + '‖' + seg : seg; }
           }
           full = segs[segs.length - 1]; // 余下可能是半句，留到下次/流结束
         }
@@ -1393,12 +1411,36 @@ async function streamDeliver(text, opts) {
   }
   var rem = full.trim();
   if (rem) {
-    await emitStreamSegment(rem, char);
+    if (_capN === 0) { await emitStreamSegment(rem, char); }
+    else if (_tailBuf) { await emitStreamSegment(_tailBuf + '‖' + rem, char); }
+    else if (_emitted < _capN) { await emitStreamSegment(rem, char); }
+    else { await emitStreamSegment(rem, char); }
+  } else if (_tailBuf) {
+    await emitStreamSegment(_tailBuf, char);
   }
   setChatTyping(false);
   try { if (typeof autoSpeakReply === 'function') autoSpeakReply(allText.replace(/\s*[‖|｜]+\s*/g, ' ')); } catch (e) {}
   return allText.trim();
 }
+
+// 把服务端后台生成的主动消息补进对应角色聊天（通知已推过，这里负责落盘进对话）
+function drainPendingToChat(pending) {
+  if (!Array.isArray(pending) || !pending.length) return;
+  var touched = {};
+  pending.forEach(function (m) {
+    var char = getCharacter(m.charId);
+    if (!char) return;
+    if (!Array.isArray(char.chat)) char.chat = [];
+    var ts = m.ts || Date.now();
+    char.chat.push({ role: 'assistant', content: m.text, time: new Date(ts).toLocaleString(), ts: ts, _proactive: true });
+    touched[char.id] = true;
+  });
+  saveState();
+  var ac = activeCharacter();
+  if (ac && touched[ac.id]) renderChat();
+  if (typeof quickNotice === 'function') quickNotice('收到 ' + pending.length + ' 条角色主动消息');
+}
+window.drainPendingToChat = drainPendingToChat;
 
 // 统一入口：按开关走流式 / 非流式。onDone(rawText) 在消息已呈现后回调（用于通话字幕等）
 async function generateAndDeliver(text, opts) {
@@ -2418,6 +2460,17 @@ function ensureCharLive(char) {
   char._lifeText = rollLife(char);
 }
 
+function replySplitInstruction() {
+  var mode = (state.settings && state.settings.replySplit) || 'auto';
+  if (mode === '1') {
+    return '用 ' + (arguments[0] || '') + ' 的身份自然回应，不要提 AI 相关话题，不要自我总结。你只发一条完整的消息，不要使用 ‖ 分隔符，也不要把内容硬拆成多条；线下模式用（）写动作表情，线上模式用语气和 emoji 表达。别为了"简短"把该说的话憋回去，但也别注水啰嗦。';
+  }
+  if (mode === '2' || mode === '3') {
+    var max = mode;
+    return '用 ' + (arguments[0] || '') + ' 的身份自然回应，不要提 AI 相关话题，不要自我总结。你的回复最多分成 ' + max + ' 条短消息连着发：只有当内容天然是好几句（先抛一句再补一句、边说边问、或有几个独立小点）时才分条，一句话能说完就只发一条；分条时每条之间用符号 ‖ 隔开（最后一条后面不用加），例如：在干嘛‖刚洗完澡，累瘫了。线下模式用（）写动作表情，线上模式用语气和 emoji 表达。别硬拆，也别注水啰嗦。';
+  }
+  return '用 ' + (arguments[0] || '') + ' 的身份自然回应，不要提 AI 相关话题，不要自我总结。你的回复要像真人发短信一样，分成 2~4 条独立的短消息连着发：每条是一两句口语，按真实聊天的节奏来——可以先抛一句、停顿一下再补一句，也可以边说边问。每条消息之间必须用符号 ‖ 隔开（最后一条后面不用加），例如：在干嘛‖刚洗完澡，累瘫了‖你呢，还不睡？；线下模式用（）写动作表情，线上模式用语气和 emoji 表达。别为了"简短"把该说的话憋回去，但也别注水啰嗦。';
+}
 function buildRoleSystemPrompt(char, userText) {
   ensureCharLive(char);
   const memCtx = buildMemoryContext(char, userText);
@@ -2450,7 +2503,7 @@ function buildRoleSystemPrompt(char, userText) {
     memCtx,
     '',
     '【回复要求】',
-    '用 ' + char.name + ' 的身份自然回应，不要提 AI 相关话题，不要自我总结。你的回复要像真人发短信一样，分成 2~4 条独立的短消息连着发：每条是一两句口语，按真实聊天的节奏来——可以先抛一句、停顿一下再补一句，也可以边说边问。每条消息之间必须用符号 ‖ 隔开（最后一条后面不用加），例如：在干嘛‖刚洗完澡，累瘫了‖你呢，还不睡？；线下模式用（）写动作表情，线上模式用语气和 emoji 表达。别为了"简短"把该说的话憋回去，但也别注水啰嗦。',
+    replySplitInstruction(char.name),
     '你要有脑子、有主见：对方说的话要真的去想、去接，给出具体而有态度的回应；绝不做只会「嗯嗯好的」的应声虫，不知道或不同意就直说，别硬凑安全又空洞的回答。',
     '【对话质量红线】',
     '1. 先接住对方刚说的话：直接回应对方话里的具体点，再自然延伸；不许答非所问，不许用反问或套话回避。尤其当对方提出直接问题或选择（要不要、该不该、去不去、想不想等），必须先明确回答这个问题，绝不允许无视问题去说别的事——比如对方问"要不要哄"，你必须先回"要 / 不要 / 看情况"，不能岔开去说奶茶店之类无关的事。',
@@ -2736,6 +2789,16 @@ function openSettings() {
     $('translateSwitch').classList.toggle('on', char.translate === true);
     var ss = $('streamSwitch');
     if (ss) ss.classList.toggle('on', !!(state.settings && state.settings.streamReply));
+    var rsSel = $('replySplitSelect');
+    if (rsSel) rsSel.value = (state.settings && state.settings.replySplit) || 'auto';
+    var ppSw = $('proactivePushSwitch');
+    if (ppSw) ppSw.classList.toggle('on', !!(char && char.proactivePush));
+    var piInp = $('proactiveIntervalInput');
+    if (piInp) piInp.value = String((state.settings && state.settings.proactiveInterval) || 180);
+    var qs = $('proactiveQuietStart');
+    if (qs) qs.value = String(((state.settings && state.settings.proactiveQuiet) || [23, 7])[0]);
+    var qe = $('proactiveQuietEnd');
+    if (qe) qe.value = String(((state.settings && state.settings.proactiveQuiet) || [23, 7])[1]);
     var tpSel = $('translateProviderSelect');
     if (tpSel) tpSel.value = (state.settings && state.settings.translateProvider) || 'deeplweb';
     updateTranslateKeyUI();
@@ -3047,6 +3110,37 @@ function toggleStream() {
   saveState();
   var sw = $('streamSwitch');
   if (sw) sw.classList.toggle('on', state.settings.streamReply);
+}
+function setReplySplit(v) {
+  if (!state.settings) state.settings = {};
+  state.settings.replySplit = (v === '1' || v === '2' || v === '3' || v === 'auto') ? v : 'auto';
+  saveState();
+}
+function toggleProactivePush() {
+  var char = activeCharacter();
+  if (!char) return;
+  char.proactivePush = !char.proactivePush;
+  saveState();
+  var sw = $('proactivePushSwitch');
+  if (sw) sw.classList.toggle('on', char.proactivePush);
+  if (typeof uploadPushConfig === 'function') uploadPushConfig();
+}
+function setProactiveInterval(v) {
+  if (!state.settings) state.settings = {};
+  var n = parseInt(v, 10);
+  if (isNaN(n) || n < 10) n = 180;
+  state.settings.proactiveInterval = n;
+  saveState();
+  if (typeof uploadPushConfig === 'function') uploadPushConfig();
+}
+function setProactiveQuiet() {
+  if (!state.settings) state.settings = {};
+  var s = parseInt($('proactiveQuietStart').value, 10);
+  var e = parseInt($('proactiveQuietEnd').value, 10);
+  if (isNaN(s)) s = 23; if (isNaN(e)) e = 7;
+  state.settings.proactiveQuiet = [s, e];
+  saveState();
+  if (typeof uploadPushConfig === 'function') uploadPushConfig();
 }
 function toggleAutoPost() {
   var char = activeCharacter();
