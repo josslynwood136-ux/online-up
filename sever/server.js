@@ -97,6 +97,8 @@ try { pushConfigs = JSON.parse(fs.readFileSync(PUSH_CFG_FILE, 'utf8')) } catch (
 function saveConfigs() {
   try { fs.writeFileSync(PUSH_CFG_FILE, JSON.stringify(pushConfigs)) } catch (e) {}
 }
+// 设备级待收队列：不依赖 Web Push 订阅，用客户端生成的 deviceId 暂存后台生成的回复
+const devicePending = {}
 function inQuiet(now, quiet) {
   if (!quiet || !Array.isArray(quiet) || quiet.length !== 2) return false
   var h = new Date(now).getHours()
@@ -182,7 +184,7 @@ async function scheduleTick() {
 }
 setInterval(scheduleTick, 60000)
 
-app.use('/push', express.json())
+app.use('/push', express.json({ limit: '2mb' }))
 // 前端拿公钥用于订阅
 app.get('/push/vapid-public-key', function (req, res) {
   if (!VAPID_KEYS) return res.status(500).json({ error: 'VAPID 未配置' })
@@ -247,16 +249,68 @@ app.post('/push/config', function (req, res) {
 // 拉取待收消息（app 打开时调用，把后台生成的消息补进聊天）
 app.get('/push/pending', function (req, res) {
   const ep = req.query && req.query.endpoint
-  if (!ep) return res.json({ pending: [] })
-  const cfg = pushConfigs[ep]
-  if (!cfg || !cfg.pending) return res.json({ pending: [] })
-  res.json({ pending: cfg.pending })
+  const did = req.query && req.query.deviceId
+  if (ep && pushConfigs[ep] && pushConfigs[ep].pending) return res.json({ pending: pushConfigs[ep].pending })
+  if (did && devicePending[did]) return res.json({ pending: devicePending[did] })
+  res.json({ pending: [] })
 })
 // 清空待收队列（拉取并写入聊天后调用）
 app.post('/push/drain', function (req, res) {
   const ep = req.body && req.body.endpoint
+  const did = req.body && req.body.deviceId
   if (ep && pushConfigs[ep]) { pushConfigs[ep].pending = []; saveConfigs() }
+  if (did && devicePending[did]) { devicePending[did] = [] }
   res.json({ ok: true })
+})
+// 按需生成回复：网页把已拼好的模型请求发来，服务端代为调用 AI（与 /relay 同样只中转、key 不留存），
+// 若 notify 且已订阅，则同时发系统推送 + 写入待收队列，从而切后台/关页面也能收到并落盘
+app.post('/push/reply', async function (req, res) {
+  const b = req.body || {}
+  const target = b.target
+  if (!target) return res.status(400).json({ error: '缺少 target' })
+  let u
+  try { u = new URL(target) } catch (e) { return res.status(400).json({ error: 'target 不合法' }) }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return res.status(400).json({ error: '仅支持 http/https' })
+  const messages = b.messages
+  if (!Array.isArray(messages) || !messages.length) return res.status(400).json({ error: '缺少 messages' })
+  const headers = Object.assign({}, b.headers || {})
+  delete headers.host; delete headers.origin; delete headers.referer; delete headers['content-length']
+  const modelBody = Object.assign({}, b.modelBody || {})
+  modelBody.stream = false
+  let text = ''
+  try {
+    const r = await fetch(target, { method: 'POST', headers: headers, body: JSON.stringify(Object.assign({ messages: messages }, modelBody)) })
+    if (!r.ok) { const ed = await r.json().catch(function () { return {} }); return res.status(502).json({ error: (ed.error && ed.error.message) || ('HTTP ' + r.status) }) }
+    const j = await r.json()
+    text = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content || '').trim()
+  } catch (e) { return res.status(502).json({ error: 'AI 请求失败：' + (e && e.message || e) }) }
+  if (!text) return res.status(502).json({ error: 'AI 返回为空' })
+  const endpoint = b.endpoint
+  const notify = b.notify
+  const deviceId = b.deviceId
+  const charId = b.charId || ''
+  const charName = b.charName || '美乐地'
+  const charAvatar = b.charAvatar || ''
+  // 已开启推送：发系统通知 + 写入该订阅的待收队列
+  if (notify && endpoint) {
+    const sub = pushSubs.find(function (s) { return s.endpoint === endpoint })
+    if (sub && VAPID_KEYS) {
+      const payload = { title: charName, body: text.slice(0, 200), url: '/', tag: 'msg-' + (charId || 'all'), avatar: charAvatar, charId: charId }
+      try { await webpush.sendNotification(sub, JSON.stringify(payload)) } catch (err) { if (err && (err.statusCode === 404 || err.statusCode === 410)) removeSub(sub) }
+    }
+    const cfg = pushConfigs[endpoint] || (pushConfigs[endpoint] = { subscription: sub || null, creds: null, chars: [], plan: { enabled: false }, lastSent: {}, pending: [] })
+    cfg.pending = cfg.pending || []
+    cfg.pending.push({ charId: charId, text: text, ts: Date.now() })
+    if (cfg.pending.length > 50) cfg.pending = cfg.pending.slice(-50)
+    saveConfigs()
+  }
+  // 设备级待收：即使没开启/没配好推送，也能暂存，回来后倒进聊天（核心需求，不依赖 Web Push）
+  if (deviceId && !endpoint) {
+    devicePending[deviceId] = devicePending[deviceId] || []
+    devicePending[deviceId].push({ charId: charId, text: text, ts: Date.now() })
+    if (devicePending[deviceId].length > 50) devicePending[deviceId] = devicePending[deviceId].slice(-50)
+  }
+  res.json({ ok: true, text: text })
 })
 
 // AI 对话通用转发：访客填哪个网址就转发到哪，密钥留在访客浏览器里

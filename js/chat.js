@@ -1294,19 +1294,28 @@ async function streamDeliver(text, opts) {
   if (!char) return '';
   var delay = randomDelay();
   await sleep(delay);
-  if (_multiSelect) { setChatTyping(false); return ''; }
+  if (_multiSelect) { setChatTyping(false); window.__genActive = false; return ''; }
   lastThinkText = '';
   lastRetract = null;
   var systemPrompt = buildRoleSystemPrompt(char, text);
   var built = buildAIMessages(char, text, opts.proactive, '');
   var userContent = built.userContent;
   var cfg = activeAIConfig();
+  window.__genActive = true;
+  window.__genHandedOff = false;
+  window.__genPayload = {
+    char: char,
+    messages: [{ role: 'system', content: systemPrompt }, ...built.history, { role: 'user', content: userContent }],
+    modelBody: { model: cfg.model, max_tokens: cfg.maxTokens || 500, temperature: cfg.temp ?? 0.75, top_p: cfg.topP ?? 0.9, presence_penalty: cfg.presencePenalty ?? 0, frequency_penalty: cfg.frequencyPenalty ?? 0 },
+    notify: true
+  };
   var isReasoner = /reasoner|r1|o1|o3|-think|thinking/i.test(cfg.model || '');
   if (!isReasoner) {
     var tk = await callAIThink(char, userContent, systemPrompt, built.history, cfg);
     lastRetract = (tk.retract !== null) ? tk.retract : null;
     if (tk.note) {
       userContent += '\n\n（参考你刚才的内心活动：' + tk.note + '）现在只输出要发给用户的正式回复，紧扣对方刚才那句话来接，保持角色语气，不要出现任何内心活动文字。';
+      if (window.__genPayload) window.__genPayload.messages[window.__genPayload.messages.length - 1].content = userContent;
     }
   }
   // 撤回：仅按角色性格判断
@@ -1332,10 +1341,22 @@ async function streamDeliver(text, opts) {
     frequency_penalty: cfg.frequencyPenalty ?? 0,
     stream: true
   };
+  if (window.__genHandedOff) { window.__genActive = false; return ''; }
+  if (document.visibilityState !== 'visible' && window.__genPayload) {
+    try {
+      var _srvText = await callAIServer(window.__genPayload.char, window.__genPayload.messages, window.__genPayload.modelBody, pushEnabled());
+      window.__genActive = false;
+      if (_srvText) return _srvText;
+    } catch (_e) { /* 后台生成失败则继续走前台路径（若页面还活着） */ }
+  }
   if (activeAbort) try { activeAbort.abort(); } catch (e) {}
   var controller = new AbortController();
   activeAbort = controller;
-  var timer = setTimeout(function () { try { controller.abort(); } catch (e) {} }, 90000);
+  var _abortFn = function () {
+    if (document.visibilityState !== 'visible') { timer = setTimeout(_abortFn, 5000); return; }
+    try { controller.abort(); } catch (e) {}
+  };
+  var timer = setTimeout(_abortFn, 90000);
   var allText = '';
   var full = '';
   try {
@@ -1408,6 +1429,7 @@ async function streamDeliver(text, opts) {
   } finally {
     clearTimeout(timer);
     if (activeAbort === controller) activeAbort = null;
+    window.__genActive = false;
   }
   var rem = full.trim();
   if (rem) {
@@ -1431,8 +1453,13 @@ function drainPendingToChat(pending) {
     var char = getCharacter(m.charId);
     if (!char) return;
     if (!Array.isArray(char.chat)) char.chat = [];
-    var ts = m.ts || Date.now();
-    char.chat.push({ role: 'assistant', content: m.text, time: new Date(ts).toLocaleString(), ts: ts, _proactive: true });
+    var parts = splitReply(m.text || '');
+    parts.forEach(function (part) {
+      var ts = m.ts || Date.now();
+      char.chat.push({ role: 'assistant', content: part, time: new Date(ts).toLocaleString(), ts: ts, _proactive: true });
+      char.unread = (char.unread || 0) + 1;
+      char.read = true;
+    });
     touched[char.id] = true;
   });
   saveState();
@@ -1441,6 +1468,36 @@ function drainPendingToChat(pending) {
   if (typeof quickNotice === 'function') quickNotice('收到 ' + pending.length + ' 条角色主动消息');
 }
 window.drainPendingToChat = drainPendingToChat;
+
+// 把回复生成交给自己的服务器（sever/server.js 的 /push/reply），使其在后台/冻结时也能完成：
+// 服务端只中转 AI 请求（key 不留存，与 /relay 同级别），notify 时再发系统推送 + 写待收队列。
+function getDeviceId() {
+  try {
+    var d = localStorage.getItem('deviceId');
+    if (!d) { d = 'dev-' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('deviceId', d); }
+    return d;
+  } catch (e) { return 'dev-anon'; }
+}
+window.getDeviceId = getDeviceId;
+
+async function callAIServer(char, messages, modelBody, notify) {
+  var cfg = activeAIConfig();
+  if (!cfg || !cfg.url || !cfg.key || !cfg.model) throw new Error('AI 未配置');
+  var sub = null;
+  try { sub = await getCurrentSub(); } catch (e) {}
+  var endpoint = sub ? sub.endpoint : '';
+  var target = joinUrl(cfg.url, 'chat/completions');
+  var headers = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + cfg.key };
+  var res = await fetch('push/reply', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify({ target: target, headers: headers, messages: messages, modelBody: modelBody, endpoint: endpoint, subscription: sub || undefined, deviceId: getDeviceId(), notify: !!notify, charId: char.id, charName: char.name, charAvatar: char.avatar })
+  });
+  var j = await res.json().catch(function () { return {}; });
+  if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+  return (j.text || '').trim();
+}
 
 // 统一入口：按开关走流式 / 非流式。onDone(rawText) 在消息已呈现后回调（用于通话字幕等）
 async function generateAndDeliver(text, opts) {
@@ -1466,6 +1523,23 @@ async function generateAndDeliver(text, opts) {
     appendBubble('system', base + detail);
   }
 }
+
+// 切后台时若正在生成回复，则交由服务器继续（避免页面被冻结而中断）；切回前台时拉取后台已生成的回复
+(function bindGenHandoff() {
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') {
+      if (window.__genActive && window.__genPayload) {
+        if (activeAbort) { try { activeAbort.abort(); } catch (e) {} }
+        window.__genActive = false;
+        window.__genHandedOff = true;
+        var _p = window.__genPayload; window.__genPayload = null;
+        callAIServer(_p.char, _p.messages, _p.modelBody, pushEnabled()).catch(function () {});
+      }
+    } else {
+      if (typeof fetchPendingMessages === 'function') fetchPendingMessages();
+    }
+  });
+})();
 
 // ===== 心声功能：点头像看 TA 此刻的心情和生活 =====
 var MOOD_EMOJI = { happy: '😊', miss: '🥺', jealous: '😒', tsundere: '😏', tired: '😮💨', calm: '🙂', excited: '🤩' };
@@ -1872,6 +1946,17 @@ async function callAI(text, shortTest = false, proactive = false, forChar = null
     thinkNote = tk.note || '';
     lastRetract = (tk.retract !== null) ? tk.retract : null;
   }
+  if (!shortTest) {
+    var _cap = buildAIMessages(char, text, proactive, '');
+    window.__genActive = true;
+    window.__genHandedOff = false;
+    window.__genPayload = {
+      char: char,
+      messages: [{ role: 'system', content: systemPrompt }, ..._cap.history, { role: 'user', content: _cap.userContent }],
+      modelBody: { model: cfg.model, max_tokens: cfg.maxTokens || 500, temperature: cfg.temp ?? 0.75, top_p: cfg.topP ?? 0.9, presence_penalty: cfg.presencePenalty ?? 0, frequency_penalty: cfg.frequencyPenalty ?? 0 },
+      notify: true
+    };
+  }
   for (var attempt = 0; attempt < 2; attempt++) {
     const built = buildAIMessages(char, text, proactive, reason);
     const history = shortTest ? [] : built.history;
@@ -1879,10 +1964,18 @@ async function callAI(text, shortTest = false, proactive = false, forChar = null
     if (thinkNote) {
       userContent += '\n\n（参考你刚才的内心活动：' + thinkNote + '）现在只输出要发给用户的正式回复，紧扣对方刚才那句话来接，保持角色语气，不要出现任何内心活动文字。';
     }
+    if (!shortTest && document.visibilityState !== 'visible') {
+      try { var _s3 = await callAIServer(window.__genPayload.char, window.__genPayload.messages, window.__genPayload.modelBody, pushEnabled()); window.__genActive = false; if (_s3) return _s3; } catch (_e2) {}
+    }
+    if (window.__genHandedOff) { window.__genActive = false; throw Object.assign(new Error('已转交服务器生成'), { name: 'AbortError' }); }
     if (activeAbort) try { activeAbort.abort(); } catch(e) {}
     const controller = new AbortController();
     activeAbort = controller;
-    const timer = setTimeout(() => { try { controller.abort(); } catch(e) {} }, shortTest ? 20000 : 90000);
+    const _abortFn2 = function () {
+      if (document.visibilityState !== 'visible') { timer = setTimeout(_abortFn2, 5000); return; }
+      try { controller.abort(); } catch (e) {}
+    };
+    const timer = setTimeout(_abortFn2, shortTest ? 20000 : 90000);
     try {
       const response = await aiRequest(joinUrl(cfg.url, 'chat/completions'), {
         method: 'POST',
@@ -1926,6 +2019,7 @@ async function callAI(text, shortTest = false, proactive = false, forChar = null
     } finally {
       clearTimeout(timer);
       if (activeAbort === controller) activeAbort = null;
+      window.__genActive = false;
     }
   }
   return '⚠️ 回复失败';
