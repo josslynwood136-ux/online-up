@@ -41,6 +41,7 @@ function init() {
   if (typeof maybeProbeNcm === 'function') maybeProbeNcm();
   if (typeof startIdleProactive === 'function') startIdleProactive();
   if (typeof initPush === 'function') initPush();
+  if (typeof checkinReminderTick === 'function') { checkinReminderTick(); setInterval(checkinReminderTick, 30000); }
   setupLaunchFullscreen();
 }
 

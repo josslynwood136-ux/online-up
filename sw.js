@@ -57,7 +57,7 @@ self.addEventListener('push', function (e) {
         body: data.body,
         tag: data.tag,
         renotify: false,
-        data: { url: data.url, charId: data.charId },
+        data: { url: data.url, charId: data.charId, openApp: data.openApp },
         requireInteraction: false
       };
       if (data.avatar) options.icon = data.avatar;

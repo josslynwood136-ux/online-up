@@ -991,6 +991,8 @@ function renderCheckins() {
       return `<div class="card">
         <div class="label">项目名称</div>
         <input class="field" id="ck-name" value="${escapeHTML(x.name)}">
+        <div class="label" style="margin-top:8px">催促时间（到点弹窗/关 App 也提醒）</div>
+        <input class="field" id="ck-remind" type="time" value="${escapeHTML(x.remindTime || '')}">
         <div class="label" style="margin-top:8px">监督角色（TA 会催你打卡）</div>
         ${checkinCharOptions(x.charId)}
         <div class="grid2">
@@ -1033,7 +1035,7 @@ function renderCheckins() {
       </div>
       <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted)">
         <span>已打卡 ${x.doneDays || 0} 次</span>
-        <span>完成率 ${rate}%</span>
+        <span>${x.remindTime ? ('⏰ ' + x.remindTime) : ('完成率 ' + rate + '%')}</span>
       </div>
        ${x.status !== 'done' ? `<button class="primary-btn" style="width:100%;margin-top:10px" onclick="doCheckin('${x.id}')">立即打卡</button>` : `<div class="subtle" style="text-align:center;margin-top:10px">🎉 已达成</div>`}
        ${x.charId && x.status !== 'done' ? `<button class="ghost-btn" style="width:100%;margin-top:8px" onclick="openChat('${x.charId}', 'comic');nudgeCheckin('${x.charId}', true)">💬 让 ${escapeHTML(checkinCharName(x.charId))} 催我</button>` : ''}
@@ -1049,6 +1051,8 @@ function renderCheckins() {
     formHtml = `<div class="card">
       <div class="label">项目名称</div>
        <input class="field" id="ck-name" placeholder="如 考研学习">
+       <div class="label" style="margin-top:8px">催促时间（到点弹窗/关 App 也提醒）</div>
+       <input class="field" id="ck-remind" type="time" value="">
        <div class="label" style="margin-top:8px">监督角色（TA 会催你打卡）</div>
        ${checkinCharOptions('')}
        <div class="grid2">
@@ -1090,11 +1094,13 @@ function doCheckin(id) {
   if (x.doneDays >= x.totalDays) {
     x.status = 'done';
     saveState();
+    if (typeof uploadPushConfig === 'function') uploadPushConfig();
     renderCheckins();
     showCheckinCelebration(x.name);
     return;
   }
   saveState();
+  if (typeof uploadPushConfig === 'function') uploadPushConfig();
   renderCheckins();
 }
 function showCheckinCelebration(name) {
@@ -1108,6 +1114,58 @@ function showCheckinCelebration(name) {
     el.style.opacity = '0';
     setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 400);
   }, 2000);
+}
+
+function isCheckinActiveToday(ck) {
+  var t = parseCkDate(todayStr());
+  var s = ck.start ? parseCkDate(ck.start) : null;
+  var e = ck.end ? parseCkDate(ck.end) : null;
+  if (s && !isNaN(s.getTime()) && t < s) return false;
+  if (e && !isNaN(e.getTime()) && t > e) return false;
+  return true;
+}
+
+function checkinReminderTick() {
+  if (!state.checkins || !state.checkins.length) return;
+  var now = new Date();
+  var cur = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+  var curMin = parseInt(cur.slice(0, 2), 10) * 60 + parseInt(cur.slice(3, 5), 10);
+  var t = todayStr();
+  state.checkins.forEach(function (ck) {
+    if (ck.status === 'done' || !ck.remindTime) return;
+    var p = ck.remindTime.split(':');
+    var rm = parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
+    var diff = curMin - rm;
+    if (diff < 0 || diff > 15) return;
+    if (!isCheckinActiveToday(ck) || !isCheckinDueToday(ck)) return;
+    if (ck.lastRemindDate === t) return;
+    ck.lastRemindDate = t;
+    saveState();
+    showCheckinReminder(ck);
+  });
+}
+
+function showCheckinReminder(ck) {
+  var exist = document.getElementById('checkinReminder');
+  if (exist) exist.remove();
+  var avatarHtml = '⏰';
+  var whoName = '打卡提醒';
+  var el = document.createElement('div');
+  el.id = 'checkinReminder';
+  el.style.cssText = 'position:fixed;inset:0;z-index:99998;display:flex;align-items:center;justify-content:center;background:rgba(60,50,40,.4);animation:fadeIn .25s ease';
+  el.innerHTML = '<div style="width:78%;max-width:300px;background:#fdfaf6;border-radius:20px;padding:22px 20px 16px;text-align:center;box-shadow:0 12px 40px rgba(120,100,80,.28),0 0 0 1px rgba(200,185,165,.2);animation:msgNoteIn .3s ease">'
+    + '<div style="width:54px;height:54px;border-radius:50%;overflow:hidden;margin:0 auto 10px;background:#ede4d8;font-size:26px;display:flex;align-items:center;justify-content:center">' + avatarHtml + '</div>'
+    + '<div style="font-size:13px;color:#a09588">' + escapeHTML(whoName) + ' 提醒你</div>'
+    + '<div style="font-size:20px;color:#5a5045;font-weight:700;margin-top:2px">⏰ 「' + escapeHTML(ck.name) + '」该打卡啦</div>'
+    + '<div style="font-size:12px;color:#9c9488;margin-top:6px">今天还没打哦，' + (ck.totalDays ? '目标 ' + ck.totalDays + ' 次，已打 ' + (ck.doneDays || 0) + ' 次' : '别断签啦') + '</div>'
+    + '<div style="display:flex;gap:10px;margin-top:18px">'
+    + '<button class="ghost-btn" style="flex:1" id="crLater">知道了</button>'
+    + '<button class="primary-btn" style="flex:1" id="crGo">去打卡</button>'
+    + '</div></div>';
+  el.addEventListener('click', function (ev) { if (ev.target === el) el.remove(); });
+  document.body.appendChild(el);
+  el.querySelector('#crLater').onclick = function () { el.remove(); };
+  el.querySelector('#crGo').onclick = function () { el.remove(); if (typeof openApp === 'function') openApp('打卡'); };
 }
 
 function parseCkDate(str) {
@@ -1154,10 +1212,12 @@ function submitNewCheckin() {
   const end = document.getElementById('ck-end').value.trim();
   const total = parseInt(document.getElementById('ck-total').value, 10) || 1;
   const charId = document.getElementById('ck-char') ? document.getElementById('ck-char').value : '';
+  const remindTime = document.getElementById('ck-remind') ? document.getElementById('ck-remind').value : '';
   if (!name) { alert('请填写名称'); return; }
-  state.checkins.push({ id: 'ck-' + Date.now(), name, start, end, totalDays: total, doneDays: 0, doneDates: [], charId: charId, status: 'doing' });
+  state.checkins.push({ id: 'ck-' + Date.now(), name, start, end, totalDays: total, doneDays: 0, doneDates: [], charId: charId, remindTime: remindTime, status: 'doing' });
   checkinForm = null;
   saveState();
+  if (typeof uploadPushConfig === 'function') uploadPushConfig();
   renderCheckins();
 }
 function submitEditCheckin(id) {
@@ -1168,11 +1228,13 @@ function submitEditCheckin(id) {
   const end = document.getElementById('ck-end').value.trim();
   const total = parseInt(document.getElementById('ck-total').value, 10) || 1;
   const charId = document.getElementById('ck-char') ? document.getElementById('ck-char').value : '';
+  const remindTime = document.getElementById('ck-remind') ? document.getElementById('ck-remind').value : '';
   if (!name) { alert('请填写名称'); return; }
-  x.name = name; x.start = start; x.end = end; x.totalDays = total; x.charId = charId;
+  x.name = name; x.start = start; x.end = end; x.totalDays = total; x.charId = charId; x.remindTime = remindTime;
   if (x.doneDays >= total) x.status = 'done'; else if (x.status === 'done') x.status = 'doing';
   checkinForm = null;
   saveState();
+  if (typeof uploadPushConfig === 'function') uploadPushConfig();
   renderCheckins();
 }
 
