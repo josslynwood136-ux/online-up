@@ -31,7 +31,7 @@ function renderIGProfile() {
     posts: 12, followers: 342, following: 156,
     gallery: ['💖','✨','🎨','🌈','🔥','🎵','📸','🦋','🌟']
   });
-  currentProfileTab = 'home';
+  currentProfileTab = 'dm';
 
   c().innerHTML = `
     <div class="ig-app">
@@ -49,7 +49,7 @@ function renderIGProfile() {
       <!-- Panels Container -->
       <div class="ig-panels">
         <!-- Panel 1: Home / Feed -->
-        <div class="profile-panel active" id="igPanelHome">
+        <div class="profile-panel" id="igPanelHome">
           <div class="feed-container" id="igFeedContainer"></div>
         </div>
         <!-- Panel 2: 角色库 -->
@@ -64,7 +64,7 @@ function renderIGProfile() {
           </div>
         </div>
         <!-- Panel 3: DM -->
-        <div class="profile-panel" id="igPanelDm">
+        <div class="profile-panel active" id="igPanelDm">
           <div class="dm-container" id="igDmContainer"></div>
         </div>
         <!-- Panel 4: Profile -->
@@ -75,21 +75,21 @@ function renderIGProfile() {
 
       <!-- IG Bottom Navigation -->
       <div class="profile-nav" id="igProfileNav">
-        <div class="nav-item active" data-tab="home" onclick="switchProfileTab('home')">
-          <span class="nav-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v9a1 1 0 001 1h3m-4-5a1 1 0 011-1h2a1 1 0 011 1v5m0 0a1 1 0 001 1h3a1 1 0 001-1v-9"/></svg></span>
-          <span class="nav-label">首页</span>
+        <div class="nav-item active" data-tab="dm" onclick="switchProfileTab('dm')">
+          <span class="nav-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></span>
+          <span class="nav-label">私信</span>
         </div>
-        <div class="nav-item" data-tab="search" onclick="switchProfileTab('search')">
-          <span class="nav-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/></svg></span>
-          <span class="nav-label">搜索</span>
+        <div class="nav-item" data-tab="home" onclick="switchProfileTab('home')">
+          <span class="nav-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v9a1 1 0 001 1h3m-4-5a1 1 0 011-1h2a1 1 0 011 1v5m0 0a1 1 0 001 1h3a1 1 0 001-1v-9"/></svg></span>
+          <span class="nav-label">空间</span>
         </div>
         <div class="nav-item" data-tab="post" onclick="openPostCreator()">
           <span class="nav-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></svg></span>
           <span class="nav-label">发布</span>
         </div>
-        <div class="nav-item" data-tab="dm" onclick="switchProfileTab('dm')">
-          <span class="nav-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></span>
-          <span class="nav-label">私信</span>
+        <div class="nav-item" data-tab="search" onclick="switchProfileTab('search')">
+          <span class="nav-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/></svg></span>
+          <span class="nav-label">搜索</span>
         </div>
         <div class="nav-item" data-tab="profile" onclick="switchProfileTab('profile')">
           <span class="nav-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
@@ -98,7 +98,7 @@ function renderIGProfile() {
       </div>
     </div>`;
 
-  renderFeed();
+  renderDmList();
 }
 
 // ====== Tab Switching ======
@@ -304,12 +304,12 @@ function renderFeed() {
   var myDisplayName = myProfile.username || '@my_username';
 
   (state.profilePosts || []).forEach(function(p) {
-    allPosts.push({
-      type: 'self', id: p.id,
-      avatarHtml: myAvatarHtml, displayName: myDisplayName,
-      content: p.image ? '<img src="' + p.image + '" style="filter:' + (p.filter || 'none') + '" />' : '<div style="font-size:80px;display:flex;align-items:center;justify-content:center;height:100%;background:var(--bg-gray,#f0ede8);">📝</div>',
-      caption: p.caption || '', time: p.time, likes: 0, liked: false
-    });
+     allPosts.push({
+       type: 'self', id: p.id,
+       avatarHtml: myAvatarHtml, displayName: myDisplayName,
+       content: p.image ? '<img src="' + p.image + '" style="filter:' + (p.filter || 'none') + '" />' : '<div style="font-size:80px;display:flex;align-items:center;justify-content:center;height:100%;background:var(--bg-gray,#f0ede8);">📝</div>',
+       caption: p.caption || '', time: p.time, likes: p.likes || 0, liked: p.liked || false, comments: p.comments || []
+     });
   });
 
   chars.forEach(function(char) {
@@ -334,21 +334,25 @@ function renderFeed() {
     return;
   }
 
-  var feedHtml = '';
-  allPosts.forEach(function(post) {
-    var likeBtn = post.liked ? '❤️' : '♡';
-    var likeCls = post.liked ? 'action-btn liked' : 'action-btn';
-    var likeHandler = post.type === 'self'
-      ? 'showIGToast(\'❤️ 已赞\')'
-      : 'igLikeAutoPost(\'' + post.id + '\',\'' + post.charId + '\')';
-    feedHtml += '<div class="feed-post">';
-    feedHtml += '<div class="feed-post-header"><div class="feed-avatar">' + post.avatarHtml + '</div><span class="feed-username">' + escapeHTML(post.displayName) + '</span><button class="feed-more">⋯</button></div>';
-    feedHtml += '<div class="feed-post-image">' + post.content + '</div>';
-    feedHtml += '<div class="feed-post-actions"><button class="' + likeCls + '" onclick="' + likeHandler + '">' + likeBtn + '</button><button class="action-btn" onclick="showIGToast(\'💬 评论\')">💬</button><button class="action-btn save-btn" onclick="showIGToast(\'已保存\')">🏷️</button></div>';
-    feedHtml += '<div class="feed-post-likes">❤️ ' + post.likes + ' 次赞</div>';
-    feedHtml += '<div class="feed-post-caption"><span class="cap-user">' + escapeHTML(post.displayName) + '</span>' + escapeHTML(post.caption) + '</div>';
-    feedHtml += '<div class="feed-post-time">' + formatPostTime(post.time) + '</div></div>';
-  });
+   var feedHtml = '';
+   allPosts.forEach(function(post) {
+     var likeBtn = post.liked ? '❤️' : '♡';
+     var likeCls = post.liked ? 'action-btn liked' : 'action-btn';
+     var likeHandler = post.type === 'self'
+       ? 'toggleSelfPostLike(\'' + post.id + '\')'
+       : 'igLikeAutoPost(\'' + post.id + '\',\'' + post.charId + '\')';
+     var cmtCount = (post.comments || []).length;
+     var commentBtn = post.type === 'self'
+       ? '<button class="action-btn" onclick="openPostComments(\'' + post.id + '\')">💬' + (cmtCount ? ' <span class="feed-cmt-count">' + cmtCount + '</span>' : '') + '</button>'
+       : '<button class="action-btn" onclick="showIGToast(\'💬 评论\')">💬</button>';
+     feedHtml += '<div class="feed-post">';
+     feedHtml += '<div class="feed-post-header"><div class="feed-avatar">' + post.avatarHtml + '</div><span class="feed-username">' + escapeHTML(post.displayName) + '</span><button class="feed-more">⋯</button></div>';
+     feedHtml += '<div class="feed-post-image">' + post.content + '</div>';
+     feedHtml += '<div class="feed-post-actions"><button class="' + likeCls + '" onclick="' + likeHandler + '">' + likeBtn + '</button>' + commentBtn + '<button class="action-btn save-btn" onclick="showIGToast(\'已保存\')">🏷️</button></div>';
+     feedHtml += '<div class="feed-post-likes" onclick="' + (post.type === 'self' ? 'openPostComments(\'' + post.id + '\')' : '') + '">❤️ ' + post.likes + ' 次赞</div>';
+     feedHtml += '<div class="feed-post-caption"><span class="cap-user">' + escapeHTML(post.displayName) + '</span>' + escapeHTML(post.caption) + '</div>';
+     feedHtml += '<div class="feed-post-time">' + formatPostTime(post.time) + '</div></div>';
+   });
   container.innerHTML = storiesHtml + feedHtml;
   bindStoryItems();
 }
@@ -368,6 +372,124 @@ function igLikeAutoPost(postId, charId) {
       }
     }
   }
+}
+
+// ====== 自己动态的 点赞 / 评论 ======
+function findSelfPost(postId) {
+  return (state.profilePosts || []).find(function(p) { return p.id === postId; });
+}
+
+function toggleSelfPostLike(postId) {
+  var post = findSelfPost(postId);
+  if (!post) return;
+  post.liked = !post.liked;
+  post.likes = (post.likes || 0) + (post.liked ? 1 : -1);
+  if (post.likes < 0) post.likes = 0;
+  saveState();
+  renderFeed();
+  if (window._openCommentPostId === postId) refreshPostDetail();
+}
+
+function openPostComments(postId) {
+  var post = findSelfPost(postId);
+  if (!post) { showIGToast('动态不存在'); return; }
+  if (!post.comments) post.comments = [];
+  window._openCommentPostId = postId;
+  var overlay = document.getElementById('igCommentOverlay');
+  if (overlay) overlay.remove();
+  overlay = document.createElement('div');
+  overlay.className = 'ig-comment-overlay';
+  overlay.id = 'igCommentOverlay';
+  overlay.innerHTML = `
+    <div class="ig-comment-mask" onclick="closePostComments()"></div>
+    <div class="ig-comment-sheet">
+      <div class="ig-comment-head"><span>评论 · ${(post.comments || []).length}</span><button class="ig-comment-close" onclick="closePostComments()">✕</button></div>
+      <div class="ig-comment-list" id="igCommentList"></div>
+      <div class="ig-comment-input-row">
+        <input class="ig-comment-input" id="igCommentInput" placeholder="说点什么..." onkeydown="if(event.key==='Enter')sendSelfComment('${postId}')" />
+        <button class="ig-comment-send" onclick="sendSelfComment('${postId}')">发送</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  renderCommentList(postId);
+  setTimeout(function() { var i = document.getElementById('igCommentInput'); if (i) i.focus(); }, 120);
+}
+
+function renderCommentList(postId) {
+  var post = findSelfPost(postId);
+  var list = document.getElementById('igCommentList');
+  if (!list || !post) return;
+  if (!post.comments || post.comments.length === 0) {
+    list.innerHTML = '<div class="ig-comment-empty">还没有评论，快来抢沙发~</div>';
+    return;
+  }
+  list.innerHTML = post.comments.map(function(c) {
+    var isMe = c.author === '我';
+    var av = c.avatar && c.avatar.startsWith && (c.avatar.startsWith('http') || c.avatar.startsWith('data:'))
+      ? '<img src="' + c.avatar + '"/>' : escapeHTML(c.avatar || '👤');
+    return '<div class="ig-comment-item' + (isMe ? ' me' : '') + '"><div class="ig-comment-av">' + av + '</div><div class="ig-comment-body"><div class="ig-comment-name">' + escapeHTML(c.author) + '</div><div class="ig-comment-text">' + escapeHTML(c.text) + '</div></div><div class="ig-comment-time">' + formatPostTime(c.time) + '</div></div>';
+  }).join('');
+  list.scrollTop = list.scrollHeight;
+}
+
+function sendSelfComment(postId) {
+  var input = document.getElementById('igCommentInput');
+  if (!input) return;
+  var text = input.value.trim();
+  if (!text) return;
+  var post = findSelfPost(postId);
+  if (!post) return;
+  if (!post.comments) post.comments = [];
+  post.comments.push({
+    author: '我',
+    avatar: (state.myProfile && (state.myProfile.avatarImage || state.myProfile.avatar)) || '👤',
+    text: text, time: Date.now()
+  });
+  saveState();
+  input.value = '';
+  renderCommentList(postId);
+  renderFeed();
+  if (window._openCommentPostId === postId && viewPostId === postId) refreshPostDetail();
+}
+
+function closePostComments() {
+  var o = document.getElementById('igCommentOverlay');
+  if (o) o.remove();
+  window._openCommentPostId = null;
+}
+
+// ====== 角色互动（点赞 / 评论）======
+var FRIEND_COMMENT_POOL = {
+  lover: ['好喜欢～', '你怎么这么可爱', '想你了💕', '这张绝了', '宝贝真棒'],
+  friend: ['哈哈哈可以', '拍得不错啊', '牛', '笑死', '下次带我一起'],
+  default: ['好看！', '赞👍', '不错哦', '喜欢这张', '有意思']
+};
+
+function simulateFriendsReaction(post) {
+  if (!post) return;
+  var roles = (state.roles || []).filter(function(r) { return r && r.name; });
+  if (roles.length === 0) return;
+  var n = Math.min(roles.length, 1 + Math.floor(Math.random() * 2));
+  roles = roles.slice().sort(function() { return Math.random() - 0.5; }).slice(0, n);
+  roles.forEach(function(char, idx) {
+    setTimeout(function() {
+      if (!post) return;
+      if (Math.random() < 0.7) post.likes = (post.likes || 0) + 1;
+      if (Math.random() < 0.6) {
+        var rel = (char.relation || '').indexOf('恋') >= 0 ? 'lover'
+          : (char.relation || '').indexOf('友') >= 0 || (char.relation || '').indexOf('朋') >= 0 ? 'friend'
+          : 'default';
+        var pool = FRIEND_COMMENT_POOL[rel] || FRIEND_COMMENT_POOL.default;
+        var text = pool[Math.floor(Math.random() * pool.length)];
+        if (!post.comments) post.comments = [];
+        post.comments.push({ author: char.name, avatar: char.avatar || '👤', text: text, time: Date.now() });
+      }
+      saveState();
+      renderFeed();
+      if (window._openCommentPostId === post.id) renderCommentList(post.id);
+      if (viewPostId === post.id) refreshPostDetail();
+    }, 1500 + idx * 1200 + Math.random() * 1500);
+  });
 }
 
 var IG_STORY_ITEMS = [
@@ -867,19 +989,24 @@ function publishPost() {
   var caption = $('postCreatorCaption').value.trim();
   var filter = pendingPostImage ? ($('postCreatorImage').style.filter || 'none') : 'none';
   if (!caption && !pendingPostImage) { showIGToast('写点什么吧'); return; }
-  state.profilePosts.unshift({
+  var post = {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
     image: pendingPostImage || '',
     filter: filter,
     caption: caption,
-    time: Date.now()
-  });
+    time: Date.now(),
+    likes: 0,
+    liked: false,
+    comments: []
+  };
+  state.profilePosts.unshift(post);
   $('postCreatorCaption').value = '';
   closePostCreator();
   saveState();
   renderMyProfileContent();
   renderFeed();
   showIGToast('已发布 ✨');
+  simulateFriendsReaction(post);
 }
 
 // ====== Post Detail ======
@@ -891,7 +1018,33 @@ function viewPost(postId) {
   $('postDetailCaption').textContent = post.caption || '无标题';
   $('postDetailTime').textContent = formatPostTime(post.time);
   $('postDetailDelete').style.display = 'block';
+  refreshPostDetail();
   $('postDetail').classList.add('active');
+}
+
+function refreshPostDetail() {
+  var post = viewPostId ? findSelfPost(viewPostId) : null;
+  if (!post) return;
+  var likeBtn = $('postDetailLike');
+  if (likeBtn) {
+    likeBtn.classList.toggle('liked', !!post.liked);
+    likeBtn.innerHTML = (post.liked ? '❤️' : '♡') + ' <span id="postDetailLikeCount">' + (post.likes || 0) + '</span>';
+  }
+  var cmtEl = $('postDetailCmtCount');
+  if (cmtEl) cmtEl.textContent = (post.comments || []).length;
+  var list = $('postDetailComments');
+  if (list) {
+    if (!post.comments || post.comments.length === 0) {
+      list.innerHTML = '<div class="pd-comments-empty">还没有评论</div>';
+    } else {
+      list.innerHTML = post.comments.map(function(c) {
+        var isMe = c.author === '我';
+        var av = c.avatar && c.avatar.startsWith && (c.avatar.startsWith('http') || c.avatar.startsWith('data:'))
+          ? '<img src="' + c.avatar + '"/>' : escapeHTML(c.avatar || '👤');
+        return '<div class="pd-comment-item' + (isMe ? ' me' : '') + '"><div class="pd-comment-av">' + av + '</div><div class="pd-comment-body"><span class="pd-comment-name">' + escapeHTML(c.author) + '</span><span class="pd-comment-text">' + escapeHTML(c.text) + '</span></div><div class="pd-comment-time">' + formatPostTime(c.time) + '</div></div>';
+      }).join('');
+    }
+  }
 }
 
 function closePostDetail() {

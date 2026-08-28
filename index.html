@@ -600,8 +600,13 @@
     <button class="post-detail-close" onclick="closePostDetail()">✕</button>
     <div class="post-detail-img" id="postDetailImg"></div>
     <div class="post-detail-info">
+      <div class="post-detail-actions">
+        <button class="pd-action" id="postDetailLike" onclick="toggleSelfPostLike(viewPostId);refreshPostDetail()">❤️ <span id="postDetailLikeCount">0</span></button>
+        <button class="pd-action" onclick="openPostComments(viewPostId)">💬 <span id="postDetailCmtCount">0</span></button>
+      </div>
       <div class="post-detail-caption" id="postDetailCaption"></div>
       <div class="post-detail-time" id="postDetailTime"></div>
+      <div class="post-detail-comments" id="postDetailComments"></div>
       <button class="post-detail-delete" id="postDetailDelete" onclick="deletePost()">🗑️ 删除</button>
     </div>
   </div>
