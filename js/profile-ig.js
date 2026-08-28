@@ -88,8 +88,8 @@ function renderIGProfile() {
           <span class="nav-label">发布</span>
         </div>
         <div class="nav-item" data-tab="search" onclick="switchProfileTab('search')">
-          <span class="nav-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/></svg></span>
-          <span class="nav-label">搜索</span>
+          <span class="nav-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="13" height="12" rx="2"/><path d="M22 8l-5 4 5 4V8z"/><circle cx="6.5" cy="12" r="1" fill="currentColor" stroke="none"/></svg></span>
+          <span class="nav-label">直播间</span>
         </div>
         <div class="nav-item" data-tab="profile" onclick="switchProfileTab('profile')">
           <span class="nav-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
@@ -184,9 +184,7 @@ function ensureCharAutoPosts() {
 }
 
 async function generateCharPost(char) {
-  var ap = state.apiProfiles && state.activeApiProfile
-    ? state.apiProfiles.find(function(p) { return p.id === state.activeApiProfile; }) : null;
-  var cfg = ap || state.api;
+  var cfg = resolveApiConfig(true);
   if (!cfg.key || !cfg.url || !cfg.model) return;
   var prompt = '你是一个角色。根据以下角色设定，发一条 Instagram 动态（一句话 + 一个emoji）。只输出动态内容，不要解释，不要加引号。\n\n角色名：' + char.name + '\n性格：' + (char.personality || '普通') + '\n说话风格：' + (char.style || '普通') + '\n背景：' + (char.background || '无');
   var memText = '';
@@ -458,12 +456,38 @@ function closePostComments() {
   window._openCommentPostId = null;
 }
 
-// ====== 角色互动（点赞 / 评论）======
-var FRIEND_COMMENT_POOL = {
-  lover: ['好喜欢～', '你怎么这么可爱', '想你了💕', '这张绝了', '宝贝真棒'],
-  friend: ['哈哈哈可以', '拍得不错啊', '牛', '笑死', '下次带我一起'],
-  default: ['好看！', '赞👍', '不错哦', '喜欢这张', '有意思']
-};
+// ====== 角色互动（点赞 / 评论，AI 生成）======
+
+async function genFriendComment(char, post) {
+  var cfg = resolveApiConfig(true);
+  if (!cfg || !cfg.key || !cfg.url || !cfg.model) return null;
+  var cap = post.caption || (post.image ? '（发了一张图片）' : '（发了一条动态）');
+  var prompt = '你是角色『' + char.name + '』。'
+    + (char.relation ? '你和用户的关系是：' + char.relation + '。' : '')
+    + (char.personality ? '你的性格：' + char.personality + '。' : '')
+    + (char.style ? '你的说话风格：' + char.style + '。' : '')
+    + '\n用户在朋友圈发了一条动态：' + cap
+    + '\n请用' + char.name + '的口吻，回一句简短的评论（一句话，可带一个 emoji，像真的在刷朋友圈顺手评论那样；只输出评论内容，不要解释，不要加引号）。';
+  try {
+    var res = await aiRequest(joinUrl(cfg.url, 'chat/completions'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + cfg.key },
+      body: JSON.stringify({
+        model: cfg.model,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 60,
+        temperature: 0.9
+      })
+    });
+    if (!res.ok) return null;
+    var data = await res.json().catch(function() { return {}; });
+    var text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '').trim();
+    text = text.replace(/^["'「『]+|["'」』]+$/g, '').trim();
+    return text || null;
+  } catch (e) {
+    return null;
+  }
+}
 
 function simulateFriendsReaction(post) {
   if (!post) return;
@@ -472,17 +496,15 @@ function simulateFriendsReaction(post) {
   var n = Math.min(roles.length, 1 + Math.floor(Math.random() * 2));
   roles = roles.slice().sort(function() { return Math.random() - 0.5; }).slice(0, n);
   roles.forEach(function(char, idx) {
-    setTimeout(function() {
+    setTimeout(async function() {
       if (!post) return;
       if (Math.random() < 0.7) post.likes = (post.likes || 0) + 1;
       if (Math.random() < 0.6) {
-        var rel = (char.relation || '').indexOf('恋') >= 0 ? 'lover'
-          : (char.relation || '').indexOf('友') >= 0 || (char.relation || '').indexOf('朋') >= 0 ? 'friend'
-          : 'default';
-        var pool = FRIEND_COMMENT_POOL[rel] || FRIEND_COMMENT_POOL.default;
-        var text = pool[Math.floor(Math.random() * pool.length)];
-        if (!post.comments) post.comments = [];
-        post.comments.push({ author: char.name, avatar: char.avatar || '👤', text: text, time: Date.now() });
+        var text = await genFriendComment(char, post);
+        if (text) {
+          if (!post.comments) post.comments = [];
+          post.comments.push({ author: char.name, avatar: char.avatar || '👤', text: text, time: Date.now() });
+        }
       }
       saveState();
       renderFeed();

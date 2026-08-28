@@ -12,6 +12,7 @@ const defaultState = {
   api: { key: '', url: 'https://api.openai.com/v1', model: 'gpt-4.1-mini', preset: '', temp: 0.85, topP: 0.9, maxTokens: 800, presencePenalty: 0.6, frequencyPenalty: 0.4 },
   apiProfiles: [],
   activeApiProfile: '',
+  secondaryApiProfile: '',
   settings: { ai: true, pinned: false, bubbleStyle: 'default', musicMode: 'loop', translateProvider: 'google', deeplKey: '', autoVoice: false, ttsProvider: 'minimax', ttsUrls: {}, ttsKeys: {}, ttsModels: {}, ttsVoices: {}, ttsGroups: {}, streamReply: true, replySplit: 'auto', proactiveInterval: 180, proactiveQuiet: [23, 7] },
   activeRoleId: 'role-default',
   roles: [
@@ -542,6 +543,26 @@ function relayAvailable() {
     .catch(function () { return false; });
   return __relayProbe;
 }
+function secondaryApiConfig() {
+  if (state.secondaryApiProfile) {
+    var p = (state.apiProfiles || []).find(function(x) { return x.id === state.secondaryApiProfile; });
+    if (p && p.key && p.url && p.model) return p;
+  }
+  return null;
+}
+
+// useSecondary=true 时优先用「副 API」（记忆总结 / 空间回复等轻活），否则/未配置时回退主 API
+function resolveApiConfig(useSecondary) {
+  if (useSecondary) {
+    var s = secondaryApiConfig();
+    if (s) return s;
+  }
+  var ap = (state.apiProfiles && state.activeApiProfile)
+    ? state.apiProfiles.find(function(p) { return p.id === state.activeApiProfile; })
+    : null;
+  return ap || state.api;
+}
+
 async function aiRequest(target, opts) {
   const served = (typeof location !== 'undefined') && location.protocol !== 'file:';
   if (/^https?:\/\//i.test(target)) {

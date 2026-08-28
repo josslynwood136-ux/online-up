@@ -29,16 +29,17 @@ function showMsgNote(charId, name, avatar, text) {
   var n = document.createElement('div');
   n.id = 'msgNote';
   n.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:99999;background:#fdfaf6;border-radius:14px;padding:8px 14px 8px 10px;display:flex;align-items:center;gap:9px;box-shadow:0 6px 20px rgba(120,100,80,.12),0 0 0 1px rgba(200,185,165,.15);max-width:250px;width:auto;cursor:pointer;animation:msgNoteIn .3s ease';
-  n.onclick = function() { this.remove(); clearTimeout(noteTimer); noteTimer = null; openChat(charId); };
+  n.onclick = function() { this.remove(); clearTimeout(noteTimer); noteTimer = null; openChat(charId, 'comic'); };
   n.innerHTML = '<div style="width:22px;height:22px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#ede4d8;font-size:12px;display:flex;align-items:center;justify-content:center">' + renderAvatar(avatar, name).replace('<img', '<img style="width:100%;height:100%;object-fit:cover"') + '</div><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;color:#5a5045">' + escapeHTML(name) + '</div><div style="font-size:11px;color:#a09588;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px">' + escapeHTML(text || '发来一条消息') + '</div></div><div style="font-size:8px;color:#c8b8a8;flex-shrink:0;align-self:flex-start;margin-top:2px">now</div>';
   document.body.appendChild(n);
   noteTimer = setTimeout(function() { var el = document.getElementById('msgNote'); if (el) el.remove(); noteTimer = null; }, 4000);
 }
 // ===== 聊天窗口 =====
 function openChat(characterId, skin) {
+  let char = null;
   if (characterId) {
     state.activeRoleId = characterId;
-    const char = getCharacter(characterId);
+    char = getCharacter(characterId);
     char.unread = 0;
     char.read = true;
     // 兼容老存档：没有 status 的旧消息，若其后已有对方回复，则补标已读
@@ -63,6 +64,10 @@ function openChat(characterId, skin) {
   $('chatWindow').classList.toggle('comic-skin', skin === 'comic');
   var cs = $('chatSettings'); if (cs) cs.classList.remove('open'); // 进入聊天时确保设置面板已收起
   renderChat();
+  // 打卡监督：打开与该角色的聊天时，若 TA 监督的打卡今天还没打且今天还没催过，让 TA 顺手催一下
+  if (char && (state.checkins || []).some(function (c) { return c.charId === characterId && isCheckinDueToday(c) && c.lastNagDate !== todayStr(); })) {
+    setTimeout(function () { if (typeof nudgeCheckin === 'function') nudgeCheckin(characterId); }, 1200);
+  }
 }
 
 function closeChat() {
@@ -2898,9 +2903,7 @@ function setAutoMemEvery(val) {
 async function manualSummarizeMemory() {
   var char = activeCharacter();
   if (!char) return alert('请先打开一个角色');
-  var cfg = (state.apiProfiles && state.activeApiProfile)
-    ? state.apiProfiles.find(function(p) { return p.id === state.activeApiProfile; }) : null;
-  cfg = cfg || state.api;
+  var cfg = resolveApiConfig(true);
   if (!cfg || !cfg.key || !cfg.url || !cfg.model) return alert('还没连上，先去设置里连接一下。');
   var msgs = (char.chat || []).filter(function(m) { return m.role !== 'system'; }).map(function(m) {
     return (m.role === 'user' ? '用户：' : (char.name + '：')) + (m.content || (m.media ? '[' + m.media.type + ']' : ''));
@@ -2953,9 +2956,7 @@ async function manualSummarizeMemory() {
 async function autoSaveMemory(char) {
   try {
     if (!char || char.autoMem === false) return;
-    var cfg = (state.apiProfiles && state.activeApiProfile)
-      ? state.apiProfiles.find(function(p) { return p.id === state.activeApiProfile; }) : null;
-    cfg = cfg || state.api;
+    var cfg = resolveApiConfig(true);
     if (!cfg || !cfg.key || !cfg.url || !cfg.model) return;
     var recent = (char.chat || []).slice(-(char.autoMemLen || 8)).filter(function(m) { return m.role !== 'system'; }).map(function(m) {
       return (m.role === 'user' ? '用户：' : (char.name + '：')) + (m.content || (m.media ? '[' + m.media.type + ']' : ''));
@@ -3012,9 +3013,7 @@ function extractJSON(t) {
 // AI 亲自整理记忆：合并重复、推理解决矛盾、升降层级、忘记无意义、写下自我总结
 async function aiConsolidateMemories(char) {
   if (!char) return false;
-  var cfg = (state.apiProfiles && state.activeApiProfile)
-    ? state.apiProfiles.find(function(p) { return p.id === state.activeApiProfile; }) : null;
-  cfg = cfg || state.api;
+  var cfg = resolveApiConfig(true);
   if (!cfg || !cfg.key || !cfg.url || !cfg.model) return false;
   if (!char.memories || char.memories.length < 2) return false;
   var list = char.memories.map(function(m) {
@@ -3997,22 +3996,136 @@ function phoneChatHtml(messages, sideMap, opts) {
   return h;
 }
 
+function phoneIgAvatarHtml(a) {
+  if (a && (a.indexOf('http') === 0 || a.indexOf('data:') === 0)) return '<img src="' + escapeHTML(a) + '">';
+  return escapeHTML(a || '👤');
+}
+function phoneIgMyAvatarHtml() {
+  return phoneIgAvatarHtml(phoneMyAvatar());
+}
+
 function renderPhoneIg(char, screen) {
-  screen.innerHTML = phoneAppBar('ig');
-  var msgs = (char.chat || []).filter(function (m) { return m && (m.content || m.text); });
-  if (!msgs.length) { screen.innerHTML += '<div class="phone-empty">（你们还没聊过天）</div>'; return; }
-  var last = msgs[msgs.length - 1];
-  var lastText = (last.content != null ? last.content : (last.text != null ? last.text : ''));
-  var time = last.time || (last.ts ? new Date(last.ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '');
-  var ua = phoneAvatarInner(phoneMyAvatar(), '💖');
-  var h = '<div class="phone-conv-list">';
-  h += '<div class="phone-conv" onclick="phoneOpenIgYou()">' +
-    '<div class="phone-conv-ava" style="background:linear-gradient(135deg,#feda75,#d62976)">' + ua + '</div>' +
-    '<div class="phone-conv-main"><div class="phone-conv-name">' + escapeHTML(phoneMyName()) + '</div><div class="phone-conv-prev">' + escapeHTML(lastText) + '</div></div>' +
-    '<div class="phone-conv-meta"><div class="phone-conv-time">' + escapeHTML(time) + '</div></div>' +
-    '</div>';
+  var homeSvg = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v9a1 1 0 001 1h3m-4-5a1 1 0 011-1h2a1 1 0 011 1v5m0 0a1 1 0 001 1h3a1 1 0 001-1v-9"/></svg>';
+  var dmSvg = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>';
+  var postSvg = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></svg>';
+  var meSvg = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+  function navItem(t, label, svg) {
+    return '<div class="nav-item" data-tab="' + t + '"><span class="nav-icon">' + svg + '</span><span class="nav-label">' + label + '</span></div>';
+  }
+  var h = '<div class="ig-app" style="height:100%">';
+  h += '<div class="ig-profile-header"><div class="logo-area"><span class="logo-text">Instagram</span></div><div class="header-actions"><button class="header-action-btn" onclick="phoneGoHome()">✕</button></div></div>';
+  h += '<div class="ig-panels">';
+  h += '<div class="profile-panel active" id="piHome"></div>';
+  h += '<div class="profile-panel" id="piDm"></div>';
+  h += '<div class="profile-panel" id="piPost"></div>';
+  h += '<div class="profile-panel" id="piMe"></div>';
   h += '</div>';
-  screen.innerHTML += h;
+  h += '<div class="profile-nav" id="piNav">';
+  h += navItem('home', '首页', homeSvg) + navItem('dm', '私信', dmSvg) + navItem('post', '发布', postSvg) + navItem('me', '我的', meSvg);
+  h += '</div>';
+  h += '</div>';
+  screen.innerHTML = h;
+  screen.querySelectorAll('#piNav .nav-item').forEach(function (it) {
+    it.onclick = function () { switchPhoneIgTab(char, it.getAttribute('data-tab')); };
+  });
+  switchPhoneIgTab(char, 'home');
+}
+
+function switchPhoneIgTab(char, tab) {
+  var ov = document.getElementById('phoneOverlay');
+  if (!ov) return;
+  var c = ov.querySelector('#phoneContent');
+  var cap = tab.charAt(0).toUpperCase() + tab.slice(1);
+  c.querySelectorAll('#piNav .nav-item').forEach(function (it) {
+    it.classList.toggle('active', it.getAttribute('data-tab') === tab);
+  });
+  c.querySelectorAll('.ig-panels .profile-panel').forEach(function (p) { p.classList.remove('active'); });
+  var panel = c.querySelector('#pi' + cap);
+  if (panel) panel.classList.add('active');
+  if (tab === 'home') renderPhoneIgHome(char, c.querySelector('#piHome'));
+  else if (tab === 'dm') renderPhoneIgDm(char, c.querySelector('#piDm'));
+  else if (tab === 'post') renderPhoneIgPosts(char, c.querySelector('#piPost'));
+  else if (tab === 'me') renderPhoneIgMe(char, c.querySelector('#piMe'));
+}
+
+function renderPhoneIgHome(char, panel) {
+  var items = [];
+  (char.igPosts || []).forEach(function (p) { items.push({ who: 'char', p: p }); });
+  (state.profilePosts || []).forEach(function (p) { items.push({ who: 'me', p: p }); });
+  items.sort(function (a, b) { return (b.p.time || 0) - (a.p.time || 0); });
+  if (!items.length) { panel.innerHTML = '<div class="profile-panel-content"><div class="phone-empty">（还没有动态）</div></div>'; return; }
+  var h = '<div class="profile-panel-content">';
+  items.forEach(function (it) {
+    var p = it.p;
+    var isChar = it.who === 'char';
+    var av = isChar ? phoneIgAvatarHtml(char.avatar) : phoneIgMyAvatarHtml();
+    var name = isChar ? (char.name || 'TA') : phoneMyName();
+    var content = p.image
+      ? '<img src="' + p.image + '" style="width:100%;border-radius:8px;display:block">'
+      : '<div style="font-size:60px;text-align:center;padding:18px 0">' + escapeHTML(p.emoji || '📝') + '</div>';
+    var time = (typeof formatPostTime === 'function') ? formatPostTime(p.time) : '';
+    h += '<div class="phone-moment"><div class="phone-moment-ava">' + av + '</div>' +
+      '<div class="phone-moment-body"><div class="phone-moment-name">' + escapeHTML(name) + '</div>' +
+      content + '<div class="phone-moment-text">' + escapeHTML(p.caption || '') + '</div>' +
+      '<div class="phone-moment-time">' + escapeHTML(time) + '</div>' +
+      '<div class="phone-moment-actions"><span class="phone-moment-like">♥ ' + (p.likes || 0) + '</span></div></div></div>';
+  });
+  h += '</div>';
+  panel.innerHTML = h;
+}
+
+function renderPhoneIgDm(char, panel) {
+  var msgs = (char.chat || []).filter(function (m) { return m && (m.content || m.text); });
+  if (!msgs.length) { panel.innerHTML = '<div class="profile-panel-content"><div class="phone-empty">（你们还没聊过天）</div></div>'; return; }
+  var h = '<div style="flex:1;min-height:0;display:flex;flex-direction:column">';
+  h += '<div style="flex:0 0 auto;padding:10px;background:#fff;border-bottom:1px solid #efefef;text-align:center;font-weight:600;color:#262626">' + escapeHTML(phoneMyName()) + '</div>';
+  h += '<div style="flex:1;overflow-y:auto;padding:10px" id="piDmScroll">' + phoneChatHtml(msgs, function (m) { return m.role === 'assistant' ? 'right' : 'left'; }, {
+    leftAvatar: phoneMyAvatarObj(),
+    rightAvatar: char.avatar ? { src: char.avatar } : { emoji: '😊' }
+  }) + '</div></div>';
+  panel.innerHTML = h;
+  var sc = panel.querySelector('#piDmScroll');
+  if (sc) phoneScrollToBottom(sc);
+}
+
+function renderPhoneIgPosts(char, panel) {
+  var posts = (char.igPosts || []);
+  if (!posts.length) { panel.innerHTML = '<div class="profile-panel-content"><div class="phone-empty">（还没有发布过内容）</div></div>'; return; }
+  var h = '<div class="profile-panel-content"><div class="phone-album-grid">';
+  posts.forEach(function (p) {
+    var inner = p.image ? '<img src="' + p.image + '" style="width:100%;height:100%;object-fit:cover">' : (p.emoji || '🖼️');
+    h += '<div class="phone-album-cell">' + inner + (p.caption ? '<div class="phone-album-cap">' + escapeHTML(p.caption) + '</div>' : '') + '</div>';
+  });
+  h += '</div></div>';
+  panel.innerHTML = h;
+}
+
+function renderPhoneIgMe(char, panel) {
+  var av = phoneIgAvatarHtml(char.avatar);
+  var name = char.name || 'TA';
+  var username = char.username || ('@' + (char.name || 'ta'));
+  var bio = char.bio || (char.persona ? char.persona.slice(0, 80) : '这个人很神秘，什么都没留下…');
+  var posts = (char.igPosts || []);
+  var h = '<div class="profile-panel-content">';
+  h += '<div style="display:flex;gap:16px;align-items:center;padding:18px 16px;background:#fff">';
+  h += '<div style="width:64px;height:64px;border-radius:50%;overflow:hidden;background:#f0f0f0;display:flex;align-items:center;justify-content:center;font-size:34px;flex:0 0 auto">' + av + '</div>';
+  h += '<div style="flex:1;min-width:0"><div style="font-size:18px;font-weight:600;color:#262626">' + escapeHTML(name) + '</div>';
+  h += '<div style="font-size:12px;color:#8e8e8e;margin-top:2px">' + escapeHTML(username) + '</div>';
+  h += '<div style="font-size:13px;color:#262626;margin-top:6px;line-height:1.5">' + escapeHTML(bio) + '</div></div></div>';
+  h += '<div style="display:flex;background:#fff;border-top:1px solid #f0f0f0;border-bottom:1px solid #f0f0f0;margin-bottom:8px">';
+  h += '<div style="flex:1;text-align:center;padding:10px 0"><div style="font-weight:600;color:#262626">' + posts.length + '</div><div style="font-size:11px;color:#8e8e8e">发布</div></div>';
+  h += '<div style="flex:1;text-align:center;padding:10px 0"><div style="font-weight:600;color:#262626">' + (char.followers || 0) + '</div><div style="font-size:11px;color:#8e8e8e">粉丝</div></div>';
+  h += '<div style="flex:1;text-align:center;padding:10px 0"><div style="font-weight:600;color:#262626">' + (char.following || 0) + '</div><div style="font-size:11px;color:#8e8e8e">关注</div></div></div>';
+  if (posts.length) {
+    h += '<div class="phone-album-grid">';
+    posts.forEach(function (p) {
+      var inner = p.image ? '<img src="' + p.image + '" style="width:100%;height:100%;object-fit:cover">' : (p.emoji || '🖼️');
+      h += '<div class="phone-album-cell">' + inner + '</div>';
+    });
+    h += '</div>';
+  }
+  h += '</div>';
+  panel.innerHTML = h;
 }
 
 function phoneOpenIgYou() {

@@ -4102,7 +4102,7 @@ button { border: 0; cursor: pointer; }
 .feed-cmt-count { font-size: 11px; color: #8e8e8e; }
 .feed-post-likes { cursor: pointer; }
 
-.ig-comment-overlay { position: fixed; left: 0; right: 0; top: 0; bottom: 0; z-index: 600; display: flex; align-items: flex-end; justify-content: center; }
+.ig-comment-overlay { position: fixed; left: 0; right: 0; top: 0; bottom: 0; z-index: 1200; display: flex; align-items: flex-end; justify-content: center; }
 .ig-comment-mask { position: absolute; inset: 0; background: rgba(0,0,0,.45); }
 .ig-comment-sheet { position: relative; width: 100%; max-width: 480px; background: #fff; border-radius: 16px 16px 0 0; max-height: 72%; display: flex; flex-direction: column; animation: igSheetUp .22s ease; }
 @keyframes igSheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }

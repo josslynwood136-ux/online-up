@@ -24,7 +24,7 @@ function init() {
     var weekLater = new Date(today);
     weekLater.setDate(weekLater.getDate() + 7);
     var fmt = function(d) { return d.getFullYear() + '/' + (d.getMonth()+1) + '/' + d.getDate(); };
-    state.checkins.push({ id: 'ck-water', name: '喝水打卡', start: fmt(today), end: fmt(weekLater), totalDays: 7, doneDays: 0, status: 'doing' });
+    state.checkins.push({ id: 'ck-water', name: '喝水打卡', start: fmt(today), end: fmt(weekLater), totalDays: 7, doneDays: 0, doneDates: [], charId: '', status: 'doing' });
     saveState();
   }
   var _prof = activeProfile();

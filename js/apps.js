@@ -162,6 +162,18 @@ function renderApiSettings() {
   h += '<button class="primary-btn" onclick="saveApiConfig()" style="justify-content:center">保存配置</button></div>';
   h += '<div id="apiTestResult" style="font-size:12px;min-height:16px;color:#b8a99a"></div></div>';
 
+  // 副 API（记忆总结 / 空间回复）
+  h += '<div style="background:#fff;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px">';
+  h += '<div style="font-size:13px;font-weight:600;color:#4a3f35;padding-bottom:2px;border-bottom:1px solid #f0ede8">副 API（记忆总结 / 空间动态·评论）</div>';
+  h += '<div style="font-size:11px;color:#b8a99a;line-height:1.5">用差一点的模型做「总结记忆库」和「空间动态/评论」这类轻活，把好一点的主 API 留给正式聊天。选「与主 API 相同」则不单独分流。</div>';
+  h += '<div><div style="font-size:11px;color:#b8a99a;margin-bottom:4px">副 API 配置</div><select class="field" id="secondaryApiSelect" onchange="setSecondaryApi(this.value)">';
+  var _secId = state.secondaryApiProfile || '';
+  h += '<option value=""' + (_secId === '' ? ' selected' : '') + '>与主 API 相同（不分）</option>';
+  profiles.forEach(function(p) {
+    h += '<option value="' + escapeHTML(p.id) + '"' + (p.id === _secId ? ' selected' : '') + '>' + escapeHTML(p.name) + '</option>';
+  });
+  h += '</select></div></div>';
+
   // 转发代理（GitHub Pages 等纯静态托管时用于规避跨域）
   h += '<div style="background:#fff;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px">';
   h += '<div style="font-size:13px;font-weight:600;color:#4a3f35;padding-bottom:2px;border-bottom:1px solid #f0ede8">转发代理（跨域）</div>';
@@ -213,6 +225,11 @@ function renderApiSettings() {
   initApiSettings();
   if (typeof refreshPushUI === 'function') refreshPushUI();
   if (typeof syncTtsOptions === 'function') syncTtsOptions();
+}
+
+function setSecondaryApi(v) {
+  state.secondaryApiProfile = v || '';
+  saveState();
 }
 
 // 只显示当前默认平台那家的密钥/地址，切换平台即切换显示（三家密钥分别保存在 state.settings.ttsKeys）
@@ -886,6 +903,84 @@ function saveMyProfile() {
 let checkinTab = 'doing';
 let checkinForm = null;
 
+function todayStr() {
+  var d = new Date();
+  return d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
+}
+function isCheckinDueToday(ck) {
+  if (!ck || ck.status === 'done') return false;
+  return (ck.doneDates || []).indexOf(todayStr()) < 0;
+}
+function checkinCharName(charId) {
+  var r = (state.roles || []).find(function (x) { return x.id === charId; });
+  return r ? r.name : 'TA';
+}
+function checkinCharAvatar(charId) {
+  var r = (state.roles || []).find(function (x) { return x.id === charId; });
+  if (!r) return '';
+  var a = r.avatar || '';
+  if (a && (a.indexOf('http') === 0 || a.indexOf('data:') === 0)) return '<img src="' + escapeHTML(a) + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
+  return escapeHTML(a || '👤');
+}
+function checkinCharOptions(selectedId) {
+  var roles = state.roles || [];
+  var h = '<select class="field" id="ck-char"><option value="">（不关联角色）</option>';
+  roles.forEach(function (r) {
+    h += '<option value="' + escapeHTML(r.id) + '"' + (r.id === selectedId ? ' selected' : '') + '>' + escapeHTML(r.name) + '</option>';
+  });
+  return h + '</select>';
+}
+
+function fallbackCheckinNag(char, ck) {
+  var rel = char.relation || '';
+  var pool;
+  if (rel.indexOf('恋') >= 0) pool = ['今天还没打卡「' + ck.name + '」哦，快去，不然我要生气了😤', '乖，先把「' + ck.name + '」打了，不打我要罚你💕', '「' + ck.name + '」今天还没打卡呢，我可都记着呢~'];
+  else if (rel.indexOf('友') >= 0 || rel.indexOf('朋') >= 0) pool = ['喂，「' + ck.name + '」今天还没打卡，赶紧的！', '你今天「' + ck.name + '」打了吗？别偷懒啊😏', '记得去打「' + ck.name + '」哦，加油'];
+  else pool = ['记得今天打卡「' + ck.name + '」呀~', '「' + ck.name + '」还没打卡，抽空弄一下哦'];
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+async function genCheckinNag(char, ck) {
+  var cfg = resolveApiConfig(true);
+  if (!cfg || !cfg.key || !cfg.url || !cfg.model) return null;
+  var persona = [char.name, char.relation, char.personality, char.style].filter(Boolean).join('；');
+  var prompt = '你是角色【' + (char.name || 'TA') + '】。人设：' + persona +
+    '\n用户正在坚持一个叫「' + ck.name + '」的打卡习惯（周期 ' + (ck.start || '') + ' 到 ' + (ck.end || '') + '，共 ' + (ck.totalDays || 0) + ' 天，已坚持 ' + ((ck.doneDates || []).length || ck.doneDays || 0) + ' 天）。' +
+    '\n现在用户今天还没打卡「' + ck.name + '」。请用你的口吻发一句话，温柔/撒娇/傲娇地催 TA 去打卡，带一点关心，顺带提一下这个习惯的名字。只输出一句话，可带一个 emoji，不要解释、不要引号。';
+  try {
+    var res = await aiRequest(joinUrl(cfg.url, 'chat/completions'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + cfg.key },
+      body: JSON.stringify({ model: cfg.model, messages: [{ role: 'user', content: prompt }], max_tokens: 60, temperature: 0.9 })
+    });
+    if (!res.ok) return null;
+    var data = await res.json().catch(function () { return {}; });
+    var t = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '').trim();
+    t = t.replace(/^["'「『]+|["'」』]+$/g, '').trim();
+    return t || null;
+  } catch (e) { return null; }
+}
+
+async function nudgeCheckin(charId, force) {
+  var char = (typeof getCharacter === 'function') ? getCharacter(charId) : null;
+  if (!char) return;
+  var cks = (state.checkins || []).filter(function (c) { return c.charId === charId; });
+  if (!cks.length) { if (force) alert('这个角色没有在监督你的打卡哦'); return; }
+  var dueFresh = cks.filter(function (c) { return isCheckinDueToday(c) && c.lastNagDate !== todayStr(); });
+  var dueAny = cks.filter(isCheckinDueToday);
+  var ck = force ? (dueAny[0] || cks[0]) : dueFresh[0];
+  if (!ck) return;
+  var txt = await genCheckinNag(char, ck);
+  if (!txt) txt = fallbackCheckinNag(char, ck);
+  if (!char.chat) char.chat = [];
+  char.chat.push({ role: 'assistant', content: txt, time: new Date().toLocaleString(), ts: Date.now() });
+  char.unread = (char.unread || 0) + 1;
+  char.read = true;
+  ck.lastNagDate = todayStr();
+  saveState();
+  if (state.activeRoleId === char.id) { if (typeof renderChat === 'function') renderChat(); }
+  else if (typeof showMsgNote === 'function') showMsgNote(char.id, char.name, char.avatar, txt);
+}
 function renderCheckins() {
   const totalDone = state.checkins.reduce((s, x) => s + (x.doneDays || 0), 0);
   const filtered = state.checkins.filter(x => (checkinTab === 'doing' && x.status !== 'done') || (checkinTab === 'done' && x.status === 'done') || (checkinTab === 'undone' && x.status === 'undone'));
@@ -896,6 +991,8 @@ function renderCheckins() {
       return `<div class="card">
         <div class="label">项目名称</div>
         <input class="field" id="ck-name" value="${escapeHTML(x.name)}">
+        <div class="label" style="margin-top:8px">监督角色（TA 会催你打卡）</div>
+        ${checkinCharOptions(x.charId)}
         <div class="grid2">
           <div><div class="label">开始</div><input class="field" id="ck-start" oninput="syncDaysToEnd()" value="${escapeHTML(x.start)}"></div>
           <div><div class="label">结束</div><input class="field" id="ck-end" oninput="syncEndToDays()" value="${escapeHTML(x.end)}"></div>
@@ -913,6 +1010,7 @@ function renderCheckins() {
         <b style="font-size:16px">${escapeHTML(x.name)}</b>
         <span class="tag">${x.status === 'done' ? '已完成' : (x.status === 'undone' ? '未完成' : '进行中')}</span>
       </div>
+      ${x.charId ? `<div class="subtle" style="margin:6px 0;display:flex;align-items:center;gap:6px"><span style="width:18px;height:18px;border-radius:50%;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;font-size:11px;background:#eee">${checkinCharAvatar(x.charId)}</span>由 ${escapeHTML(checkinCharName(x.charId))} 监督</div>` : ''}
       <div class="subtle" style="margin:6px 0">${escapeHTML(x.start)} - ${escapeHTML(x.end)}　共 ${x.totalDays} 天</div>
       <div style="position:relative;height:24px;background:#e8e3db;border-radius:12px;margin:10px 0 2px;box-shadow:inset 0 1px 3px rgba(0,0,0,.06)">
         <div style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;padding:0 20px;pointer-events:none">
@@ -938,6 +1036,7 @@ function renderCheckins() {
         <span>完成率 ${rate}%</span>
       </div>
       ${x.status !== 'done' ? `<button class="primary-btn" style="width:100%;margin-top:10px" onclick="doCheckin('${x.id}')">立即打卡</button>` : `<div class="subtle" style="text-align:center;margin-top:10px">🎉 已达成</div>`}
+      ${x.charId && x.status !== 'done' ? `<button class="ghost-btn" style="width:100%;margin-top:8px" onclick="openChat('${x.charId}');nudgeCheckin('${x.charId}', true)">💬 让 ${escapeHTML(checkinCharName(x.charId))} 催我</button>` : ''}
       <div style="display:flex;gap:10px;margin-top:8px">
         <button class="ghost-btn" style="flex:1" onclick="checkinForm={mode:'edit',id:'${x.id}'};renderCheckins()">编辑</button>
         <button class="danger-btn" style="flex:1" onclick="deleteCheckin('${x.id}')">删除</button>
@@ -950,6 +1049,8 @@ function renderCheckins() {
     formHtml = `<div class="card">
       <div class="label">项目名称</div>
       <input class="field" id="ck-name" placeholder="如 考研学习">
+      <div class="label" style="margin-top:8px">监督角色（TA 会催你打卡）</div>
+      ${checkinCharOptions('')}
       <div class="grid2">
         <div><div class="label">开始</div><input class="field" id="ck-start" oninput="syncDaysToEnd()" value="2026/1/1"></div>
         <div><div class="label">结束</div><input class="field" id="ck-end" oninput="syncEndToDays()" value="2026/6/1"></div>
@@ -982,7 +1083,12 @@ function renderCheckins() {
 function doCheckin(id) {
   const x = state.checkins.find(c => c.id === id);
   if (!x || x.status === 'done') return;
-  x.doneDays = (x.doneDays || 0) + 1;
+  if (!x.doneDates) x.doneDates = [];
+  const t = todayStr();
+  if (x.doneDates.indexOf(t) < 0) {
+    x.doneDates.push(t);
+    x.doneDays = (x.doneDates || []).length;
+  }
   if (x.doneDays >= x.totalDays) {
     x.status = 'done';
     saveState();
@@ -1049,8 +1155,9 @@ function submitNewCheckin() {
   const start = document.getElementById('ck-start').value.trim();
   const end = document.getElementById('ck-end').value.trim();
   const total = parseInt(document.getElementById('ck-total').value, 10) || 1;
+  const charId = document.getElementById('ck-char') ? document.getElementById('ck-char').value : '';
   if (!name) { alert('请填写名称'); return; }
-  state.checkins.push({ id: 'ck-' + Date.now(), name, start, end, totalDays: total, doneDays: 0, status: 'doing' });
+  state.checkins.push({ id: 'ck-' + Date.now(), name, start, end, totalDays: total, doneDays: 0, doneDates: [], charId: charId, status: 'doing' });
   checkinForm = null;
   saveState();
   renderCheckins();
@@ -1062,8 +1169,9 @@ function submitEditCheckin(id) {
   const start = document.getElementById('ck-start').value.trim();
   const end = document.getElementById('ck-end').value.trim();
   const total = parseInt(document.getElementById('ck-total').value, 10) || 1;
+  const charId = document.getElementById('ck-char') ? document.getElementById('ck-char').value : '';
   if (!name) { alert('请填写名称'); return; }
-  x.name = name; x.start = start; x.end = end; x.totalDays = total;
+  x.name = name; x.start = start; x.end = end; x.totalDays = total; x.charId = charId;
   if (x.doneDays >= total) x.status = 'done'; else if (x.status === 'done') x.status = 'doing';
   checkinForm = null;
   saveState();

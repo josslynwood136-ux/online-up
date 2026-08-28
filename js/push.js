@@ -166,7 +166,7 @@ async function initPush() {
       if (e.data && e.data.type === 'push-click') {
         try {
           if (e.data.charId && typeof getCharacter === 'function' && getCharacter(e.data.charId)) {
-            openChat(e.data.charId);
+            openChat(e.data.charId, 'comic');
           } else if (typeof openApp === 'function') {
             openApp('消息');
           }
