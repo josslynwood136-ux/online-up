@@ -1475,7 +1475,7 @@ function drainPendingToChat(pending) {
 window.drainPendingToChat = drainPendingToChat;
 
 // 把回复生成交给自己的服务器（sever/server.js 的 /push/reply），使其在后台/冻结时也能完成：
-// 服务端只中转 AI 请求（key 不留存，与 /relay 同级别），notify 时再发系统推送 + 写待收队列。
+// 服务端只中转 AI 请求（key 不留存，与 /relay 同级别），生成的消息写入待收队列，由前端后台轮询弹通知。
 function getDeviceId() {
   try {
     var d = localStorage.getItem('deviceId');

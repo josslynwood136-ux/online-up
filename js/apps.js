@@ -185,14 +185,14 @@ function renderApiSettings() {
 
   h += sbCloudBlock();
 
-  // 推送通知（设备级：后台/关闭页面也能收到角色消息）
+  // 后台消息通知（页面级 Notification，不依赖 Web Push / FCM）
   h += '<div style="background:#fff;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px">';
-  h += '<div style="font-size:13px;font-weight:600;color:#4a3f35;padding-bottom:2px;border-bottom:1px solid #f0ede8">推送通知</div>';
+  h += '<div style="font-size:13px;font-weight:600;color:#4a3f35;padding-bottom:2px;border-bottom:1px solid #f0ede8">后台消息通知</div>';
   h += '<div style="display:flex;align-items:center;gap:10px">';
-  h += '<div style="flex:1;min-width:0"><div style="font-size:12px;color:#4a3f35">后台消息推送</div><div class="push-hint" style="font-size:11px;color:#b8a99a;margin-top:2px;line-height:1.4">开启后，即使网页在后台或关闭，也能收到角色消息通知</div></div>';
+  h += '<div style="flex:1;min-width:0"><div style="font-size:12px;color:#4a3f35">后台消息通知</div><div class="push-hint" style="font-size:11px;color:#b8a99a;margin-top:2px;line-height:1.4">开启后，网页在后台时也能收到角色消息通知</div></div>';
   h += '<div class="switch push-switch"></div></div>';
-  h += '<button class="ghost-btn push-test-btn" onclick="testPush()" style="justify-content:center;display:none">发送测试推送</button>';
-  h += '<div style="font-size:11px;color:#c0b0a0;line-height:1.5">提示：iOS 需把本页「添加到主屏幕」安装成 App（系统 16.4+）才能后台收推送；安卓 Chrome 直接支持。</div>';
+  h += '<button class="ghost-btn push-test-btn" onclick="testPush()" style="justify-content:center;display:none">发送测试通知</button>';
+  h += '<div style="font-size:11px;color:#c0b0a0;line-height:1.5">提示：需保持本页打开（放后台即可），关闭 App 后不会收到；安卓 / iOS 浏览器均支持系统通知。</div>';
   h += '</div>';
 
   // 角色语音（全局：开关 + 默认平台 + 三平台独立密钥）

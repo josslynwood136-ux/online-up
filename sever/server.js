@@ -6,7 +6,6 @@ const http = require('http')
 const https = require('https')
 const path = require('path')
 const fs = require('fs')
-const webpush = require('web-push')
 
 const PORT = Number(process.env.PORT || 3000)
 
@@ -49,47 +48,10 @@ app.use('/qq', require('./qq'))
 app.all('/relay-probe', function (req, res) { res.status(204).end() })
 
 // ============================================================
-// Web Push（网页后台 / 关闭时也能把消息推到手机）
+// 后台消息（网页开着 / 放后台时，定时生成角色消息，前端轮询后弹出通知）
+// 不依赖 Web Push / FCM，国内安卓也能用；代价是 App 必须保持打开（后台）
 // ============================================================
-// VAPID 密钥：优先用环境变量，否则用项目里的 vapid-keys.json（已生成）
-const VAPID_KEYS = (function () {
-  const pub = process.env.VAPID_PUBLIC_KEY
-  const pri = process.env.VAPID_PRIVATE_KEY
-  if (pub && pri) return { publicKey: pub, privateKey: pri }
-  try {
-    return JSON.parse(fs.readFileSync(path.join(__dirname, 'vapid-keys.json'), 'utf8'))
-  } catch (e) {
-    console.error('未找到 VAPID 密钥：请设置 VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY 或生成 vapid-keys.json')
-    return null
-  }
-})()
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:push@mele.me'
-if (VAPID_KEYS) {
-  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_KEYS.publicKey, VAPID_KEYS.privateKey)
-}
-
-// 订阅存储（文件持久化，重启不丢）
-const SUB_FILE = path.join(__dirname, 'push-subscriptions.json')
-let pushSubs = []
-try { pushSubs = JSON.parse(fs.readFileSync(SUB_FILE, 'utf8')) } catch (e) { pushSubs = [] }
-function saveSubs() {
-  try { fs.writeFileSync(SUB_FILE, JSON.stringify(pushSubs)) } catch (e) {}
-}
-function upsertSub(sub) {
-  if (!sub || !sub.endpoint) return
-  const i = pushSubs.findIndex(function (s) { return s.endpoint === sub.endpoint })
-  if (i >= 0) pushSubs[i] = sub; else pushSubs.push(sub)
-  saveSubs()
-}
-function removeSub(sub) {
-  if (!sub || !sub.endpoint) return
-  pushSubs = pushSubs.filter(function (s) { return s.endpoint !== sub.endpoint })
-  saveSubs()
-  // 订阅删除时一并清掉它的配置/待收
-  if (pushConfigs[sub.endpoint]) { delete pushConfigs[sub.endpoint]; saveConfigs() }
-}
-
-// ===== 主动推送配置（含 AI 凭证 + 角色人设 + 发送计划，存服务器用于后台生成）=====
+// ===== 主动消息配置（含 AI 凭证 + 角色人设 + 发送计划，存服务器用于后台生成）=====
 // ⚠️ 注意：这里会以明文保存用户的 AI key，仅适用于你自己部署、信任该服务器的场景。
 const PUSH_CFG_FILE = path.join(__dirname, 'push-config.json')
 let pushConfigs = {}
@@ -168,12 +130,12 @@ function _ckActive(ck, today) {
   if (e && !isNaN(e.getTime()) && t > e) return false
   return true
 }
-// 定时器：每分钟扫一遍，给"到点"的订阅生成并推送主动消息 / 打卡提醒
+// 定时器：每分钟扫一遍，给"到点"的设备生成主动消息 / 打卡提醒，写入待收队列
 async function scheduleTick() {
   var now = Date.now()
   for (var ep in pushConfigs) {
     var cfg = pushConfigs[ep]
-    if (!cfg || !cfg.subscription) continue
+    if (!cfg || !cfg.deviceId) continue
     if (inQuiet(now, cfg.plan.quiet)) continue
     var chars = cfg.chars || []
     if (!chars.length) continue
@@ -190,26 +152,14 @@ async function scheduleTick() {
     if (!best) continue
     var text = await genCharacterMessage(best, cfg.creds)
     if (!text) continue
-    var payload = {
-      title: best.name || '美乐地',
-      body: text.slice(0, 200),
-      url: '/',
-      tag: 'proactive-' + (best.id || 'all'),
-      avatar: best.avatar || '',
-      charId: best.id || ''
-    }
-    try { await webpush.sendNotification(cfg.subscription, JSON.stringify(payload)) } catch (err) {
-      if (err && (err.statusCode === 404 || err.statusCode === 410)) { delete pushConfigs[ep]; saveConfigs() }
-      continue
-    }
-    // 写入待收队列，app 打开时倒进聊天
+    // 写入设备待收队列，前端轮询按 deviceId 拉取并弹通知
     cfg.lastSent = cfg.lastSent || {}
     cfg.lastSent[best.id] = now
-    cfg.pending = cfg.pending || []
-    cfg.pending.push({ charId: best.id || '', text: text, ts: now })
-    if (cfg.pending.length > 50) cfg.pending = cfg.pending.slice(-50)
+    devicePending[cfg.deviceId] = devicePending[cfg.deviceId] || []
+    devicePending[cfg.deviceId].push({ charId: best.id || '', charName: best.name || '美乐地', text: text, ts: now })
+    if (devicePending[cfg.deviceId].length > 50) devicePending[cfg.deviceId] = devicePending[cfg.deviceId].slice(-50)
     saveConfigs()
-    // ---- 打卡提醒（不需要 AI，模板文案，关 App 也能弹）----
+    // ---- 打卡提醒（不需要 AI，模板文案）----
     var cks = cfg.checkins || []
     if (cks.length) {
       var clk = cfg.tz ? _userClock(cfg.tz) : null
@@ -227,20 +177,9 @@ async function scheduleTick() {
         if (diff < 0 || diff > 15) continue
         if (cfg.checkinReminded[ck.id] === tKey) continue
         cfg.checkinReminded[ck.id] = tKey
-        var cpayload = {
-          title: '⏰ 打卡提醒',
-          body: '「' + (ck.name || '打卡') + '」该打卡啦，今天还没打哦',
-          url: '/',
-          tag: 'checkin-' + ck.id,
-          openApp: '打卡',
-          charId: ''
-        }
-        try {
-          await webpush.sendNotification(cfg.subscription, JSON.stringify(cpayload))
-          saveConfigs()
-        } catch (err) {
-          if (err && (err.statusCode === 404 || err.statusCode === 410)) { delete pushConfigs[ep]; saveConfigs() }
-        }
+        devicePending[cfg.deviceId] = devicePending[cfg.deviceId] || []
+        devicePending[cfg.deviceId].push({ charId: '', charName: '⏰ 打卡提醒', text: '「' + (ck.name || '打卡') + '」该打卡啦，今天还没打哦', ts: now })
+        if (devicePending[cfg.deviceId].length > 50) devicePending[cfg.deviceId] = devicePending[cfg.deviceId].slice(-50)
       }
     }
   }
@@ -248,60 +187,20 @@ async function scheduleTick() {
 setInterval(scheduleTick, 60000)
 
 app.use('/push', express.json({ limit: '2mb' }))
-// 前端拿公钥用于订阅
-app.get('/push/vapid-public-key', function (req, res) {
-  if (!VAPID_KEYS) return res.status(500).json({ error: 'VAPID 未配置' })
-  res.json({ publicKey: VAPID_KEYS.publicKey })
-})
-// 保存订阅
-app.post('/push/subscribe', function (req, res) {
-  const sub = req.body && req.body.subscription
-  if (!sub || !sub.endpoint) return res.status(400).json({ error: '缺少 subscription' })
-  upsertSub(sub)
-  res.json({ ok: true, count: pushSubs.length })
-})
-// 取消订阅
-app.post('/push/unsubscribe', function (req, res) {
-  const sub = req.body && req.body.subscription
-  if (sub && sub.endpoint) removeSub(sub)
-  res.json({ ok: true, count: pushSubs.length })
-})
-// 发送推送（characterId 可选，用于对某角色的单设备定向；这里简单推送给全部订阅）
-app.post('/push/send', function (req, res) {
-  const payload = {
-    title: (req.body && req.body.title) || '美乐地',
-    body: (req.body && req.body.body) || '你有一条新消息',
-    url: (req.body && req.body.url) || '/',
-    tag: (req.body && req.body.tag) || 'msg',
-    avatar: (req.body && req.body.avatar) || '',
-    charId: (req.body && req.body.charId) || ''
-  }
-  if (!pushSubs.length) return res.json({ ok: true, sent: 0, skipped: true })
-  const data = JSON.stringify(payload)
-  let sent = 0, failed = 0
-  const tasks = pushSubs.map(function (sub) {
-    return webpush.sendNotification(sub, data).then(function () { sent++ }).catch(function (err) {
-      failed++
-      if (err.statusCode === 404 || err.statusCode === 410) removeSub(sub) // 订阅失效，清理
-    })
-  })
-  Promise.all(tasks).then(function () {
-    res.json({ ok: true, sent: sent, failed: failed, total: pushSubs.length })
-  }).catch(function () { res.json({ ok: true, sent: sent, failed: failed }) })
-})
-// 上报/更新主动推送配置（凭证 + 角色人设 + 计划）
+// 上报/更新主动消息配置（凭证 + 角色人设 + 计划）
+// 仅用 deviceId 作键：不依赖 Web Push 订阅，国内安卓也能后台接收
 app.post('/push/config', function (req, res) {
-  const sub = req.body && req.body.subscription
-  if (!sub || !sub.endpoint) return res.status(400).json({ error: '缺少 subscription' })
+  const deviceId = req.body && req.body.deviceId
+  if (!deviceId) return res.status(400).json({ error: '缺少 deviceId' })
   const creds = req.body.creds || null
   const chars = Array.isArray(req.body.chars) ? req.body.chars : []
   const checkins = Array.isArray(req.body.checkins) ? req.body.checkins : []
   const tz = req.body.tz || ''
   const plan = req.body.plan || { enabled: false }
-  const ep = sub.endpoint
+  const ep = 'device:' + deviceId
   const old = pushConfigs[ep] || {}
   pushConfigs[ep] = {
-    subscription: sub,
+    deviceId: deviceId,
     creds: creds,
     chars: chars,
     plan: plan,
@@ -314,24 +213,20 @@ app.post('/push/config', function (req, res) {
   saveConfigs()
   res.json({ ok: true })
 })
-// 拉取待收消息（app 打开时调用，把后台生成的消息补进聊天）
+// 拉取待收消息（app 打开/后台轮询时调用，把后台生成的消息补进聊天）
 app.get('/push/pending', function (req, res) {
-  const ep = req.query && req.query.endpoint
   const did = req.query && req.query.deviceId
-  if (ep && pushConfigs[ep] && pushConfigs[ep].pending) return res.json({ pending: pushConfigs[ep].pending })
   if (did && devicePending[did]) return res.json({ pending: devicePending[did] })
   res.json({ pending: [] })
 })
 // 清空待收队列（拉取并写入聊天后调用）
 app.post('/push/drain', function (req, res) {
-  const ep = req.body && req.body.endpoint
   const did = req.body && req.body.deviceId
-  if (ep && pushConfigs[ep]) { pushConfigs[ep].pending = []; saveConfigs() }
   if (did && devicePending[did]) { devicePending[did] = [] }
   res.json({ ok: true })
 })
-// 按需生成回复：网页把已拼好的模型请求发来，服务端代为调用 AI（与 /relay 同样只中转、key 不留存），
-// 若 notify 且已订阅，则同时发系统推送 + 写入待收队列，从而切后台/关页面也能收到并落盘
+// 按需生成回复：网页把已拼好的模型请求发来，服务端代为调用 AI（与 /relay 同样只中转、key 不留存）。
+// 生成的消息写入 devicePending，前端在后台开着时轮询拉取并弹系统通知。
 app.post('/push/reply', async function (req, res) {
   const b = req.body || {}
   const target = b.target
@@ -353,29 +248,13 @@ app.post('/push/reply', async function (req, res) {
     text = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content || '').trim()
   } catch (e) { return res.status(502).json({ error: 'AI 请求失败：' + (e && e.message || e) }) }
   if (!text) return res.status(502).json({ error: 'AI 返回为空' })
-  const endpoint = b.endpoint
-  const notify = b.notify
   const deviceId = b.deviceId
   const charId = b.charId || ''
   const charName = b.charName || '美乐地'
-  const charAvatar = b.charAvatar || ''
-  // 已开启推送：发系统通知 + 写入该订阅的待收队列
-  if (notify && endpoint) {
-    const sub = pushSubs.find(function (s) { return s.endpoint === endpoint })
-    if (sub && VAPID_KEYS) {
-      const payload = { title: charName, body: text.slice(0, 200), url: '/', tag: 'msg-' + (charId || 'all'), avatar: charAvatar, charId: charId }
-      try { await webpush.sendNotification(sub, JSON.stringify(payload)) } catch (err) { if (err && (err.statusCode === 404 || err.statusCode === 410)) removeSub(sub) }
-    }
-    const cfg = pushConfigs[endpoint] || (pushConfigs[endpoint] = { subscription: sub || null, creds: null, chars: [], plan: { enabled: false }, lastSent: {}, pending: [] })
-    cfg.pending = cfg.pending || []
-    cfg.pending.push({ charId: charId, text: text, ts: Date.now() })
-    if (cfg.pending.length > 50) cfg.pending = cfg.pending.slice(-50)
-    saveConfigs()
-  }
-  // 设备级待收：即使没开启/没配好推送，也能暂存，回来后倒进聊天（核心需求，不依赖 Web Push）
-  if (deviceId && !endpoint) {
+  // 设备级待收：写入 devicePending，前端轮询（后台开着时）拉取并弹通知
+  if (deviceId) {
     devicePending[deviceId] = devicePending[deviceId] || []
-    devicePending[deviceId].push({ charId: charId, text: text, ts: Date.now() })
+    devicePending[deviceId].push({ charId: charId, charName: charName, text: text, ts: Date.now() })
     if (devicePending[deviceId].length > 50) devicePending[deviceId] = devicePending[deviceId].slice(-50)
   }
   res.json({ ok: true, text: text })
