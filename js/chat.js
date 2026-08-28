@@ -3226,7 +3226,7 @@ function applyBubbleStyle() {
   var cw = $('chatWindow');
   if (!cw) return;
   var s = state.settings.bubbleStyle || 'default';
-  cw.classList.remove('bubble-style-default', 'bubble-style-cute', 'bubble-style-warm', 'bubble-style-dark', 'bubble-style-ig', 'bubble-style-glow', 'bubble-style-comic', 'bubble-style-imessage');
+  cw.classList.remove('bubble-style-comic', 'bubble-style-imessage');
   cw.classList.add('bubble-style-' + s);
   cw.classList.remove('comic-skin', 'imessage-skin');
   if (s === 'comic') cw.classList.add('comic-skin');
