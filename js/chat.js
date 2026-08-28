@@ -3811,3 +3811,298 @@ function setIdleParams(min, cooldown) {
   if (min && !isNaN(min) && min > 0) _idleMin = min;
   if (cooldown && !isNaN(cooldown) && cooldown > 0) _idleCooldown = cooldown;
 }
+
+/* ===================== 查角色的手机 ===================== */
+function phoneShellHtml(char) {
+  var now = new Date();
+  var hh = ('0' + now.getHours()).slice(-2);
+  var mm = ('0' + now.getMinutes()).slice(-2);
+  return '<div class="phone-frame" onclick="event.stopPropagation()">' +
+    '<div class="phone-screen" id="phoneScreen">' +
+      '<div class="phone-statusbar"><span class="phone-time">' + hh + ':' + mm + '</span><span class="phone-sig">📶&nbsp;&nbsp;🔋</span></div>' +
+      '<div class="phone-content" id="phoneContent"></div>' +
+    '</div>' +
+    '<div class="phone-homebar" onclick="phoneGoHome()"><div class="phone-homebar-line"></div></div>' +
+  '</div>';
+}
+
+function closeCharacterPhone() {
+  var ov = document.getElementById('phoneOverlay');
+  if (ov) ov.remove();
+}
+
+function phoneGoHome() {
+  var ov = document.getElementById('phoneOverlay');
+  if (!ov) return;
+  renderPhoneHome(activeCharacter(), ov);
+}
+
+async function openCharacterPhone() {
+  var char = activeCharacter();
+  if (!char) return;
+  var ov = document.createElement('div');
+  ov.className = 'phone-overlay';
+  ov.id = 'phoneOverlay';
+  ov.innerHTML = phoneShellHtml(char);
+  document.body.appendChild(ov);
+  requestAnimationFrame(function () { ov.classList.add('open'); });
+  ov.addEventListener('click', function (e) { if (e.target === ov) closeCharacterPhone(); });
+  renderPhoneHome(char, ov);
+  if (!char.phone) {
+    var screen = ov.querySelector('#phoneContent');
+    screen.innerHTML = '<div class="phone-loading">正在解锁 ' + escapeHTML(char.name || 'TA') + ' 的手机…<div class="phone-spinner"></div></div>';
+    var content = await genPhoneContent(char);
+    if (!document.getElementById('phoneOverlay')) return;
+    if (content && Array.isArray(content.notes)) {
+      char.phone = content;
+    } else {
+      char.phone = {
+        notes: ['（TA 的手机好像没电了，什么也没留下）'],
+        search: ['（搜索记录空空如也）'],
+        chats: []
+      };
+    }
+    if (typeof saveState === 'function') saveState();
+    renderPhoneHome(activeCharacter(), document.getElementById('phoneOverlay'));
+  }
+}
+
+async function genPhoneContent(char) {
+  var cfg = activeAIConfig();
+  if (!cfg || !cfg.url || !cfg.key || !cfg.model) return null;
+  var persona = [char.persona, char.personality, char.background, char.style].filter(Boolean).join('；');
+  var memSample = (char.memories || []).slice(0, 8).map(function (m) { return (m.text || m.content || ''); }).join(' / ');
+  var sys = '你是角色【' + (char.name || 'TA') + '】。人设与背景：' + persona +
+    '\n当前心情：' + (char.mood || '') + '\n记忆片段：' + memSample +
+    '\n\n请只输出一个 JSON 对象（不要 markdown、不要任何解释文字），结构如下：\n' +
+    '{"notes":["3-6 条私密备忘录，像 TA 随手记在手机里的，口语化、带情绪，可含对恋人的小心思或日常吐槽，每条不超过 40 字"],' +
+    '"search":["4-8 条搜索记录，像真实浏览器历史，透露 TA 近期在意/好奇的事，可甜可有点小心机"],' +
+    '"chats":[{"name":"一个朋友的名字（如 小鹿、阿橘）","messages":[{"role":"me"|"them","text":"消息内容"}]}]}\n' +
+    '其中 chats 为 1 段 TA 和朋友的私聊，6-10 条，me 是 TA 自己、them 是朋友，口语自然、有生活气息。';
+  var ctrl = new AbortController();
+  var tmr = setTimeout(function () { try { ctrl.abort(); } catch (e) {} }, 30000);
+  try {
+    var res = await aiRequest(joinUrl(cfg.url, 'chat/completions'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + cfg.key },
+      signal: ctrl.signal,
+      body: JSON.stringify({
+        model: cfg.model,
+        messages: [{ role: 'system', content: sys }, { role: 'user', content: '开始生成' }],
+        temperature: 0.85, max_tokens: 1400
+      })
+    });
+    if (!res.ok) return null;
+    var data = await res.json().catch(function () { return null; });
+    var out = (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '').trim();
+    out = out.replace(/^```[a-zA-Z]*\n?/, '').replace(/```$/, '').trim();
+    var parsed = JSON.parse(out);
+    if (!parsed || !Array.isArray(parsed.notes)) return null;
+    return parsed;
+  } catch (e) { return null; } finally { clearTimeout(tmr); }
+}
+
+function renderPhoneHome(char, ov) {
+  var screen = ov.querySelector('#phoneContent');
+  var pscreen = ov.querySelector('#phoneScreen');
+  if (pscreen) pscreen.classList.remove('app-open');
+  var now = new Date();
+  var hh = ('0' + now.getHours()).slice(-2);
+  var mm = ('0' + now.getMinutes()).slice(-2);
+  var days = ['日', '一', '二', '三', '四', '五', '六'];
+  var dateStr = (now.getMonth() + 1) + '月' + now.getDate() + '日 星期' + days[now.getDay()];
+  var apps = [
+    { id: 'wechat', icon: '💬', name: '微信', bg: 'linear-gradient(135deg,#3fd06a,#16b83f)' },
+    { id: 'msg', icon: '✉️', name: '信息', bg: 'linear-gradient(135deg,#5aa0ff,#2a6fe0)' },
+    { id: 'album', icon: '🖼️', name: '相册', bg: 'linear-gradient(135deg,#ff9a76,#ff5e62)' },
+    { id: 'moments', icon: '🌈', name: '朋友圈', bg: 'linear-gradient(135deg,#ffd24d,#ff9d2e)' },
+    { id: 'notes', icon: '📝', name: '备忘录', bg: 'linear-gradient(135deg,#ffe08a,#ffc24d)' },
+    { id: 'browser', icon: '🌐', name: '浏览器', bg: 'linear-gradient(135deg,#5ad1fa,#1f8bff)' }
+  ];
+  var h = '<div class="phone-home">';
+  h += '<div class="phone-home-widget"><div class="phone-home-time">' + hh + ':' + mm + '</div><div class="phone-home-date">' + dateStr + '</div></div>';
+  h += '<div class="phone-appgrid">';
+  apps.forEach(function (a) {
+    h += '<div class="phone-app" onclick="phoneOpenApp(\'' + a.id + '\')"><div class="phone-app-icon" style="background:' + a.bg + '">' + a.icon + '</div><div class="phone-app-name">' + a.name + '</div></div>';
+  });
+  h += '</div>';
+  h += '<div class="phone-hint">（偷偷看的，别让 TA 发现）</div>';
+  h += '</div>';
+  screen.innerHTML = h;
+}
+
+function phoneAppBar(title) {
+  var d = new Date();
+  var hh = ('0' + d.getHours()).slice(-2);
+  var mm = ('0' + d.getMinutes()).slice(-2);
+  return '<div class="phone-appbar"><button class="phone-back" onclick="phoneGoHome()">‹</button><span>' + escapeHTML(title) + '</span><span class="phone-appbar-time">' + hh + ':' + mm + '</span></div>';
+}
+
+function phoneOpenApp(app) {
+  var char = activeCharacter();
+  var ov = document.getElementById('phoneOverlay');
+  if (!char || !ov) return;
+  var screen = ov.querySelector('#phoneContent');
+  ov.querySelector('#phoneScreen').classList.add('app-open');
+  if (app === 'wechat') return renderPhoneWechat(char, screen);
+  if (app === 'msg') return renderPhoneMsg(char, screen);
+  if (app === 'album') return renderPhoneAlbum(char, screen);
+  if (app === 'moments') return renderPhoneMoments(char, screen);
+  if (app === 'notes') return renderPhoneNotes(char, screen);
+  if (app === 'browser') return renderPhoneBrowser(char, screen);
+}
+
+function phoneChatHtml(messages, sideMap, opts) {
+  opts = opts || {};
+  var h = '<div class="phone-chat">';
+  (messages || []).forEach(function (m) {
+    var text = (m.content != null ? m.content : (m.text != null ? m.text : ''));
+    if (!text) return;
+    var side = sideMap(m) === 'right' ? 'right' : 'left';
+    var av = side === 'right' ? opts.rightAvatar : opts.leftAvatar;
+    var ava = '';
+    if (av) {
+      ava = '<div class="phone-ava ' + (side === 'right' ? 'phone-ava-r' : 'phone-ava-l') + '">' +
+        (av.src ? '<img src="' + av.src + '" style="width:100%;height:100%;object-fit:cover">' : escapeHTML(av.emoji || '👤')) + '</div>';
+    }
+    h += '<div class="phone-bubble-row ' + side + '">' +
+      (side === 'left' ? ava : '') +
+      '<div class="phone-bubble">' + escapeHTML(String(text)) + '</div>' +
+      (side === 'right' ? ava : '') +
+      '</div>';
+  });
+  h += '</div>';
+  return h;
+}
+
+function renderPhoneWechat(char, screen) {
+  screen.innerHTML = phoneAppBar('微信');
+  var msgs = (char.chat || []).filter(function (m) { return m && (m.content || m.text); });
+  if (!msgs.length) { screen.innerHTML += '<div class="phone-empty">（你们还没聊过天）</div>'; return; }
+  var last = msgs[msgs.length - 1];
+  var lastText = (last.content != null ? last.content : (last.text != null ? last.text : ''));
+  var time = last.time || (last.ts ? new Date(last.ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '');
+  var ua = (state.profile && state.profile.avatar)
+    ? '<img src="' + state.profile.avatar + '" style="width:100%;height:100%;object-fit:cover">'
+    : '💖';
+  var h = '<div class="phone-conv-list">';
+  h += '<div class="phone-conv" onclick="phoneOpenWechatYou()">' +
+    '<div class="phone-conv-ava" style="background:linear-gradient(135deg,#ff8fb0,#ff5e7e)">' + ua + '</div>' +
+    '<div class="phone-conv-main"><div class="phone-conv-name">' + escapeHTML((state.profile && state.profile.name) || '你') + '</div><div class="phone-conv-prev">' + escapeHTML(lastText) + '</div></div>' +
+    '<div class="phone-conv-meta"><div class="phone-conv-time">' + escapeHTML(time) + '</div></div>' +
+    '</div>';
+  h += '</div>';
+  screen.innerHTML += h;
+}
+
+function phoneOpenWechatYou() {
+  var char = activeCharacter();
+  var ov = document.getElementById('phoneOverlay');
+  if (!char || !ov) return;
+  var screen = ov.querySelector('#phoneContent');
+  ov.querySelector('#phoneScreen').classList.add('app-open');
+  var msgs = (char.chat || []).filter(function (m) { return m && (m.content || m.text); });
+  screen.innerHTML = phoneAppBar((state.profile && state.profile.name) || '你');
+  var body = document.createElement('div');
+  body.className = 'phone-scroll';
+  body.innerHTML = phoneChatHtml(msgs, function (m) { return m.role === 'assistant' ? 'right' : 'left'; }, {
+    leftAvatar: (state.profile && state.profile.avatar) ? { src: state.profile.avatar } : { emoji: '💖' },
+    rightAvatar: char.avatar ? { src: char.avatar } : { emoji: '😊' }
+  });
+  screen.appendChild(body);
+}
+
+function renderPhoneMsg(char, screen) {
+  screen.innerHTML = phoneAppBar('信息');
+  var chats = (char.phone && char.phone.chats) || [];
+  if (!chats.length) { screen.innerHTML += '<div class="phone-empty">（TA 好像没跟谁聊）</div>'; return; }
+  var h = '<div class="phone-conv-list">';
+  chats.forEach(function (c, i) {
+    var msgs = c.messages || [];
+    var last = msgs[msgs.length - 1] || {};
+    var prev = last.text || '';
+    var time = last.time || (last.ts ? new Date(last.ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '');
+    h += '<div class="phone-conv" onclick="phoneOpenFriend(' + i + ')">' +
+      '<div class="phone-conv-ava" style="background:linear-gradient(135deg,#9ad0ff,#5a8fe0)">👤</div>' +
+      '<div class="phone-conv-main"><div class="phone-conv-name">' + escapeHTML(c.name || '朋友') + '</div><div class="phone-conv-prev">' + escapeHTML(prev) + '</div></div>' +
+      '<div class="phone-conv-meta"><div class="phone-conv-time">' + escapeHTML(time) + '</div></div>' +
+      '</div>';
+  });
+  h += '</div>';
+  screen.innerHTML += h;
+}
+
+function phoneOpenFriend(i) {
+  var char = activeCharacter();
+  var ov = document.getElementById('phoneOverlay');
+  if (!char || !ov) return;
+  var screen = ov.querySelector('#phoneContent');
+  ov.querySelector('#phoneScreen').classList.add('app-open');
+  var c = (char.phone && char.phone.chats && char.phone.chats[i]) || { name: '朋友', messages: [] };
+  screen.innerHTML = phoneAppBar(c.name || '朋友');
+  var body = document.createElement('div');
+  body.className = 'phone-scroll';
+  body.innerHTML = phoneChatHtml(c.messages, function (m) { return (m.role === 'me') ? 'right' : 'left'; }, {
+    leftAvatar: { emoji: '👤' },
+    rightAvatar: char.avatar ? { src: char.avatar } : { emoji: '😊' }
+  });
+  screen.appendChild(body);
+}
+
+function renderPhoneAlbum(char, screen) {
+  screen.innerHTML = phoneAppBar('相册');
+  var posts = (char.igPosts || []);
+  if (!posts.length) { screen.innerHTML += '<div class="phone-empty">（相册里还没有照片）</div>'; return; }
+  var h = '<div class="phone-album-grid">';
+  posts.forEach(function (p) {
+    var inner = p.image ? '<img src="' + p.image + '" style="width:100%;height:100%;object-fit:cover">' : (p.emoji || '🖼️');
+    h += '<div class="phone-album-cell">' + inner + (p.caption ? '<div class="phone-album-cap">' + escapeHTML(p.caption) + '</div>' : '') + '</div>';
+  });
+  h += '</div>';
+  screen.innerHTML += h;
+}
+
+function renderPhoneMoments(char, screen) {
+  screen.innerHTML = phoneAppBar('朋友圈');
+  var posts = (char.igPosts || []).slice().reverse();
+  if (!posts.length) { screen.innerHTML += '<div class="phone-empty">（还没有发过朋友圈）</div>'; return; }
+  var h = '<div class="phone-moments">';
+  posts.forEach(function (p) {
+    var ava = char.avatar ? '<img src="' + char.avatar + '" style="width:100%;height:100%;object-fit:cover">' : '👤';
+    var time = (typeof formatPostTime === 'function') ? formatPostTime(p.time) : '';
+    h += '<div class="phone-moment"><div class="phone-moment-ava">' + ava + '</div>' +
+      '<div class="phone-moment-body">' +
+        '<div class="phone-moment-name">' + escapeHTML(char.name || 'TA') + '</div>' +
+        '<div class="phone-moment-emoji">' + (p.emoji || '') + '</div>' +
+        '<div class="phone-moment-text">' + escapeHTML(p.caption || '') + '</div>' +
+        '<div class="phone-moment-time">' + escapeHTML(time) + '</div>' +
+        '<div class="phone-moment-actions"><span class="phone-moment-like">♥ ' + (p.likes || 0) + '</span><span class="phone-moment-cmt">💬 评论</span></div>' +
+      '</div></div>';
+  });
+  h += '</div>';
+  screen.innerHTML += h;
+}
+
+function renderPhoneNotes(char, screen) {
+  screen.innerHTML = phoneAppBar('备忘录');
+  var notes = (char.phone && char.phone.notes) || [];
+  if (!notes.length) { screen.innerHTML += '<div class="phone-empty">（没有备忘录）</div>'; return; }
+  var h = '<div class="phone-notes">';
+  notes.forEach(function (n) {
+    h += '<div class="phone-note"><div class="phone-note-tag">私密</div>' + escapeHTML(n) + '</div>';
+  });
+  h += '</div>';
+  screen.innerHTML += h;
+}
+
+function renderPhoneBrowser(char, screen) {
+  screen.innerHTML = phoneAppBar('浏览器');
+  var searches = (char.phone && char.phone.search) || [];
+  if (!searches.length) { screen.innerHTML += '<div class="phone-empty">（没有搜索记录）</div>'; return; }
+  var h = '<div class="phone-searchbar">🔍 搜索或输入网址</div><div class="phone-searchlist">';
+  searches.forEach(function (s) {
+    h += '<div class="phone-searchrow"><span class="phone-search-ico">🔍</span><span class="phone-search-text">' + escapeHTML(s) + '</span></div>';
+  });
+  h += '</div>';
+  screen.innerHTML += h;
+}

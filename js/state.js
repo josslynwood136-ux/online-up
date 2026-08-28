@@ -239,7 +239,8 @@ function ensureStateShape(next, saved) {
       ttsClone: role.ttsClone || null,
       ttsVoices: (role.ttsVoices && typeof role.ttsVoices === 'object') ? role.ttsVoices : {},
       ttsStyle: typeof role.ttsStyle === 'string' ? role.ttsStyle : '',
-      ttsTemp: (typeof role.ttsTemp === 'number') ? role.ttsTemp : (typeof role.ttsTemp === 'string' ? parseFloat(role.ttsTemp) || 0.6 : 0.6)
+      ttsTemp: (typeof role.ttsTemp === 'number') ? role.ttsTemp : (typeof role.ttsTemp === 'string' ? parseFloat(role.ttsTemp) || 0.6 : 0.6),
+      phone: (role.phone && typeof role.phone === 'object') ? role.phone : null
     }));
   if (!next.activeRoleId || !next.roles.some(role => role.id === next.activeRoleId)) {
     next.activeRoleId = next.roles[0].id;
