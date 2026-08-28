@@ -61,7 +61,6 @@ function openChat(characterId, skin) {
   var ob = $('aiBtn');
   if (ob) ob.remove();
   $('chatWindow').classList.add('open');
-  $('chatWindow').classList.toggle('comic-skin', skin === 'comic');
   var cs = $('chatSettings'); if (cs) cs.classList.remove('open'); // 进入聊天时确保设置面板已收起
   renderChat();
   // 打卡监督：打开与该角色的聊天时，若 TA 监督的打卡今天还没打且今天还没催过，让 TA 顺手催一下
@@ -79,7 +78,7 @@ function closeChat() {
   var ob = $('aiBtn');
   if (ob) ob.remove();
   $('chatWindow').classList.remove('open');
-  $('chatWindow').classList.remove('comic-skin');
+  $('chatWindow').classList.remove('comic-skin', 'imessage-skin');
   var cs = $('chatSettings'); if (cs) cs.classList.remove('open'); // 关闭聊天时一并收起设置，避免设置面板滞留覆盖
   hidePanels();
 }
@@ -3227,8 +3226,11 @@ function applyBubbleStyle() {
   var cw = $('chatWindow');
   if (!cw) return;
   var s = state.settings.bubbleStyle || 'default';
-  cw.classList.remove('bubble-style-default', 'bubble-style-cute', 'bubble-style-warm', 'bubble-style-dark', 'bubble-style-ig', 'bubble-style-glow', 'bubble-style-comic');
+  cw.classList.remove('bubble-style-default', 'bubble-style-cute', 'bubble-style-warm', 'bubble-style-dark', 'bubble-style-ig', 'bubble-style-glow', 'bubble-style-comic', 'bubble-style-imessage');
   cw.classList.add('bubble-style-' + s);
+  cw.classList.remove('comic-skin', 'imessage-skin');
+  if (s === 'comic') cw.classList.add('comic-skin');
+  else if (s === 'imessage') cw.classList.add('imessage-skin');
   var sel = $('bubbleStyleSelect');
   if (sel) sel.value = s;
 }

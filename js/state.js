@@ -13,7 +13,7 @@ const defaultState = {
   apiProfiles: [],
   activeApiProfile: '',
   secondaryApiProfile: '',
-  settings: { ai: true, pinned: false, bubbleStyle: 'default', musicMode: 'loop', translateProvider: 'google', deeplKey: '', autoVoice: false, ttsProvider: 'minimax', ttsUrls: {}, ttsKeys: {}, ttsModels: {}, ttsVoices: {}, ttsGroups: {}, streamReply: true, replySplit: 'auto', proactiveInterval: 180, proactiveQuiet: [23, 7] },
+  settings: { ai: true, pinned: false, bubbleStyle: 'comic', musicMode: 'loop', translateProvider: 'google', deeplKey: '', autoVoice: false, ttsProvider: 'minimax', ttsUrls: {}, ttsKeys: {}, ttsModels: {}, ttsVoices: {}, ttsGroups: {}, streamReply: true, replySplit: 'auto', proactiveInterval: 180, proactiveQuiet: [23, 7] },
   activeRoleId: 'role-default',
   roles: [
     {
@@ -377,7 +377,7 @@ function ensureStateShape(next, saved) {
   next.willow.date = typeof next.willow.date === 'string' ? next.willow.date : '';
   next.willow.text = typeof next.willow.text === 'string' ? next.willow.text : '';
   next.willow.rule = typeof next.willow.rule === 'string' ? next.willow.rule : '';
-  next.settings = Object.assign({ ai: true, pinned: false, bubbleStyle: 'default', musicMode: 'loop', translateProvider: 'google', deeplKey: '', autoVoice: false, ttsProvider: 'minimax', ttsUrls: {}, ttsKeys: {}, ttsModels: {}, ttsVoices: {}, ttsGroups: {}, streamReply: true, replySplit: 'auto', proactiveInterval: 180, proactiveQuiet: [23, 7], cloudAuto: true }, next.settings || {});
+  next.settings = Object.assign({ ai: true, pinned: false, bubbleStyle: 'comic', musicMode: 'loop', translateProvider: 'google', deeplKey: '', autoVoice: false, ttsProvider: 'minimax', ttsUrls: {}, ttsKeys: {}, ttsModels: {}, ttsVoices: {}, ttsGroups: {}, streamReply: true, replySplit: 'auto', proactiveInterval: 180, proactiveQuiet: [23, 7], cloudAuto: true }, next.settings || {});
   if (['minimax', 'mimo', 'elevenlabs'].indexOf(next.settings.ttsProvider) < 0) next.settings.ttsProvider = 'minimax';
   next.settings.relayUrl = typeof next.settings.relayUrl === 'string' ? next.settings.relayUrl : '';
   return next;

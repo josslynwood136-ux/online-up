@@ -485,7 +485,7 @@ function renderMessageList() {
         const rel = char.relation ? `<span class="tag glass-tag">${escapeHTML(char.relation)}</span>` : '';
         const dot = char.online ? '<span class="online-dot"></span>' : '<span class="offline-dot"></span>';
         return `
-        <div class="list-card glass-card${char.pinned ? ' msg-pinned' : ''}" onclick="openChat('${char.id}')">
+        <div class="list-card glass-card${char.pinned ? ' msg-pinned' : ''}" onclick="openChat('${char.id}', 'comic')">
           <div class="avatar" style="position:relative">${renderAvatar(char.avatar, char.name)}${dot}</div>
           <div style="flex:1;min-width:0">
             <div style="display:flex;align-items:center;gap:6px"><b>${escapeHTML(char.name)}</b>${rel}</div>
@@ -521,7 +521,7 @@ function renderContacts() {
         <div class="subtle" style="padding:4px 2px">我认识的角色（${state.roles.length}）</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         ${state.roles.map(char => `
-          <div class="card char-cell" onclick="openChat('${char.id}')">
+          <div class="card char-cell" onclick="openChat('${char.id}', 'comic')">
             <div class="avatar" style="position:relative;margin:0 auto 6px">${renderAvatar(char.avatar, char.name)}${char.online ? '<span class="online-dot"></span>' : '<span class="offline-dot"></span>'}</div>
             <div style="text-align:center;font-weight:700">${escapeHTML(char.name)}</div>
             <div class="subtle" style="text-align:center;font-size:12px;margin-top:2px">${escapeHTML(char.relation || char.aliases || '角色')}</div>
@@ -1036,7 +1036,7 @@ function renderCheckins() {
         <span>完成率 ${rate}%</span>
       </div>
       ${x.status !== 'done' ? `<button class="primary-btn" style="width:100%;margin-top:10px" onclick="doCheckin('${x.id}')">立即打卡</button>` : `<div class="subtle" style="text-align:center;margin-top:10px">🎉 已达成</div>`}
-      ${x.charId && x.status !== 'done' ? `<button class="ghost-btn" style="width:100%;margin-top:8px" onclick="openChat('${x.charId}');nudgeCheckin('${x.charId}', true)">💬 让 ${escapeHTML(checkinCharName(x.charId))} 催我</button>` : ''}
+      ${x.charId && x.status !== 'done' ? `<button class="ghost-btn" style="width:100%;margin-top:8px" onclick="openChat('${x.charId}', 'comic');nudgeCheckin('${x.charId}', true)">💬 让 ${escapeHTML(checkinCharName(x.charId))} 催我</button>` : ''}
       <div style="display:flex;gap:10px;margin-top:8px">
         <button class="ghost-btn" style="flex:1" onclick="checkinForm={mode:'edit',id:'${x.id}'};renderCheckins()">编辑</button>
         <button class="danger-btn" style="flex:1" onclick="deleteCheckin('${x.id}')">删除</button>

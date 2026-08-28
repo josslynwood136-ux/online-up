@@ -3702,6 +3702,69 @@ button { border: 0; cursor: pointer; }
 #chatWindow.bubble-style-comic .bubble.typing { background:#fff; }
 #chatWindow.bubble-style-comic .typing-dot { background:#1c1c1c; }
 
+/* ===== i message 皮肤 ===== */
+#chatWindow.imessage-skin .chat-header {
+  background: #fff;
+  border-bottom: 1px solid #e5e5ea;
+}
+#chatWindow.imessage-skin .chat-header .header-action { color: #007aff; }
+#chatWindow.imessage-skin #chatName { color: #1c1c1e; }
+#chatWindow.imessage-skin #chatRel { color: #8e8e93; }
+#chatWindow.imessage-skin .chat-header .icon-btn { color: #007aff; }
+#chatWindow.imessage-skin .chat-body {
+  background: #f2f2f7;
+  gap: 8px;
+  padding: 10px 12px;
+}
+#chatWindow.imessage-skin .chat-footer {
+  background: #fff;
+  border-top: 1px solid #e5e5ea;
+}
+#chatWindow.imessage-skin .chat-input-wrapper { background: #f2f2f7; }
+#chatWindow.imessage-skin .chat-input { color: #1c1c1e; }
+#chatWindow.imessage-skin .send-btn { color: #007aff; }
+#chatWindow.imessage-skin .emoji-panel,
+#chatWindow.imessage-skin .more-panel { background: #fff; border-top: 1px solid #e5e5ea; }
+
+#chatWindow.bubble-style-imessage .bubble {
+  border: none;
+  box-shadow: none;
+  font-size: 14px;
+  line-height: 1.35;
+  font-weight: 400;
+  padding: 7px 13px;
+  border-radius: 18px;
+  color: #fff;
+}
+#chatWindow.bubble-style-imessage .bubble.left {
+  background: #e9e9eb;
+  color: #1c1c1e;
+  border-radius: 18px 18px 4px 18px;
+  align-self: flex-start;
+}
+#chatWindow.bubble-style-imessage .bubble.right {
+  background: linear-gradient(180deg, #2f9bff, #0a84ff);
+  color: #fff;
+  border-radius: 18px 18px 18px 4px;
+  align-self: flex-end;
+}
+#chatWindow.bubble-style-imessage .bubble.left::after,
+#chatWindow.bubble-style-imessage .bubble.right::after { content: none; }
+#chatWindow.bubble-style-imessage .bubble::before { content: none; }
+#chatWindow.bubble-style-imessage .bubble.system {
+  background: rgba(0,0,0,.06);
+  color: #8e8e93;
+  border: none;
+  box-shadow: none;
+  align-self: center;
+  border-radius: 10px;
+  font-weight: 400;
+}
+#chatWindow.bubble-style-imessage .bubble.typing { background: #e9e9eb; }
+#chatWindow.bubble-style-imessage .typing-dot { background: #8e8e93; }
+#chatWindow.bubble-style-imessage .msg-time { color: #8e8e93; }
+#chatWindow.bubble-style-imessage .read-tick { color: #8e8e93; }
+
 /* ===== 许愿柳 · One Wish Willow (假装老玩具包装盒) ===== */
 .wl-wrap { display:flex; flex-direction:column; align-items:center; padding-top:14px; gap:14px; text-align:center; }
 .wl-box {
