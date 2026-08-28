@@ -165,9 +165,7 @@ async function initPush() {
     navigator.serviceWorker.addEventListener('message', function (e) {
        if (e.data && e.data.type === 'push-click') {
          try {
-           if (e.data.openApp && typeof openApp === 'function') {
-             openApp(e.data.openApp);
-           } else if (e.data.charId && typeof getCharacter === 'function' && getCharacter(e.data.charId)) {
+           if (e.data.charId && typeof getCharacter === 'function' && getCharacter(e.data.charId)) {
              openChat(e.data.charId, 'comic');
            } else if (typeof openApp === 'function') {
              openApp('消息');
@@ -211,19 +209,11 @@ async function uploadPushConfig() {
   var chars = (state.roles || []).map(function (r) {
     return { id: r.id, name: r.name, persona: r.persona || '', relation: r.relation || '', style: r.style || '', lang: r.lang || '中文', mode: r.mode || 'offline', proactive: !!(r.proactivePush) };
   });
-  // 打卡提醒需要上报：只传设了催促时间的项目，含判断"今天是否该打"所需的字段
-  var checkins = (state.checkins || []).filter(function (c) { return c.remindTime; }).map(function (c) {
-    return { id: c.id, name: c.name, start: c.start, end: c.end, totalDays: c.totalDays, doneDays: c.doneDays, doneDates: c.doneDates || [], remindTime: c.remindTime, status: c.status };
-  });
-  // 上报用户时区，让服务器按用户本地时间判断"今天/现在"（Render 默认 UTC）
-  var tz = '';
-  try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) {}
   var anyOn = chars.some(function (c) { return c.proactive; });
   if (!api.url || !api.key || !api.model) {
-    // 没填 AI 三件套：仍上报（清掉凭证、禁用），避免服务器用旧 key 继续生成。
-    // 仅当有角色开启了后台主动发消息时才提醒填密钥；打卡提醒不需要 AI，静默上报即可。
-    if (anyOn && typeof quickNotice === 'function') quickNotice('主动推送需先在「连接」填好 AI 地址/密钥/模型');
-    try { await fetch('push/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ subscription: sub, creds: null, chars: chars, plan: { enabled: false }, checkins: checkins, tz: tz }) }); } catch (e) {}
+    // 没填 AI 三件套：仍上报（清掉凭证、禁用），避免服务器用旧 key 继续生成
+    if (typeof quickNotice === 'function') quickNotice('主动推送需先在「连接」填好 AI 地址/密钥/模型');
+    try { await fetch('push/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ subscription: sub, creds: null, chars: chars, plan: { enabled: false } }) }); } catch (e) {}
     return;
   }
   var plan = { enabled: anyOn, intervalMin: Number(s.proactiveInterval) || 180, quiet: s.proactiveQuiet || [23, 7] };
@@ -232,7 +222,7 @@ async function uploadPushConfig() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
-      body: JSON.stringify({ subscription: sub, creds: { url: api.url, key: api.key, model: api.model }, chars: chars, plan: plan, checkins: checkins, tz: tz })
+      body: JSON.stringify({ subscription: sub, creds: { url: api.url, key: api.key, model: api.model }, chars: chars, plan: plan })
     });
   } catch (e) {}
 }

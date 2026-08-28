@@ -63,6 +63,10 @@ function openChat(characterId, skin) {
   $('chatWindow').classList.add('open');
   var cs = $('chatSettings'); if (cs) cs.classList.remove('open'); // 进入聊天时确保设置面板已收起
   renderChat();
+  // 打卡监督：打开与该角色聊天时，若 TA 监督的打卡今天还没打且今天还没催过，让 TA 顺手催一下
+  if (char && (state.checkins || []).some(function (c) { return c.charId === characterId && isCheckinDueToday(c) && c.lastNagDate !== todayStr(); })) {
+    setTimeout(function () { if (typeof nudgeCheckin === 'function') nudgeCheckin(characterId); }, 1200);
+  }
 }
 
 function closeChat() {
