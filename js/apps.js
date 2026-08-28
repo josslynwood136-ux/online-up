@@ -1020,10 +1020,12 @@ function doCheckin(id) {
     saveState();
     renderCheckins();
     showCheckinCelebration(x.name);
+    if (typeof pushEnabled === 'function' && pushEnabled() && typeof uploadPushConfig === 'function') uploadPushConfig();
     return;
   }
   saveState();
   renderCheckins();
+  if (typeof pushEnabled === 'function' && pushEnabled() && typeof uploadPushConfig === 'function') uploadPushConfig();
 }
 function showCheckinCelebration(name) {
   var el = document.createElement('div');
@@ -1127,6 +1129,7 @@ async function deleteCheckin(id) {
   state.checkins = state.checkins.filter(c => c.id !== id);
   saveState();
   renderCheckins();
+  if (typeof pushEnabled === 'function' && pushEnabled() && typeof uploadPushConfig === 'function') uploadPushConfig();
 }
 function submitNewCheckin() {
   const name = document.getElementById('ck-name').value.trim();
@@ -1139,6 +1142,7 @@ function submitNewCheckin() {
   checkinForm = null;
   saveState();
   renderCheckins();
+  if (typeof pushEnabled === 'function' && pushEnabled() && typeof uploadPushConfig === 'function') uploadPushConfig();
 }
 function submitEditCheckin(id) {
   const x = state.checkins.find(c => c.id === id);
@@ -1154,6 +1158,7 @@ function submitEditCheckin(id) {
   checkinForm = null;
   saveState();
   renderCheckins();
+  if (typeof pushEnabled === 'function' && pushEnabled() && typeof uploadPushConfig === 'function') uploadPushConfig();
 }
 
 function toggleHabit(id) {

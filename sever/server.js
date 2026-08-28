@@ -137,49 +137,117 @@ async function genCharacterMessage(char, creds) {
     return txt
   } catch (e) { return null }
 }
-// 定时器：每分钟扫一遍，给"到点"的订阅生成并推送主动消息
+// ====== 打卡提醒用的时间/日期工具（服务器本地时区，部署时请让服务器时区与用户一致）======
+function _todayKey() {
+  var d = new Date()
+  return d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate()
+}
+function _nowHHMM() {
+  var d = new Date()
+  return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2)
+}
+function _parseCk(s) { var p = String(s || '').split('/'); return new Date(+p[0], +p[1] - 1, +p[2]) }
+// 按用户上报的 IANA 时区算出"今天"和"现在 HH:MM"；没上报则用服务器本地时区
+function _userClock(tz) {
+  if (!tz) return null
+  try {
+    var s = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date())
+    var m = String(s).match(/(\d{2})\/(\d{2})\/(\d{4})[,\s]+(\d{2}):(\d{2})/)
+    if (!m) return null
+    return { tKey: m[3] + '/' + m[1] + '/' + m[2], cur: m[4] + ':' + m[5] }
+  } catch (e) { return null }
+}
+function _ckDue(ck, today) {
+  if (!ck || ck.status === 'done') return false
+  return (ck.doneDates || []).indexOf(today) < 0
+}
+function _ckActive(ck, today) {
+  var t = _parseCk(today), s = ck.start ? _parseCk(ck.start) : null, e = ck.end ? _parseCk(ck.end) : null
+  if (s && !isNaN(s.getTime()) && t < s) return false
+  if (e && !isNaN(e.getTime()) && t > e) return false
+  return true
+}
+// 定时器：每分钟扫一遍，给"到点"的订阅生成并推送主动消息 / 打卡提醒
 async function scheduleTick() {
   var now = Date.now()
   for (var ep in pushConfigs) {
     var cfg = pushConfigs[ep]
-    if (!cfg || !cfg.plan || !cfg.plan.enabled) continue
-    if (!cfg.creds || !cfg.creds.url || !cfg.creds.key) continue
-    if (!cfg.subscription) continue
-    if (inQuiet(now, cfg.plan.quiet)) continue
-    var chars = cfg.chars || []
-    if (!chars.length) continue
-    var interval = (Number(cfg.plan.intervalMin) || 180) * 60000
-    // 挑"最 overdue"的角色，每轮最多发一条，摊开负载
-    var best = null, bestOver = -1
-    for (var i = 0; i < chars.length; i++) {
-      var c = chars[i]
-      if (!c.proactive) continue // 该角色未开启后台主动发消息
-      var last = cfg.lastSent && cfg.lastSent[c.id] ? cfg.lastSent[c.id] : 0
-      var over = now - last - interval
-      if (over >= 0 && over > bestOver) { best = c; bestOver = over }
+    if (!cfg || !cfg.subscription) continue
+    // ---- 角色主动消息 ----
+    if (cfg.plan && cfg.plan.enabled && cfg.creds && cfg.creds.url && cfg.creds.key) {
+      if (!inQuiet(now, cfg.plan.quiet)) {
+        var chars = cfg.chars || []
+        var interval = (Number(cfg.plan.intervalMin) || 180) * 60000
+        // 挑"最 overdue"的角色，每轮最多发一条，摊开负载
+        var best = null, bestOver = -1
+        for (var i = 0; i < chars.length; i++) {
+          var c = chars[i]
+          if (!c.proactive) continue // 该角色未开启后台主动发消息
+          var last = cfg.lastSent && cfg.lastSent[c.id] ? cfg.lastSent[c.id] : 0
+          var over = now - last - interval
+          if (over >= 0 && over > bestOver) { best = c; bestOver = over }
+        }
+        if (best) {
+          var text = await genCharacterMessage(best, cfg.creds)
+          if (text) {
+            var payload = {
+              title: best.name || '美乐地',
+              body: text.slice(0, 200),
+              url: '/',
+              tag: 'proactive-' + (best.id || 'all'),
+              avatar: best.avatar || '',
+              charId: best.id || ''
+            }
+            try {
+              await webpush.sendNotification(cfg.subscription, JSON.stringify(payload))
+              // 写入待收队列，app 打开时倒进聊天
+              cfg.lastSent = cfg.lastSent || {}
+              cfg.lastSent[best.id] = now
+              cfg.pending = cfg.pending || []
+              cfg.pending.push({ charId: best.id || '', text: text, ts: now })
+              if (cfg.pending.length > 50) cfg.pending = cfg.pending.slice(-50)
+              saveConfigs()
+            } catch (err) {
+              if (err && (err.statusCode === 404 || err.statusCode === 410)) { delete pushConfigs[ep]; saveConfigs() }
+            }
+          }
+        }
+      }
     }
-    if (!best) continue
-    var text = await genCharacterMessage(best, cfg.creds)
-    if (!text) continue
-    var payload = {
-      title: best.name || '美乐地',
-      body: text.slice(0, 200),
-      url: '/',
-      tag: 'proactive-' + (best.id || 'all'),
-      avatar: best.avatar || '',
-      charId: best.id || ''
+    // ---- 打卡提醒（不需要 AI，模板文案，关 App 也能弹）----
+    var cks = cfg.checkins || []
+    if (cks.length) {
+      var clk = cfg.tz ? _userClock(cfg.tz) : null
+      var tKey = clk ? clk.tKey : _todayKey()
+      var cur = clk ? clk.cur : _nowHHMM()
+      var curMin = parseInt(cur.slice(0, 2), 10) * 60 + parseInt(cur.slice(3, 5), 10)
+      cfg.checkinReminded = cfg.checkinReminded || {}
+      for (var k = 0; k < cks.length; k++) {
+        var ck = cks[k]
+        if (!ck.remindTime || ck.status === 'done') continue
+        if (!_ckActive(ck, tKey) || !_ckDue(ck, tKey)) continue
+        var pp = ck.remindTime.split(':')
+        var rm = (parseInt(pp[0], 10) || 0) * 60 + (parseInt(pp[1], 10) || 0)
+        var diff = curMin - rm
+        if (diff < 0 || diff > 15) continue
+        if (cfg.checkinReminded[ck.id] === tKey) continue
+        cfg.checkinReminded[ck.id] = tKey
+        var cpayload = {
+          title: '⏰ 打卡提醒',
+          body: '「' + (ck.name || '打卡') + '」该打卡啦，今天还没打哦',
+          url: '/',
+          tag: 'checkin-' + ck.id,
+          openApp: '打卡',
+          charId: ''
+        }
+        try {
+          await webpush.sendNotification(cfg.subscription, JSON.stringify(cpayload))
+          saveConfigs()
+        } catch (err) {
+          if (err && (err.statusCode === 404 || err.statusCode === 410)) { delete pushConfigs[ep]; saveConfigs() }
+        }
+      }
     }
-    try { await webpush.sendNotification(cfg.subscription, JSON.stringify(payload)) } catch (err) {
-      if (err && (err.statusCode === 404 || err.statusCode === 410)) { delete pushConfigs[ep]; saveConfigs() }
-      continue
-    }
-    // 写入待收队列，app 打开时倒进聊天
-    cfg.lastSent = cfg.lastSent || {}
-    cfg.lastSent[best.id] = now
-    cfg.pending = cfg.pending || []
-    cfg.pending.push({ charId: best.id || '', text: text, ts: now })
-    if (cfg.pending.length > 50) cfg.pending = cfg.pending.slice(-50)
-    saveConfigs()
   }
 }
 setInterval(scheduleTick, 60000)
@@ -233,6 +301,8 @@ app.post('/push/config', function (req, res) {
   const creds = req.body.creds || null
   const chars = Array.isArray(req.body.chars) ? req.body.chars : []
   const plan = req.body.plan || { enabled: false }
+  const checkins = Array.isArray(req.body.checkins) ? req.body.checkins : []
+  const tz = req.body.tz || ''
   const ep = sub.endpoint
   const old = pushConfigs[ep] || {}
   pushConfigs[ep] = {
@@ -240,6 +310,9 @@ app.post('/push/config', function (req, res) {
     creds: creds,
     chars: chars,
     plan: plan,
+    checkins: checkins,
+    tz: tz,
+    checkinReminded: old.checkinReminded || {},
     lastSent: old.lastSent || {},
     pending: old.pending || []
   }
