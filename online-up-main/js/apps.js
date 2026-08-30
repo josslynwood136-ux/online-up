@@ -39,12 +39,7 @@ function openApp(name) {
       '音乐': renderMusic, '啵啵': renderLiveHall, '啵啵间': renderLiveHall, '线下': renderOffline, '相册': renderAlbum, '表情包': renderStickerManager,
       '许愿柳': renderWillow, '许愿流': renderWillow, '游戏': renderGame, '游戏房': renderGame,
       'QQ': renderIGProfile,
-      'IG': renderIGProfile,
-      '群聊': openGroupChat,
-      '小组件': renderWidgetsPanel,
-      '时间线': renderTimeline,
-      '生图': showImageGenHistory,
-      '直播间': renderLiveHall
+      'IG': renderIGProfile
     };
     if (map[name]) { map[name](); musicAppOpen = (name === '音乐'); if (name === '音乐') { ncmProbedAt = 0; maybeProbeNcm(); } updateMiniPlayer(); return; }
     c().innerHTML = '<div class="card subtle">未找到「' + escapeHTML(name) + '」对应的应用。</div>';
@@ -225,17 +220,6 @@ function renderApiSettings() {
   h += '<div style="background:#fff;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px">';
   h += '<div style="font-size:13px;font-weight:600;color:#4a3f35;padding-bottom:2px;border-bottom:1px solid #f0ede8">显示</div>';
   h += '<div style="font-size:11px;color:#c0b0a0;line-height:1.5;padding:0 4px">如果直接用浏览器打开 HTML，部分接口可能因跨域策略被拦截。能用的中转接口或允许跨域的 API 可直接聊天。</div></div>';
-
-  // ===== 新增功能入口 =====
-  h += '<div style="background:#fff;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px">';
-  h += '<div style="font-size:13px;font-weight:600;color:#4a3f35;padding-bottom:2px;border-bottom:1px solid #f0ede8">🆕 新增功能</div>';
-  h += '<button class="primary-btn" style="width:100%;justify-content:center" onclick="openGroupChat()">👥 群聊模式 — 多角色一起聊天</button>';
-  h += '<button class="ghost-btn" style="width:100%;justify-content:center" onclick="renderWidgetsPanel()">📱 小组件 — 天气/倒数日/打卡/计时</button>';
-  h += '<button class="ghost-btn" style="width:100%;justify-content:center" onclick="renderTimeline()">📅 时间线 — 对话记录与摘要</button>';
-  h += '<button class="ghost-btn" style="width:100%;justify-content:center" onclick="showImageGenHistory()">🎨 AI 生图 — SDXL/Flux/Midjourney</button>';
-  h += '<button class="ghost-btn" style="width:100%;justify-content:center" onclick="triggerMemorySummary()">🧹 记忆总结 — 生成时间线摘要</button>';
-  h += '<button class="ghost-btn" style="width:100%;justify-content:center" onclick="exportTimelines()">📤 导出时间线</button>';
-  h += '</div>';
 
   c().innerHTML = h;
   initApiSettings();
@@ -3607,6 +3591,969 @@ function updateMiniPlayer() {
   $('gmpPlay').innerHTML = playing ? MUS_ICO.pause : MUS_ICO.play;
 }
 
+// ---------- 啵啵间 · 直播 ----------
+var _liveTimer = null;
+var _liveBagTimer = null;
+var _liveHallTimer = null;
+var _liveBag = { t: 60, grabbed: false };
+var _liveBoard = null;
+var _toastT = null;
+var _liveSangAt = 0;
+var _liveAnchor = null;
+var _liveFromHall = true;
+var _hallCat = '全部';
+
+const LIVE_AUDIENCE = ['明月', '阿紫', '桃子', '懒羊羊', '小橘猫', '鲸鱼', '奶茶', 'Q酱', '团团', '阿澈', '布丁', '晚风'];
+const LIVE_AUDIENCE_MSGS = [
+  '主播好可爱～', '前排前排！', '啵啵啵', '哈哈哈哈哈哈哈', '好喜欢这个背景', '来了来了', '加油加油', '么么哒', '蹲一个', '学到了', '主播今天心情好好', '真滴爱了', '氛围感拉满', '赞赞赞', '等你开唱！', '晚上好呀～'
+];
+const LIVE_ANCHOR_MSGS = [
+  '家人们晚上好，啵啵～', '今天也要开开心心', '来，给大家比个心 ❤', '我刚写完作业，出来透透气', '今天心情超好！', '谢谢大家的点赞', '想聊什么都可以', '偷偷放一颗小星星 ✨', '耶，人气又涨啦', '么么么，爱你们', '今天有没有人想听我唱歌呀？', '最近在追一部剧，好上头！', '问你们一个问题：你们今天开心吗？', '我学会了新技能，改天展示给你们看', '夜里的直播间，都是温柔的人呀'
+];
+const LIVE_ANCHOR_TITLE = ['我们的{T}今天也要好好的', '今天也是想{T}的一天', '给{T}比个心 ❤', '好宠我的{T}～'];
+const LIVE_GIFTS = [
+  { name: '小花花', icon: '🌹', cost: 10 },
+  { name: '爱心', icon: '💖', cost: 20 },
+  { name: '甜蛋糕', icon: '🍰', cost: 30 },
+  { name: '啵啵兔', icon: '🐰', cost: 52 },
+  { name: '大束花', icon: '🌷', cost: 66 },
+  { name: '白马火箭', icon: '🚀', cost: 99 }
+];
+const LIVE_AUD_GIFTS = [
+  { name: '小花花', icon: '🌹', cost: 10 },
+  { name: '爱心', icon: '💖', cost: 20 },
+  { name: '甜蛋糕', icon: '🍰', cost: 30 }
+];
+const LIVE_LEVELS = [
+  { lv: 1, name: '路人', need: 0 },
+  { lv: 2, name: '新朋友', need: 20 },
+  { lv: 3, name: '常客', need: 50 },
+  { lv: 4, name: '熟客', need: 100 },
+  { lv: 5, name: '老粉', need: 200 },
+  { lv: 6, name: '铁粉', need: 400 },
+  { lv: 7, name: '死忠', need: 800 },
+  { lv: 8, name: '真爱', need: 1500 },
+  { lv: 9, name: '专属', need: 3000 },
+  { lv: 10, name: '唯一', need: 6000 }
+];
+const LIVE_BIG_FANS = [
+  { name: '星辰入梦', emoji: '🌠' }, { name: '一只猫不是猫', emoji: '🐱' },
+  { name: '奶茶三分糖', emoji: '🧋' }, { name: '深海的鲸', emoji: '🐋' },
+  { name: '柚子汽水', emoji: '🧃' }, { name: '今天也想你', emoji: '💙' }
+];
+const LIVE_SONGS = ['小星星', '夏天的风', '告白气球', '小城夏天', '月亮代表我的心', '略略略之歌'];
+const LIVE_HALL_POOL = [
+  { id: 'h1', title: '深夜电台 · 想听故事', tag: '聊天', emoji: '🌙', g1: '#e7d9f6', g2: '#e3c9ea', base: 128, night: true, anchor: '一只月', avatar: '🌙', bio: '夜里讲故事的人，声音软软的🌙', posts: ['今晚月色真美', '讲一个关于星星的故事✨', '失眠的朋友欢迎来坐坐'] },
+  { id: 'h2', title: '街边小吃局', tag: '美食', emoji: '🍜', g1: '#fee0cf', g2: '#ffe9d9', base: 87, anchor: '饱饱', avatar: '🍜', bio: '带你吃遍每一条小吃街🍢', posts: ['今晚的炒粉很香', '找到了超好吃的炸串！', '深夜放毒预警⚠️'] },
+  { id: 'h3', title: '安静自习室', tag: '学习', emoji: '📖', g1: '#d4ece4', g2: '#e2f2ed', base: 56, dayOnly: true, anchor: '小森林', avatar: '📚', bio: '一起安静学习，互相监督📖', posts: ['今日打卡：2小时', '整理了一份笔记', '图书馆窗外的黄昏'] },
+  { id: 'h4', title: '深夜KTV', tag: '唱歌', emoji: '🎤', g1: '#e2d6f8', g2: '#f0dcf0', base: 203, night: true, anchor: '麦霸', avatar: '🎤', bio: '点歌就唱，麦克风递给你🎤', posts: ['今晚唱《夏天的风》', '翻唱了周杰伦', '高音我来了！'] },
+  { id: 'h5', title: '撸猫日常', tag: '宠物', emoji: '🐱', g1: '#eae7df', g2: '#f2ede4', base: 74, anchor: '猫饼', avatar: '🐱', bio: '三只猫的铲屎官🐱', posts: ['饼饼今天又睡了18小时', '新买的逗猫棒', '猫咪晒太阳合集'] },
+  { id: 'h6', title: '手账素材分享', tag: '手工', emoji: '🎨', g1: '#fdeccd', g2: '#f8e2c0', base: 43, dayOnly: true, anchor: '小画笔', avatar: '🎨', bio: '手账排版灵感分享🎨', posts: ['新入的胶带', '今日拼贴完成！', '素材整理到深夜'] },
+  { id: 'h7', title: '动漫番剧吐槽', tag: '聊天', emoji: '📺', g1: '#dcdef8', g2: '#e4e6f8', base: 96, anchor: '阿宅', avatar: '📺', bio: '追番十年，吐槽专业户📺', posts: ['这周新番你看了吗', '完结撒花🎉', '千万别剧透啊'] },
+  { id: 'h8', title: '睡前读诗', tag: '聊天', emoji: '🌠', g1: '#e0e7f8', g2: '#eae0f4', base: 61, night: true, anchor: '晚风', avatar: '🌠', bio: '睡前读一首诗，陪你入睡🌠', posts: ['今天读聂鲁达', '晚安，世界', '诗里的月亮最温柔'] }
+];
+const LIVE_KEYWORDS = [
+  { re: /(火箭|🚀)/, eff: 'rocket' },
+  { re: /777/, eff: '777' },
+  { re: /(666|六六六)/, eff: '666' },
+  { re: /(爱|喜欢|么么|啵啵|想你)/, eff: 'love' },
+  { re: /(赞|牛|好听)/, eff: 'nice' }
+];
+
+function livePick(a) { return a[Math.floor(Math.random() * a.length)]; }
+function liveLevel() {
+  var iv = state.live.intimacy;
+  var cur = LIVE_LEVELS[0];
+  for (var i = 0; i < LIVE_LEVELS.length; i++) { if (iv >= LIVE_LEVELS[i].need) cur = LIVE_LEVELS[i]; }
+  var next = LIVE_LEVELS[cur.lv] || null;
+  var prev = LIVE_LEVELS[cur.lv - 2] || cur;
+  var pct = next ? Math.min(100, Math.round((iv - prev.need) / (next.need - prev.need) * 100)) : 100;
+  return { lv: cur.lv, name: cur.name, need: cur.need, nextNeed: next ? next.need : null, pct: pct };
+}
+function liveTitle(lv) {
+  if (lv >= 8) return '专属宝贝';
+  if (lv >= 6) return '亲爱的';
+  if (lv >= 4) return '宝贝';
+  if (lv >= 2) return '常来呀';
+  return '观众';
+}
+
+// ---------- 报纸时间 & 开播调度 ----------
+var _hallKey = '';
+function paperIsNight() {
+  var h = new Date().getHours();
+  return h >= 18 || h < 6;
+}
+function paperName() { return paperIsNight() ? '晚报' : '日报'; }
+function roomIsLive(r) {
+  if (r.night && !paperIsNight()) return false;
+  if (r.dayOnly && paperIsNight()) return false;
+  return r.on !== false;
+}
+function updateRoomSchedule() {
+  var now = Date.now();
+  var key = '';
+  LIVE_HALL_POOL.forEach(function (r) {
+    if (r.on === undefined) r.on = Math.random() > 0.25;
+    if (r.next === undefined) r.next = now + (2 + Math.random() * 8) * 60000;
+    if (now >= r.next) {
+      r.on = !r.on;
+      r.next = now + (3 + Math.random() * 10) * 60000;
+    }
+    if (roomIsLive(r)) key += r.id + ',';
+  });
+  var changed = key !== _hallKey;
+  _hallKey = key;
+  return changed;
+}
+function refreshHallMasthead() {
+  var t = document.querySelector('.hall-title');
+  var n = document.querySelector('.hall-now');
+  if (t) t.textContent = '啵啵间' + paperName();
+  if (n) {
+    var live = LIVE_HALL_POOL.filter(function (r) { return roomIsLive(r); }).length;
+    n.textContent = live + ' / ' + LIVE_HALL_POOL.length + ' 间直播中';
+  }
+}
+function hallTicker() {
+  var changed = updateRoomSchedule();
+  if (changed) { renderHallRooms(_hallCat || '全部'); refreshHallMasthead(); }
+  else renderHallViewers();
+}
+
+// ---------- 直播间大厅 ----------
+function renderLiveHall() {
+  _liveFromHall = true;
+  const hdr = document.querySelector('.app-header');
+  if (hdr) hdr.classList.add('hidden');
+  const mc = c();
+  if (mc) { mc.style.padding = '0'; mc.style.height = '100%'; mc.style.overflow = 'hidden'; mc.style.background = 'transparent'; }
+  if (_liveTimer) { clearInterval(_liveTimer); _liveTimer = null; }
+  if (_liveBagTimer) { clearInterval(_liveBagTimer); _liveBagTimer = null; }
+  const char = activeCharacter();
+  var cats = ['全部', '唱歌', '聊天', '美食', '学习'];
+  c().innerHTML = `
+    <div class="hall-scroll">
+      <div class="hall-bg"></div>
+      <div class="hall-head">
+        <button class="live-close" onclick="closeApp()">✕</button>
+        <div class="hall-title">啵啵间${paperName()}</div>
+        <div class="hall-now">— · —</div>
+      </div>
+      <div class="hall-feature" onclick="openLiveRoom('')">
+        <div class="hall-feat-live">LIVE</div>
+        <div class="hall-feat-info">
+          <div class="hall-feat-avatar" onclick="event.stopPropagation();liveOpenProfile('')" title="我的主页">${renderAvatar(char.avatar, char.name)}</div>
+          <div class="hall-feat-mid">
+            <div class="hall-feat-head">今 日 头 条</div>
+            <div class="hall-feat-title">${escapeHTML(char.name)} 的直播间</div>
+            <div class="hall-feat-sub">${escapeHTML(char.relation || '我们的主播')} · 进去聊聊</div>
+          </div>
+          <div class="hall-feat-right">
+            <div class="hall-feat-viewers">观众 <b>${state.live.viewer || 12}</b> 人</div>
+            <button class="hall-enter-btn">进场</button>
+          </div>
+        </div>
+      </div>
+      <div class="hall-cats">${cats.map(function (c2) { return '<span class="hall-cat' + (c2 === '全部' ? ' on' : '') + '" data-cat="' + c2 + '" onclick="filterHall(\'' + c2 + '\')">' + c2 + '</span>'; }).join('')}</div>
+      <div class="hall-grid" id="hallGrid"></div>
+    </div>`;
+  updateRoomSchedule();
+  renderHallRooms('全部');
+  refreshHallMasthead();
+  if (_liveHallTimer) clearInterval(_liveHallTimer);
+  _liveHallTimer = setInterval(hallTicker, 3200);
+}
+function renderHallRooms(cat) {
+  const grid = $('hallGrid');
+  if (!grid) return;
+  var list = LIVE_HALL_POOL.filter(function (r) { return roomIsLive(r); });
+  if (cat && cat !== '全部') list = list.filter(function (r) { return r.tag === cat; });
+  if (!list.length) { grid.innerHTML = '<div class="board-empty" style="grid-column:1/-1;color:#7a6f5c">此栏目今日无直播</div>'; return; }
+  grid.innerHTML = list.map(function (r) {
+    var v = r.base + Math.floor(Math.random() * 40) - 18; if (v < 1) v = 1;
+    return '<div class="hall-card" onclick="openLiveRoom(\'' + r.id + '\')">' +
+      '<div class="hall-cover">' +
+      '<span class="hall-cover-emoji">' + r.emoji + '</span>' +
+      '<span class="hall-live-badge">LIVE</span>' +
+      '<span class="hall-cover-viewers" data-i="' + r.id + '">' + v + ' 人</span>' +
+      '<span class="hall-tag">' + escapeHTML(r.tag) + '</span>' +
+      '</div>' +
+      '<div class="hall-card-title">' + escapeHTML(r.title) + '</div>' +
+      '<div class="hall-card-anchor">' + escapeHTML(r.anchor) + '</div>' +
+      '</div>';
+  }).join('');
+}
+function renderHallViewers() {
+  document.querySelectorAll('.hall-cover-viewers').forEach(function (el) {
+    var r = LIVE_HALL_POOL.find(function (x) { return x.id === el.getAttribute('data-i'); });
+    if (!r) return;
+    var v = r.base + Math.floor(Math.random() * 40) - 20; if (v < 1) v = 1;
+    el.textContent = v + ' 人';
+  });
+}
+function filterHall(c) {
+  _hallCat = c;
+  document.querySelectorAll('.hall-cat').forEach(function (x) {
+    x.classList.toggle('on', x.getAttribute('data-cat') === c);
+  });
+  renderHallRooms(c);
+}
+function openLiveRoom(id) {
+  _liveFromHall = true;
+  if (id) {
+    var r = LIVE_HALL_POOL.find(function (x) { return x.id === id; });
+    _liveAnchor = r ? r : null;
+  } else {
+    _liveAnchor = null;
+  }
+  renderLive();
+}
+function liveBack() {
+  if (_liveFromHall) renderLiveHall();
+  else closeApp();
+}
+function liveSpawnParticles() {
+  const bg = document.querySelector('.live-scroll .live-bg');
+  if (!bg || bg.getAttribute('data-seeded')) return;
+  bg.setAttribute('data-seeded', '1');
+  for (var i = 0; i < 18; i++) {
+    var d = document.createElement('div');
+    d.className = 'live-particle';
+    d.style.left = (Math.random() * 100) + '%';
+    var s = 2 + Math.random() * 4;
+    d.style.width = s.toFixed(1) + 'px';
+    d.style.height = s.toFixed(1) + 'px';
+    d.style.opacity = (0.25 + Math.random() * 0.55).toFixed(2);
+    d.style.animationDelay = (Math.random() * 9).toFixed(1) + 's';
+    d.style.animationDuration = (6 + Math.random() * 8).toFixed(1) + 's';
+    bg.appendChild(d);
+  }
+}
+
+// ---------- 直播间个人主页 ----------
+var _igLiveMode = false;
+function liveBack() {
+  if (_igLiveMode) {
+    _igLiveMode = false;
+    if (_liveTimer) { clearInterval(_liveTimer); _liveTimer = null; }
+    if (_liveBagTimer) { clearInterval(_liveBagTimer); _liveBagTimer = null; }
+    if (window.renderIGProfile) renderIGProfile();
+    if (window.switchProfileTab) switchProfileTab('search');
+    return;
+  }
+  if (_liveFromHall) renderLiveHall();
+  else closeApp();
+}
+function liveOpenProfile(id) {
+  var src;
+  if (id) {
+    src = LIVE_HALL_POOL.find(function (x) { return x.id === id; });
+  } else {
+    src = _liveAnchor;
+  }
+  var self;
+  if (!src) {
+    self = true;
+    var ch = activeCharacter();
+    var mp = state.myProfile || {};
+    src = {
+      name: mp.name || ch.name, avatar: mp.avatarImage ? mp.avatar : (mp.avatar || ch.avatar),
+      avatarImage: mp.avatarImage || '', bio: mp.bio || ch.background || ch.greeting || '这个人很懒，什么都没写...',
+      followers: state.live.followers || (mp.followers || 342),
+      posts: mp.gallery ? mp.gallery.slice(0, 9) : []
+    };
+  }
+  var name = src.anchor || src.name || '主播';
+  var avatar = src.avatar || '🌸';
+  var avatarHtml = src.avatarImage
+    ? '<img src="' + src.avatarImage + '" alt="">'
+    : '<span style="font-size:42px">' + avatar + '</span>';
+  var rel = '';
+  if (!self && src.tag) rel = '<div class="lp-chip">' + escapeHTML(src.tag) + '</div>';
+  var posts = (src.posts && src.posts.length)
+    ? src.posts.map(function (t) {
+        return '<div class="lp-post"><span class="lp-post-emoji">' + (src.emoji || avatar) + '</span><span class="lp-post-text">' + escapeHTML(t) + '</span></div>';
+      }).join('')
+    : '<div class="board-empty">还没有动态～</div>';
+  var ml = document.querySelector('.live-scroll');
+  var wrap = document.createElement('div');
+  wrap.className = 'lp-mask';
+  wrap.id = 'liveProfileMask';
+  wrap.onclick = function () { liveCloseProfile(); };
+  wrap.innerHTML = `
+    <div class="lp-sheet" onclick="event.stopPropagation()">
+      <div class="lp-head">
+        <button class="live-close" onclick="liveCloseProfile()">◁</button>
+        <span class="lp-head-title">个人主页</span>
+        <span class="lp-spacer"></span>
+      </div>
+      <div class="lp-scroll">
+        <div class="lp-cover">
+          <div class="lp-avatar">${avatarHtml}</div>
+          <div class="lp-name">${escapeHTML(name)}</div>
+          <div class="lp-followers">⭐ ${src.followers || 0} 粉丝</div>
+          ${rel}
+        </div>
+        <div class="lp-bio">${escapeHTML(src.bio || '这个人很懒，什么都没写...')}</div>
+        <div class="lp-actions">
+          <button class="lp-btn lp-btn-primary" onclick="liveProfileFollow()">➕ 关注</button>
+          <button class="lp-btn" onclick="liveProfileMessage()">💬 私信</button>
+        </div>
+        <div class="lp-title">TA 的动态</div>
+        <div class="lp-posts">${posts}</div>
+      </div>
+    </div>`;
+  ml.appendChild(wrap);
+}
+function liveCloseProfile() {
+  var m = $('liveProfileMask');
+  if (m) m.remove();
+}
+function liveProfileFollow() {
+  state.live.followers = (state.live.followers || 0) + 1;
+  liveCloseProfile();
+  livePush('', 'system', '你关注了主播，粉丝 +1 🎉');
+  var nm = _liveAnchor ? (_liveAnchor.anchor || _liveAnchor.name) : activeCharacter().name;
+  var el = document.querySelector('.live-anchor-name');
+  if (el) el.innerHTML = escapeHTML(nm) + '<span style="font-size:12px;color:#c23b2a;margin-left:6px">☆ ' + state.live.followers + ' 粉</span>';
+}
+function liveProfileMessage() {
+  liveCloseProfile();
+  liveToast('已发出一条私信～');
+}
+function liveProfileHint() {
+  var a = document.querySelector('.live-avatar');
+  if (a) a.title = '查看主播主页';
+}
+
+// ---------- 直播间换肤 ----------
+function liveThemeCur() {
+  try { return localStorage.getItem('liveTheme') || 'paper'; } catch (e) { return 'paper'; }
+}
+function applyLiveTheme() {
+  var s = document.querySelector('.live-scroll');
+  if (s) s.classList.toggle('theme-hot', liveThemeCur() === 'hot');
+  var b = document.getElementById('liveThemeBtn');
+  if (b) b.textContent = liveThemeCur() === 'hot' ? '🎨 报纸' : '🎨 网黄';
+}
+function toggleLiveTheme() {
+  var next = liveThemeCur() === 'hot' ? 'paper' : 'hot';
+  try { localStorage.setItem('liveTheme', next); } catch (e) {}
+  applyLiveTheme();
+  var chip = document.getElementById('flirtChip');
+  if (chip) chip.style.display = liveThemeCur() === 'hot' ? '' : 'none';
+  liveToast(next === 'hot' ? '已切换 · 网黄模式 💗' : '已切换 · 报纸模式 📰');
+}
+
+// ---------- 撩心机制 ----------
+var HOT_LINES = ['心跳加速了呢…', '别这样一直盯着人家看啦', '再撩我要把持不住了', '嗯…你喜欢就好', '脸都红红的，被你发现了', '想听我唱歌，还是说情话呀', '这一杯，敬你的心动', '再靠近一点点嘛～'];
+var HOT_MSGS = ['啊啊好甜！', '她好会，我腿都软了', '求链接！我要这样的主播', '老夫的少女心动了', '这也太撩了吧', '晕，嗑到了', '姐姐今天也太蛊了吧'];
+var HOT_WORDS = [/(爱|亲|抱|喜欢|想你|宝贝|老婆|贴贴)/, /(么么|啵啵)/, /(撩|心动|脸红)/, /(好看|可爱|漂亮|性感)/];
+function liveHot() { return liveThemeCur() === 'hot'; }
+function liveHotMsg() { return liveHot() ? livePick(HOT_MSGS) : livePick(LIVE_AUDIENCE_MSGS); }
+function bumpFlirt(step) {
+  state.live.flirt = (state.live.flirt || 0) + (step === undefined ? 1 : step);
+  var el = document.getElementById('liveFlirt');
+  if (el) el.textContent = state.live.flirt;
+  if (state.live.flirt > 0) { var chip = document.getElementById('flirtChip'); if (chip) chip.style.display = ''; }
+  if (!liveHot()) return;
+  var n = state.live.flirt;
+  if (n % 5 === 0 && n > 0) {
+    var line = document.getElementById('liveLine');
+    if (line) line.textContent = livePick(HOT_LINES);
+    liveKissStamp();
+    liveHeartBurst();
+    if (n % 10 === 0) liveBlush(true);
+    if (n === 5) liveToast('💋 撩心 +' + n + '，主播脸红了！');
+  }
+}
+function liveBlush(strong) {
+  var a = document.querySelector('.live-scroll.theme-hot .live-avatar');
+  if (!a) return;
+  a.classList.add('blushing');
+  clearTimeout(a._bt);
+  a._bt = setTimeout(function () { a.classList.remove('blushing'); }, strong ? 2400 : 1500);
+}
+function liveKiss() {
+  bumpFlirt(1);
+  if (!liveHot()) { liveToast('切到网黄模式才能亲亲哦 💗'); return; }
+  liveBlush(false);
+  liveHeartBurst();
+  liveToast('😳 讨厌，人家会害羞的…');
+}
+function liveKissStamp() {
+  var stage = document.getElementById('liveStage');
+  if (!stage) return;
+  var s = document.createElement('div');
+  s.className = 'live-kiss';
+  s.textContent = '💋';
+  stage.appendChild(s);
+  setTimeout(function () { s.remove(); }, 1400);
+}
+function liveHeartBurst() {
+  var stage = document.getElementById('liveStage');
+  if (!stage) return;
+  for (var i = 0; i < 12; i++) {
+    (function (i) {
+      var h = document.createElement('div');
+      h.className = 'live-float-heart';
+      h.textContent = i % 3 === 0 ? '💋' : (i % 3 === 1 ? '💗' : '🌸');
+      h.style.left = (36 + Math.random() * 28) + '%';
+      h.style.bottom = (28 + Math.random() * 20) + '%';
+      h.style.fontSize = (16 + Math.random() * 16) + 'px';
+      stage.appendChild(h);
+      setTimeout(function () { h.remove(); }, 1500);
+    })(i);
+  }
+}
+function liveRain() {
+  var stage = document.getElementById('liveStage');
+  if (!stage) return;
+  var em = ['💗', '💖', '🌹', '💋', '🌸', '💘'];
+  for (var i = 0; i < 26; i++) {
+    (function (i) {
+      var r = document.createElement('div');
+      r.className = 'live-rain';
+      r.textContent = em[i % em.length];
+      r.style.left = (Math.random() * 100) + '%';
+      r.style.fontSize = (15 + Math.random() * 20) + 'px';
+      r.style.animationDuration = (2 + Math.random() * 2.2) + 's';
+      r.style.animationDelay = (Math.random() * 1.2) + 's';
+      stage.appendChild(r);
+      setTimeout(function () { r.remove(); }, 5600);
+    })(i);
+  }
+}
+
+// ---------- 骚轰轰 · 花活 ----------
+var HOT_POKE = ['啊！你戳我干嘛 😳', '别乱碰呀！', '痒痒的……讨厌啦', '再戳我可要记小本本了', '唔…好痒', '你戳到我的心啦 💗', '嗯…摸都摸了，得负责哦'];
+var HOT_PICKUP = ['你嘴唇有点干，要不要我帮你润一润？', '知道我和星星的区别吗？星星在天上，你在我的心里', '我可以当你的手机吗？这样你每天都把我捧在手里', '猜猜我什么星座——为你量身定做', '最近胸口有点闷，好像被你的可爱堵住了', '你累不累？你都出现在我脑海里一整天了'];
+var HOT_PICKUP_REPLY = ['油！太油了！', '哈哈你这张嘴呀～', '虽然土，但我居然心动了', '你再这样我可要当真了哦', '啵～ 接住了', '哼，撩我？还早着呢', '这句哪里抄的？还挺会'];
+function livePoke() {
+  bumpFlirt(1);
+  if (!liveHot()) return;
+  var a = document.querySelector('.live-scroll.theme-hot .live-avatar');
+  if (a) { a.classList.add('poking'); setTimeout(function () { a.classList.remove('poking'); }, 600); }
+  var line = document.getElementById('liveLine');
+  if (line) line.textContent = livePick(HOT_POKE);
+  liveBlush(false);
+  liveSteam();
+}
+function livePickupLine() {
+  var t = livePick(HOT_PICKUP);
+  livePush(t, 'me');
+  var line = document.getElementById('liveLine');
+  if (line) line.textContent = liveHot() ? livePick(HOT_PICKUP_REPLY) : '哈哈你太会了';
+  if (liveHot()) { bumpFlirt(1); liveBlush(false); if (Math.random() < 0.6) liveHeartBurst(); }
+}
+function liveFlyKiss() {
+  if (!liveHot()) { liveToast('切到网黄模式才能飞吻哦 💋'); return; }
+  bumpFlirt(1);
+  var stage = document.getElementById('liveStage');
+  if (!stage) return;
+  var k = document.createElement('div');
+  k.className = 'live-flykiss';
+  k.textContent = '💋';
+  stage.appendChild(k);
+  setTimeout(function () { k.remove(); liveBlush(false); liveHeartBurst(); liveSteam(); liveToast('啵～ 接住你的飞吻了 💗'); }, 1200);
+}
+function liveSteam() {
+  var av = document.querySelector('.live-scroll.theme-hot .live-avatar');
+  if (!av || !av.parentNode) return;
+  for (var i = 0; i < 3; i++) {
+    var s = document.createElement('div');
+    s.className = 'live-steam';
+    s.textContent = '///';
+    s.style.left = (16 + Math.random() * 68) + '%';
+    s.style.top = (10 + Math.random() * 20) + '%';
+    s.style.fontSize = (13 + Math.random() * 7) + 'px';
+    av.parentNode.appendChild(s);
+    (function (node) { setTimeout(function () { node.remove(); }, 1500); })(s);
+  }
+}
+
+function renderLive() {
+  if (!state.live) state.live = { viewer: 12, likes: 0, giftWorth: 0, gifts: 0, followers: 0, intimacy: 0, coins: 0, lastSign: '', giftLog: [], song: '', flirt: 0 };
+  const hdr = document.querySelector('.app-header');
+  if (hdr) hdr.classList.add('hidden');
+  const mc = c();
+  if (mc) { mc.style.padding = '0'; mc.style.height = '100%'; mc.style.overflow = 'hidden'; mc.style.background = 'transparent'; }
+  let char;
+  if (_liveAnchor && _liveAnchor.anchor) {
+    char = { name: _liveAnchor.anchor, avatar: _liveAnchor.avatar };
+  } else {
+    char = activeCharacter();
+  }
+  const now = state.live;
+  const lv = liveLevel();
+  c().innerHTML = `
+    <div class="live-scroll">
+      <div class="live-bg">
+        <div class="live-aurora live-aurora-a"></div>
+        <div class="live-aurora live-aurora-b"></div>
+        <div class="live-spot"></div>
+      </div>
+      <button class="live-close" onclick="liveBack()">◁</button>
+      <div class="live-banner" id="liveBanner"></div>
+      <div class="live-toast" id="liveToast"></div>
+      <div class="live-top">
+        <span class="live-viewer-chip"><span class="live-dot"></span>LIVE</span>
+        <span class="live-viewer-chip">👀 <b id="liveViewerNum">${now.viewer}</b></span>
+        <span class="live-viewer-chip">❤️ <b id="liveLikeNum">${now.likes}</b></span>
+        <span class="live-spacer"></span>
+        <span class="live-viewer-chip">🏅 Lv<span id="liveLv">${lv.lv}</span>·<span id="liveLvName">${lv.name}</span></span>
+        <span class="live-viewer-chip">💰 <span id="liveCoins">${now.coins}</span></span>
+        <span class="live-viewer-chip" id="flirtChip" style="display:none">💋 撩心 <b id="liveFlirt">0</b></span>
+      </div>
+      <div class="live-stage" id="liveStage">
+        <div class="live-aura"></div>
+        <div class="live-rays" id="liveRays"></div>
+        <div class="live-notes" id="liveNotes"></div>
+        <div style="position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;z-index:2">
+          <div style="position:relative">
+            <div class="live-avatar" onclick="liveHot()?livePoke():liveOpenProfile('${_liveAnchor ? _liveAnchor.id : ''}')" title="戳她一下">${renderAvatar(char.avatar, char.name)}</div>
+            <div class="live-badge">LIVE·${escapeHTML(char.name || '主播')}</div>
+          </div>
+          <div class="live-anchor-name" onclick="liveOpenProfile('${_liveAnchor ? _liveAnchor.id : ''}')" title="查看主播主页">${escapeHTML(char.name || '主播')}<span style="font-size:12px;color:#c23b2a;margin-left:6px">☆ ${now.followers} 粉</span></div>
+          <div class="live-line" id="liveLine">正在营业，啵一个～</div>
+        </div>
+        <div class="live-hearts" id="liveHearts"></div>
+        <div class="live-follow-pop" id="liveFollowPop" style="display:none"></div>
+        <div class="live-bag" id="liveBag">
+          <span class="live-bag-icon">🎁</span><span>福袋</span>
+          <b id="liveBagTime">60</b><span>s</span>
+          <button class="live-bag-btn" id="liveBagBtn" onclick="liveBagGrab()">抢</button>
+        </div>
+        <div class="live-chat" id="liveChat"></div>
+      </div>
+      <div class="live-growth" id="liveGrowth"></div>
+      <div class="live-gift-tray" id="liveGiftTray" style="display:none"></div>
+      <div class="live-song-tray" id="liveSongTray" style="display:none"></div>
+      <div class="live-board" id="liveBoard" style="display:none"></div>
+      <div class="live-tool">
+        <button class="live-tool-btn" onclick="liveSign()">📝 签到</button>
+        <button class="live-tool-btn" onclick="liveBar()">🪄 荧光棒</button>
+        <button class="live-tool-btn" id="liveMicBtn" onclick="liveMic()">🎙️ 连麦</button>
+        <button class="live-tool-btn" onclick="toggleLiveBoard()">🏆 榜单</button>
+        <button class="live-tool-btn" onclick="toggleLiveSongs()">🎵 点歌</button>
+        <button class="live-tool-btn" onclick="livePickupLine()">💬 情话机</button>
+        <button class="live-tool-btn" onclick="liveFlyKiss()">💋 飞吻</button>
+        <button class="live-tool-btn" onclick="liveKiss()">亲亲</button>
+        <button class="live-tool-btn" onclick="liveRain()">🌹 爱心雨</button>
+        <button class="live-tool-btn" onclick="liveFollow()">➕ 关注</button>
+        <button class="live-tool-btn" id="liveThemeBtn" onclick="toggleLiveTheme()">🎨 网黄</button>
+      </div>
+      <div class="live-bar">
+        <input class="live-input" id="liveInput" placeholder="说点什么…" onkeydown="if(event.key==='Enter')liveSay()">
+        <button class="live-act" title="点赞" onclick="liveHeart()">❤️</button>
+        <button class="live-act" title="礼物" onclick="toggleLiveGifts()">🎁</button>
+        <button class="live-send" onclick="liveSay()">发送</button>
+      </div>
+    </div>`;
+  renderLiveGifts();
+  renderLiveSongs();
+  if (_liveTimer) { clearInterval(_liveTimer); _liveTimer = null; }
+  if (_liveBagTimer) { clearInterval(_liveBagTimer); _liveBagTimer = null; }
+  livePush('', 'system', '欢迎进入「啵啵间」· ' + escapeHTML(char.name) + ' 的直播间');
+  livePush(livePick(LIVE_AUDIENCE), 'a', liveHotMsg());
+  _liveTimer = setInterval(liveTick, 2200);
+  liveBagStart();
+  liveSpawnParticles();
+  applyLiveTheme();
+}
+
+function renderLiveGifts() {
+  const tray = $('liveGiftTray');
+  if (!tray) return;
+  tray.innerHTML = LIVE_GIFTS.map(function (g, i) {
+    return '<button class="live-gift" onclick="liveGift(' + i + ')">' + g.icon + '　' + escapeHTML(g.name) + ' ¥' + g.cost + '</button>';
+  }).join('');
+}
+function renderLiveSongs() {
+  const tray = $('liveSongTray');
+  if (!tray) return;
+  var nowSong = state.live.song;
+  tray.innerHTML = LIVE_SONGS.map(function (s, i) {
+    return '<button class="live-gift' + (s === nowSong ? ' cur' : '') + '" onclick="liveSong(' + i + ')">🎵 ' + escapeHTML(s) + '</button>';
+  }).join('');
+}
+function renderLiveBoard() {
+  const board = $('liveBoard');
+  if (!board) return;
+  if (!_liveBoard) {
+    _liveBoard = [
+      { name: '阿澈', emoji: '🐱', worth: 188 },
+      { name: '奶茶', emoji: '🧋', worth: 120 },
+      { name: '橘子', emoji: '🍊', worth: 66 }
+    ];
+  }
+  var me = { name: '我', emoji: '🙋', worth: state.live.giftWorth || 0 };
+  var rows = _liveBoard.concat([me]).sort(function (a, b) { return b.worth - a.worth; }).slice(0, 3);
+  var topHtml = rows.map(function (r, i) {
+    var mine = r.emoji === '🙋' ? ' mine' : '';
+    return '<div class="board-row' + mine + '"><span class="board-rank">' + (i + 1) + '</span><span class="board-emoji">' + r.emoji + '</span><span class="board-name">' + escapeHTML(r.name) + '</span><span class="board-worth">¥' + r.worth + '</span></div>';
+  }).join('');
+  var wall = (state.live.giftLog || []).slice(0, 14).map(function (g) {
+    return '<span class="wall-item">' + g.icon + ' ' + escapeHTML(g.from) + ' ' + escapeHTML(g.name) + ' ¥' + g.cost + '</span>';
+  }).join('') || '<div class="board-empty">还没人送礼物，去送一个吧～</div>';
+  var lv = liveLevel();
+  var next = LIVE_LEVELS[lv.lv] || null;
+  board.innerHTML =
+    '<div class="board-head"><b>🏆 贡献榜 TOP3</b><span class="board-close" onclick="toggleLiveBoard()">✕</span></div>' +
+    topHtml +
+    '<div class="board-title">🎁 礼物墙</div><div class="wall-wrap">' + wall + '</div>' +
+    '<div class="board-title">⭐ 我的等级 · 亲密度 ' + state.live.intimacy + '</div>' +
+    '<div class="lv-row"><span class="lv-badge">Lv' + lv.lv + '</span><span>' + escapeHTML(lv.name) + '</span><span class="lv-address">' + escapeHTML(liveTitle(lv.lv)) + '</span></div>' +
+    '<div class="lv-track"><div class="lv-fill" style="width:' + lv.pct + '%"></div></div>' +
+    '<div class="board-sub">' + (next ? '距离 Lv' + next.lv + '·' + escapeHTML(next.name) + ' 还需亲密 ' + (next.need - state.live.intimacy) : '已满级') + '</div>';
+}
+function toggleLiveGifts() {
+  const tray = $('liveGiftTray');
+  if (!tray) return;
+  const show = tray.style.display === 'none';
+  tray.style.display = show ? 'grid' : 'none';
+  $('liveSongTray').style.display = 'none';
+  $('liveBoard').style.display = 'none';
+  if (show) renderLiveGifts();
+}
+function toggleLiveSongs() {
+  const tray = $('liveSongTray');
+  if (!tray) return;
+  const show = tray.style.display === 'none';
+  tray.style.display = show ? 'grid' : 'none';
+  $('liveGiftTray').style.display = 'none';
+  $('liveBoard').style.display = 'none';
+  if (show) renderLiveSongs();
+}
+function toggleLiveBoard() {
+  const board = $('liveBoard');
+  if (!board) return;
+  const show = board.style.display === 'none';
+  board.style.display = show ? 'block' : 'none';
+  $('liveGiftTray').style.display = 'none';
+  $('liveSongTray').style.display = 'none';
+  if (show) renderLiveBoard();
+}
+function liveNum(n) {
+  if (isNaN(n)) return;
+  state.live.viewer = Math.max(0, n);
+  const el = $('liveViewerNum');
+  if (el) el.innerText = state.live.viewer;
+}
+function liveRefreshChips() {
+  var lv = liveLevel();
+  var lvEl = $('liveLv'); if (lvEl) lvEl.innerText = lv.lv;
+  var nEl = $('liveLvName'); if (nEl) nEl.innerText = lv.name;
+  var cEl = $('liveCoins'); if (cEl) cEl.innerText = state.live.coins;
+}
+function liveToast(msg) {
+  const t = $('liveToast');
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.remove('show');
+  void t.offsetWidth;
+  t.classList.add('show');
+  clearTimeout(_toastT);
+  _toastT = setTimeout(function () { const tt = $('liveToast'); if (tt) tt.classList.remove('show'); }, 2200);
+}
+function livePush(text, who, html) {
+  const feed = $('liveChat');
+  if (!feed) return;
+  const item = document.createElement('div');
+  item.className = 'live-item';
+  if (who === 'me') item.innerHTML = '<b style="color:#6fd8ff">我：</b>' + text;
+  else if (who === 'myheart') item.innerHTML = '<b style="color:#ff6b81">我：</b> ❤ ' + text;
+  else if (who === 'mygift') item.innerHTML = '<b style="color:#c23b2a">我：</b> 送出 ' + text;
+  else if (who === 'follow') item.innerHTML = '<b style="color:#7cc9ff">我：</b> 关注了主播～';
+  else if (who === 'sys') item.innerHTML = '<b style="color:#8f7bb0">📢</b> ' + escapeHTML(text);
+  else if (who === 'anchor') item.innerHTML = '<b style="color:#c23b2a">主播：</b> ' + escapeHTML(text);
+  else if (who === 'eff') item.innerHTML = html || '';
+  else if (who === 'system') item.innerHTML = '<b style="color:#8f7bb0">💬</b> ' + (html || escapeHTML(text));
+  else item.innerHTML = html || escapeHTML(text);
+  feed.appendChild(item);
+  while (feed.children.length > 7) feed.removeChild(feed.firstChild);
+}
+function liveFloatHeart() {
+  const stage = $('liveHearts');
+  if (!stage) return;
+  const h = document.createElement('div');
+  h.className = 'live-float-heart';
+  h.textContent = livePick(['❤️', '💖', '💛', '💚', '💜']);
+  h.style.left = (20 + Math.random() * 60) + '%';
+  stage.appendChild(h);
+  setTimeout(function () { if (h.parentNode) h.parentNode.removeChild(h); }, 1100);
+}
+function liveGiftBurst(icon) {
+  const burst = document.createElement('div');
+  burst.className = 'live-gift-burst';
+  burst.textContent = icon;
+  const stage = $('liveStage');
+  if (stage) stage.appendChild(burst);
+  setTimeout(function () { if (burst.parentNode) burst.parentNode.removeChild(burst); }, 1200);
+}
+function liveRaysBurst() {
+  const r = $('liveRays');
+  if (!r) return;
+  r.classList.remove('on');
+  void r.offsetWidth;
+  r.classList.add('on');
+  setTimeout(function () { if (r) r.classList.remove('on'); }, 1200);
+}
+function liveNotes() {
+  const zone = $('liveNotes');
+  if (!zone) return;
+  for (var i = 0; i < 4; i++) {
+    (function (k) {
+      setTimeout(function () {
+        const n = document.createElement('div');
+        n.className = 'live-note';
+        n.textContent = livePick(['🎵', '🎶', '♪', '♫']);
+        n.style.left = (20 + Math.random() * 60) + '%';
+        zone.appendChild(n);
+        setTimeout(function () { if (n.parentNode) n.parentNode.removeChild(n); }, 1800);
+      }, k * 180);
+    })(i);
+  }
+}
+function liveGrowth() {
+  const g = $('liveGrowth');
+  if (!g) return;
+  const el = document.createElement('div');
+  el.className = 'live-follow-pop';
+  el.style.top = 'auto';
+  el.style.bottom = '74px';
+  el.textContent = '+1';
+  el.style.right = '30px';
+  g.appendChild(el);
+  setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 1200);
+}
+function liveSay() {
+  const input = $('liveInput');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  livePush(text, 'me');
+  liveNum(state.live.viewer + (Math.random() < 0.5 ? 1 : 0));
+  var eff = null;
+  for (var i = 0; i < LIVE_KEYWORDS.length; i++) {
+    if (LIVE_KEYWORDS[i].re.test(text)) { eff = LIVE_KEYWORDS[i].eff; break; }
+  }
+  const line = $('liveLine');
+  if (eff === 'rocket') { liveGiftBurst('🚀'); if (line) line.textContent = '哇 有人刷火箭啦！！'; livePush('', 'eff', '<b style="color:#c23b2a">🚀 火箭直达！</b>'); }
+  else if (eff === '777') { livePush('', 'eff', '<b style="color:#7cc9ff;font-size:15px">777 💙</b>'); }
+  else if (eff === '666') { livePush('', 'eff', '<b style="color:#c23b2a;font-size:15px">666 ✨</b>'); if (line) line.textContent = '你们好会夸，我害羞了～'; }
+  else if (eff === 'love') { liveFloatHeart(); if (line) line.textContent = text.length <= 6 ? '我也' + text : '心都被你说软了 ❤'; bumpFlirt(1); liveBlush(false); }
+  else if (eff === 'nice') { livePush('', 'eff', '<b style="color:#7cc9ff">👏 谢谢夸奖</b>'); if (line) line.textContent = '谢谢谢谢，我会继续加油的！'; }
+  else {
+    var hv = false;
+    for (var k = 0; k < HOT_WORDS.length; k++) { if (HOT_WORDS[k].test(text)) { hv = true; break; } }
+    if (hv) { bumpFlirt(1); liveBlush(false); if (liveHot() && line) line.textContent = livePick(HOT_LINES); }
+    else if (Math.random() < 0.3 && !liveHot()) livePush('', 'a', livePick(LIVE_AUDIENCE_MSGS));
+  }
+}
+function liveHeart() {
+  state.live.likes++;
+  const likeEl = $('liveLikeNum');
+  if (likeEl) likeEl.innerText = state.live.likes;
+  liveFloatHeart();
+  livePush('', 'myheart', '给主播比个心');
+  if (Math.random() < 0.34) livePush('', 'a', '谢谢主播～');
+  if (liveHot() && Math.random() < 0.5) { bumpFlirt(1); liveBlush(false); }
+  saveState();
+}
+function liveFollow() {
+  var first = state.live.followers === 0;
+  state.live.followers++;
+  liveAddIntimacy(first ? 10 : 5, false);
+  const pop = $('liveFollowPop');
+  if (pop) { pop.style.display = 'block'; pop.textContent = '🎉 感谢关注！粉丝 ' + state.live.followers; setTimeout(function () { pop.style.display = 'none'; }, 1800); }
+  livePush('', 'follow');
+  const line = $('liveLine');
+  if (line) line.textContent = '关注不迷路，' + liveTitle(liveLevel().lv) + '！';
+  saveState();
+}
+function liveSign() {
+  var t = todayKey();
+  if (state.live.lastSign === t) { liveToast('今天已经签到过啦，明天再来'); return; }
+  state.live.lastSign = t;
+  state.live.coins += 20;
+  liveAddIntimacy(5, false);
+  livePush('', 'sys', '签到成功 +20 金币');
+  liveToast('📝 签到成功 +20金币 · 亲密+5');
+  saveState();
+}
+function liveBar() {
+  if (state.live.coins < 5) { liveToast('金币不够啦，先签到或抢福袋吧'); return; }
+  state.live.coins -= 5;
+  liveAddIntimacy(2, false);
+  liveRaysBurst();
+  livePush('', 'me', '🪄 点亮了一根荧光棒');
+  const line = $('liveLine');
+  if (line) line.textContent = '哇 有人点亮荧光棒！好有氛围～';
+  saveState();
+}
+function liveMic() {
+  state.live.mic = !state.live.mic;
+  const btn = $('liveMicBtn');
+  if (btn) btn.classList.toggle('on', state.live.mic);
+  const line = $('liveLine');
+  if (state.live.mic) {
+    livePush('', 'sys', '🎙️ 我 已上麦');
+    livePush('', 'anchor', livePick(['欢迎' + liveTitle(liveLevel().lv) + '上麦！', '上麦啦，你说话我都听着', '🎙️ 连麦中，别紧张～']));
+    if (line) line.textContent = '🎙️ 我们' + liveTitle(liveLevel().lv) + '上麦了，大家欢迎～';
+  } else {
+    livePush('', 'sys', '🎙️ 我 已下麦');
+    if (line) line.textContent = '下麦啦，聊得好好的嘛～';
+  }
+  saveState();
+}
+function liveSong(k) {
+  var name = LIVE_SONGS[k];
+  if (!name) return;
+  state.live.song = name;
+  livePush('', 'sys', '点歌：《' + escapeHTML(name) + '》');
+  const line = $('liveLine');
+  if (line) line.textContent = '好，唱给你听～《' + name + '》';
+  liveNotes();
+  $('liveSongTray').style.display = 'none';
+  saveState();
+  renderLiveSongs();
+}
+function liveAddIntimacy(n, fromGift) {
+  var before = liveLevel().lv;
+  state.live.intimacy = Math.max(0, (state.live.intimacy || 0) + n);
+  liveRefreshChips();
+  var after = liveLevel();
+  if (after.lv > before) liveLevelUp(after);
+}
+function liveLevelUp(after) {
+  const el = document.createElement('div');
+  el.className = 'live-levelup';
+  el.innerHTML = '🎉 升级 Lv' + after.lv + ' · ' + escapeHTML(after.name);
+  const stage = $('liveStage');
+  if (stage) stage.appendChild(el);
+  setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 2400);
+  const line = $('liveLine');
+  if (line) line.textContent = '哇，' + liveTitle(after.lv) + '升到 Lv' + after.lv + ' 啦！';
+  livePush('', 'sys', '🎉 我 升级啦 → Lv' + after.lv + '·' + after.name);
+  saveState();
+}
+function liveRememberGift(g) {
+  const char = activeCharacter();
+  if (!char) return;
+  var mems = char.memories || [];
+  var last = mems[0];
+  if (last && last.title === '啵啵间' && last.text.indexOf(g.name) >= 0 && (Date.now() - (last.ts || 0)) < 60000) return;
+  char.memories.unshift({ id: 'mem-live-' + Date.now(), title: '啵啵间', text: '在直播间给' + char.name + '送过「' + g.name + '」（¥' + g.cost + '），TA 心里记着呢。', date: new Date().toLocaleString(), ts: Date.now() });
+  if (char.memories.length > 20) char.memories.length = 20;
+  saveState();
+}
+function liveGift(i) {
+  var g = LIVE_GIFTS[i];
+  if (!g) return;
+  if (parseFloat(state.profile.wallet) < g.cost) { liveToast('钱包余额不足，去账本看看啦'); return; }
+  state.profile.wallet = parseFloat(state.profile.wallet || 0) - g.cost;
+  state.live.gifts++;
+  state.live.giftWorth += g.cost;
+  state.live.giftLog.unshift({ icon: g.icon, name: g.name, from: '我', cost: g.cost, time: Date.now() });
+  if (state.live.giftLog.length > 30) state.live.giftLog.length = 30;
+  const worthEl = $('liveGiftWorth');
+  if (worthEl) worthEl.innerText = state.live.giftWorth;
+  $('liveGiftTray').style.display = 'none';
+  livePush('', 'mygift', '<b style="color:#c23b2a">' + g.icon + ' ' + escapeHTML(g.name) + '</b>（¥' + g.cost + '）');
+  liveGiftBurst(g.icon);
+  const line = $('liveLine');
+  if (line) line.textContent = livePick(['谢谢宝贝的' + g.name + '！', '哇 ' + g.icon + ' 好喜欢，谢谢你～', '收到' + g.icon + '，今晚做梦都会笑', '好宠我，爱你 ❤']);
+  if (Math.random() < 0.5) livePush('', 'a', '哇，土豪出没！');
+  liveAddIntimacy(g.cost, true);
+  liveRememberGift(g);
+  bumpFlirt(g.cost >= 50 ? 3 : 1);
+  if (liveHot()) liveKissStamp();
+  saveState();
+}
+function liveBigFan() {
+  var f = livePick(LIVE_BIG_FANS);
+  const b = $('liveBanner');
+  if (!b) return;
+  b.innerHTML = '🌟 ' + escapeHTML(f.name) + ' ' + f.emoji + ' 进入直播间';
+  b.classList.remove('show');
+  void b.offsetWidth;
+  b.classList.add('show');
+  setTimeout(function () { b.classList.remove('show'); }, 2600);
+}
+function liveAudienceGift() {
+  var g = livePick(LIVE_AUD_GIFTS);
+  var a = livePick(LIVE_AUDIENCE);
+  state.live.giftWorth += g.cost;
+  state.live.giftLog.unshift({ icon: g.icon, name: g.name, from: a, cost: g.cost, time: Date.now() });
+  if (state.live.giftLog.length > 30) state.live.giftLog.length = 30;
+  const w = $('liveGiftWorth');
+  if (w) w.innerText = state.live.giftWorth;
+  livePush('', 'eff', '<b style="color:#c23b2a">' + escapeHTML(a) + '</b> 送出 ' + g.icon + ' ' + escapeHTML(g.name) + ' ¥' + g.cost);
+  if (_liveBoard) {
+    var row = _liveBoard.find(function (x) { return x.name === a; });
+    if (row) row.worth += g.cost;
+  }
+  saveState();
+}
+function liveTick() {
+  if (!_liveTimer) return;
+  var r = Math.random();
+  if (r < 0.38) {
+    livePush('', 'a', liveHotMsg());
+    if (Math.random() < 0.18) liveNum(state.live.viewer + (Math.random() < 0.5 ? 1 : (state.live.viewer > 3 ? -1 : 1)));
+  } else if (r < 0.56) {
+    const line = $('liveLine');
+    if (line) {
+      if (Math.random() < 0.5) line.textContent = livePick(LIVE_ANCHOR_MSGS);
+      else line.textContent = livePick(LIVE_ANCHOR_TITLE).replace('{T}', liveTitle(liveLevel().lv));
+    }
+  } else if (r < 0.70) {
+    liveBigFan();
+  } else if (r < 0.80) {
+    liveAudienceGift();
+  } else if (r < 0.90) {
+    if (state.live.viewer > 2 && Math.random() < 0.5) liveNum(state.live.viewer - 1);
+  }
+}
+function liveBagStart() {
+  if (_liveBagTimer) clearInterval(_liveBagTimer);
+  _liveBag.grabbed = false;
+  _liveBag.t = 60;
+  var te = $('liveBagTime'); if (te) te.innerText = _liveBag.t;
+  var btn = $('liveBagBtn');
+  if (btn) { btn.disabled = false; btn.textContent = '抢'; }
+  _liveBagTimer = setInterval(function () {
+    _liveBag.t--;
+    var el = $('liveBagTime');
+    if (el) el.innerText = Math.max(0, _liveBag.t);
+    if (_liveBag.t <= 0) liveBagOpen();
+  }, 1000);
+}
+function liveBagOpen() {
+  if (_liveBagTimer) { clearInterval(_liveBagTimer); _liveBagTimer = null; }
+  var won = _liveBag.grabbed ? '我' : livePick(LIVE_AUDIENCE);
+  var val = 10 + Math.floor(Math.random() * 16);
+  if (won === '我') {
+    state.live.coins += val;
+    liveAddIntimacy(3, false);
+    liveToast('🎁 福袋开奖：你抢到 ' + val + ' 金币！');
+    livePush('', 'sys', '🎁 福袋开奖：我 抢到 ' + val + ' 金币！');
+  } else {
+    livePush('', 'sys', '🎁 福袋开奖：' + escapeHTML(won) + ' 抢到 ' + val + ' 金币');
+  }
+  saveState();
+  liveBagStart();
+}
+function liveBagGrab() {
+  if (_liveBag.grabbed) { liveToast('你已经抢过这个福袋啦'); return; }
+  _liveBag.grabbed = true;
+  const btn = $('liveBagBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '已抢'; }
+  liveToast('🎁 已抢福袋，等开奖～');
+}
 
 // ---------- 相册 ----------
 let currentAlbumId = null;
@@ -4076,13 +5023,9 @@ function renderGame() {
               <b>🍰 阿Sue做蛋糕</b><span class="subtle">按订单装饰蛋糕</span></div>
             <div onclick="gameMode='puzzle';renderGame()" style="display:flex;justify-content:space-between;align-items:center;padding:11px 2px;cursor:pointer">
               <b>🧩 拼图</b><span class="subtle">用你们的合照拼</span></div>
-         </div>
-         <button class="primary-btn" style="margin-top:10px" onclick="openGroupChat()">👥 群聊模式</button>
-         <button class="ghost-btn" style="margin-top:6px" onclick="renderWidgetsPanel()">📱 小组件</button>
-         <button class="ghost-btn" style="margin-top:6px" onclick="renderTimeline()">📅 时间线</button>
-         <button class="ghost-btn" style="margin-top:6px" onclick="showImageGenHistory()">🎨 AI 生图记录</button>
-       </div>
-     </div>`;
+          </div>
+        </div>
+      </div>`;
     return;
   }
   c().innerHTML = `

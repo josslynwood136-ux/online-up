@@ -18,66 +18,6 @@ function showIGToast(msg) {
   el._timer = setTimeout(() => el.classList.remove('show'), 2500);
 }
 
-function filterIGContacts() { renderIGContacts(); }
-
-// ====== IG Group Creation ======
-let igGroupSelecting = false;
-let igGroupSelected = {};
-
-function igStartCreateGroup() {
-  const chars = state.roles.filter(r => r.id !== 'role-default');
-  if (chars.length < 2) { showIGToast('至少需要 2 个角色才能建群'); return; }
-  igGroupSelecting = true;
-  igGroupSelected = {};
-  const mask = $('igGroupSheetMask');
-  const sheet = $('igGroupSheet');
-  const list = $('igGroupSheetList');
-  if (mask) mask.style.display = '';
-  if (sheet) sheet.style.display = '';
-  if (list) {
-    list.innerHTML = chars.map(c => {
-      return '<div class="ig-group-item" data-id="' + c.id + '" onclick="igToggleGroupMember(\'' + c.id + '\')">' +
-        '<div class="ig-group-item-avatar">' + renderAvatar(c.avatar, c.name) + '</div>' +
-        '<div class="ig-group-item-name">' + escapeHTML(c.name) + '</div>' +
-        '<div class="ig-group-item-check"></div>' +
-      '</div>';
-    }).join('');
-  }
-  igUpdateGroupConfirm();
-}
-
-function igCancelCreateGroup() {
-  igGroupSelecting = false;
-  igGroupSelected = {};
-  const mask = $('igGroupSheetMask');
-  const sheet = $('igGroupSheet');
-  if (mask) mask.style.display = 'none';
-  if (sheet) sheet.style.display = 'none';
-}
-
-function igToggleGroupMember(id) {
-  if (igGroupSelected[id]) { delete igGroupSelected[id]; }
-  else { igGroupSelected[id] = true; }
-  const item = document.querySelector('.ig-group-item[data-id="' + id + '"]');
-  if (item) item.classList.toggle('selected', !!igGroupSelected[id]);
-  igUpdateGroupConfirm();
-}
-
-function igUpdateGroupConfirm() {
-  const count = Object.keys(igGroupSelected).length;
-  const btn = $('igGroupConfirmBtn');
-  const hint = $('igGroupHint');
-  if (btn) { btn.disabled = count < 2; btn.textContent = count >= 2 ? '创建群聊 (' + count + ')' : '至少选 2 人'; }
-  if (hint) hint.textContent = count >= 2 ? '已选 ' + count + ' 人' : '至少选 2 人';
-}
-
-function igConfirmCreateGroup() {
-  const ids = Object.keys(igGroupSelected);
-  if (ids.length < 2) return;
-  igCancelCreateGroup();
-  openGroupChat(ids);
-}
-
 function renderIGProfile() {
   const mc = c();
   if (mc) { mc.style.padding = '0'; mc.style.height = '100%'; mc.style.overflow = 'hidden'; }
@@ -131,27 +71,6 @@ function renderIGProfile() {
         <div class="profile-panel" id="igPanelProfile">
           <div class="profile-panel-content" id="igProfileContent"></div>
         </div>
-        <!-- Panel 5: Contacts -->
-        <div class="profile-panel" id="igPanelContacts">
-          <div class="ig-contacts-wrap" id="igContactsContainer">
-            <div class="ig-contacts-topbar">
-              <div class="ig-contacts-search">
-                <span class="ig-contacts-search-icon">🔍</span>
-                <input type="text" class="ig-contacts-search-input" id="igContactsSearchInput" placeholder="搜索联系人..." oninput="filterIGContacts()" />
-              </div>
-              <button class="ig-contacts-create-btn" id="igCreateGroupBtn" onclick="igStartCreateGroup()">＋建群</button>
-            </div>
-            <div class="ig-contacts-list" id="igContactsList"></div>
-          </div>
-          <div class="ig-group-sheet-mask" id="igGroupSheetMask" style="display:none" onclick="igCancelCreateGroup()"></div>
-          <div class="ig-group-sheet" id="igGroupSheet" style="display:none">
-            <div class="ig-group-sheet-handle"></div>
-            <div class="ig-group-sheet-title">选择群聊成员</div>
-            <div class="ig-group-sheet-hint" id="igGroupHint">至少选 2 人</div>
-            <div class="ig-group-sheet-list" id="igGroupSheetList"></div>
-            <button class="ig-group-confirm-btn" id="igGroupConfirmBtn" disabled onclick="igConfirmCreateGroup()">创建群聊</button>
-          </div>
-        </div>
       </div>
 
       <!-- IG Bottom Navigation -->
@@ -167,10 +86,6 @@ function renderIGProfile() {
         <div class="nav-item" data-tab="post" onclick="openPostCreator()">
           <span class="nav-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></svg></span>
           <span class="nav-label">发布</span>
-        </div>
-        <div class="nav-item" data-tab="contacts" onclick="switchProfileTab('contacts')">
-          <span class="nav-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M6.5 6.5a3 3 0 010 4.5"/></svg></span>
-          <span class="nav-label">联系人</span>
         </div>
         <div class="nav-item" data-tab="profile" onclick="switchProfileTab('profile')">
           <span class="nav-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
@@ -199,9 +114,6 @@ function switchProfileTab(tab) {
   } else if (tab === 'profile') {
     $('igPanelProfile').classList.add('active');
     renderMyProfileContent();
-  } else if (tab === 'contacts') {
-    $('igPanelContacts').classList.add('active');
-    renderIGContacts();
   }
 }
 
@@ -857,64 +769,10 @@ function renderDmList() {
     `;
     container.appendChild(div);
   });
- }
+}
 
-  // ====== IG Contacts (Panel 5) ======
-  function renderIGContacts() {
-    const list = $('igContactsList');
-    if (!list) return;
-    const chars = state.roles.filter(r => r.id !== 'role-default');
-    if (chars.length === 0) {
-      list.innerHTML = '<div class="ig-contacts-empty"><div class="ig-contacts-empty-icon">👥</div><div class="ig-contacts-empty-text">还没有联系人</div><div class="ig-contacts-empty-sub">去创建角色吧</div></div>';
-      return;
-    }
-    const query = ($('igContactsSearchInput') || {}).value || '';
-    const q = query.toLowerCase();
-    const filtered = q ? chars.filter(c => c.name.toLowerCase().includes(q) || (c.relation || '').toLowerCase().includes(q)) : chars;
-    const active = [], idle = [];
-    filtered.forEach(c => {
-      const chat = c.chat || [];
-      const last = chat[chat.length - 1];
-      const hasRecent = last && last.time && (Date.now() - last.time < 86400000);
-      (hasRecent ? active : idle).push(c);
-    });
-    let html = '';
-    if (active.length > 0) {
-      html += '<div class="ig-contacts-section"><div class="ig-contacts-section-head"><span class="ig-contacts-section-dot online"></span>最近活跃</div>';
-      active.forEach(c => { html += contactCard(c); });
-      html += '</div>';
-    }
-    if (idle.length > 0) {
-      html += '<div class="ig-contacts-section"><div class="ig-contacts-section-head">全部联系人 <span class="ig-contacts-section-count">' + idle.length + '</span></div>';
-      idle.forEach(c => { html += contactCard(c); });
-      html += '</div>';
-    }
-    if (active.length === 0 && idle.length === 0) {
-      html = '<div class="ig-contacts-empty"><div class="ig-contacts-empty-icon">🔍</div><div class="ig-contacts-empty-text">没有找到</div></div>';
-    }
-    list.innerHTML = html;
-  }
-  function contactCard(c) {
-    const chat = c.chat || [];
-    const last = chat[chat.length - 1];
-    const preview = last ? last.content.slice(0, 36) + (last.content.length > 36 ? '...' : '') : '还没有互动';
-    const time = last && last.time ? formatPostTime(last.time) : '';
-    const online = chat.length > 0;
-    const rel = (c.relation || '').trim();
-    const relTag = rel ? '<span class="ig-contact-rel">' + escapeHTML(rel) + '</span>' : '';
-    return '<div class="ig-contact-card" onclick="openChat(\'' + c.id + '\',\'comic\')">' +
-      '<div class="ig-contact-avatar">' + renderAvatar(c.avatar, c.name) + '</div>' +
-      (online ? '<span class="ig-contact-online-dot"></span>' : '') +
-      '<div class="ig-contact-body">' +
-        '<div class="ig-contact-row"><span class="ig-contact-name">' + escapeHTML(c.name) + '</span>' + relTag + '</div>' +
-        '<div class="ig-contact-preview">' + escapeHTML(preview) + '</div>' +
-      '</div>' +
-      '<div class="ig-contact-meta">' + (time ? '<span class="ig-contact-time">' + time + '</span>' : '') + '</div>' +
-    '</div>';
-  }
-
- // ====== My Profile Content (Panel 4) ======
- function renderMyProfileContent() {
+// ====== My Profile Content (Panel 4) ======
+function renderMyProfileContent() {
   const p = state.myProfile || (state.myProfile = {
     avatar: '🌸', avatarImage: '', coverImage: '',
     name: '我的名字', username: '@my_username',

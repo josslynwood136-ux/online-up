@@ -184,9 +184,6 @@ _w.currentWillowWish = currentWillowWish; _w.currentWillowRule = currentWillowRu
 _w.startIdleProactive = startIdleProactive; _w.setIdleParams = setIdleParams;
 _w.showInnerVoice = showInnerVoice; _w.closeInnerVoice = closeInnerVoice;
 _w.toggleAutoVoice = toggleAutoVoice; _w.setTtsProvider = setTtsProvider; _w.setTtsUrl = setTtsUrl; _w.setTtsKey = setTtsKey; _w.setTtsModel = setTtsModel; _w.setCharTtsProvider = setCharTtsProvider; _w.setCharTtsVoice = setCharTtsVoice; _w.testTtsConnection = testTtsConnection; _w.toggleMsgVoice = toggleMsgVoice; _w.stopSpeak = stopSpeak; _w.speakText = speakText;
-_w.openGroupChat = openGroupChat; _w.closeGroupChat = closeGroupChat; _w.sendGroupMessage = sendGroupMessage; _w.generateGroupReply = generateGroupReply; _w.renderRelationshipGraph = renderRelationshipGraph; _w.setRel = setRel;
-_w.renderWidgetsPanel = renderWidgetsPanel; _w.toggleWidget = toggleWidget; _w.renderTimeline = renderTimeline; _w.triggerMemorySummary = triggerMemorySummary; _w.exportTimelines = exportTimelines;
-_w.startCall = startCall; _w.endCall = endCall; _w.genImageInChat = genImageInChat; _w.genImageForPost = genImageForPost; _w.showImageGenHistory = showImageGenHistory; _w.generateImage = generateImage;
 
 // 离开时保存
 window.addEventListener('beforeunload', saveState);

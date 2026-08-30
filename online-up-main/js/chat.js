@@ -1115,7 +1115,6 @@ function toastVoice(msg) {
 
 // ===== AI 对话 =====
 function sendChat() {
-  if (groupMode) { sendGroupMessage(); return; }
   const input = $('chatInput');
   const text = input.value.trim();
   if (!state.api.key || !state.api.url || !state.api.model) {
@@ -4207,6 +4206,4 @@ function renderPhoneBrowser(char, screen) {
   h += '</div>';
   screen.innerHTML += h;
 }
-
-
 
