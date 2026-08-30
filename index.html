@@ -111,12 +111,22 @@
           <button class="icon-btn" id="voiceRecBtn" title="按住说话">🎤</button>
           <button class="icon-btn" onclick="toggleMore()">＋</button>
           <button class="icon-btn" onclick="toggleEmoji()">☺</button>
+          <button class="icon-btn" onclick="toggleAtPanel()">@</button>
           <div class="chat-input-wrapper">
             <input type="text" class="chat-input" id="chatInput" placeholder="发消息..." onkeydown="if(event.key==='Enter')sendChat()">
           </div>
           <button class="send-btn" id="sendBtn" title="发送" onclick="sendChat()"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
         </div>
         <div class="emoji-panel" id="emojiPanel"></div>
+<div id="atPanel" class="at-panel" style="display:none;padding:8px;border:1.5px solid #d8cfc4;border-radius:10px;background:#f7f5f2;margin-top:4px;">
+  <div style="font-size:12px;color:#6a5d4f;margin-bottom:8px;">快速提及</div>
+  <div style="display:flex;flex-wrap:wrap;gap:4px;">
+    <button class="at-item" onclick="insertAt('王')">王</button>
+    <button class="at-item" onclick="insertAt('李')">李</button>
+    <button class="at-item" onclick="insertAt('张')">张</button>
+    <button class="at-item" onclick="insertAt('测试')">测试</button>
+  </div>
+</div>
       </div>
       <div id="selectHereLine" class="select-here-line" style="display:none"></div>
       <button id="selectHereBtn" class="select-here-btn" style="display:none" title="拖动绿色滑块到目标消息，松手即选中该范围；点一下确认">
@@ -651,7 +661,7 @@
   <script src="js/state.js?v=20260826a"></script>
   <script src="js/chat.js?v=20260828d"></script>
   <script src="js/tts.js?v=20260824n"></script>
-  <script src="js/groupchat.js?v=20260831a"></script>
+  <script src="js/groupchat.js?v=20260901a"></script>
   <script src="js/rag.js?v=20260831a"></script>
   <script src="js/webrtc.js?v=20260831a"></script>
   <script src="js/widgets.js?v=20260831a"></script>
