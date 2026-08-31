@@ -40,8 +40,6 @@ function openApp(name) {
       '许愿柳': renderWillow, '许愿流': renderWillow, '游戏': renderGame, '游戏房': renderGame,
       'QQ': renderIGProfile,
       'IG': renderIGProfile,
-      '时间线': renderTimeline,
-      '生图': showImageGenHistory,
       '直播间': renderLiveHall
     };
     if (map[name]) { map[name](); musicAppOpen = (name === '音乐'); if (name === '音乐') { ncmProbedAt = 0; maybeProbeNcm(); } updateMiniPlayer(); return; }
@@ -98,10 +96,9 @@ function switchTab(t, el) {
   closeSettings();
   document.querySelectorAll('.tab-item').forEach(i => i.classList.remove('active'));
   el.classList.add('active');
-  const title = t === 'msg' ? '消息' : t === 'contact' ? '联系人' : t === 'moment' ? '动态' : '我的';
+  const title = t === 'msg' ? '消息' : t === 'moment' ? '动态' : '我的';
   setTitle(title);
   if (t === 'msg') renderMessageList();
-  if (t === 'contact') renderContacts();
   if (t === 'moment') renderMoments();
   if (t === 'me') renderMyProfile();
 }
@@ -223,15 +220,6 @@ function renderApiSettings() {
   h += '<div style="background:#fff;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px">';
   h += '<div style="font-size:13px;font-weight:600;color:#4a3f35;padding-bottom:2px;border-bottom:1px solid #f0ede8">显示</div>';
   h += '<div style="font-size:11px;color:#c0b0a0;line-height:1.5;padding:0 4px">如果直接用浏览器打开 HTML，部分接口可能因跨域策略被拦截。能用的中转接口或允许跨域的 API 可直接聊天。</div></div>';
-
-  // ===== 新增功能入口 =====
-  h += '<div style="background:#fff;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px">';
-  h += '<div style="font-size:13px;font-weight:600;color:#4a3f35;padding-bottom:2px;border-bottom:1px solid #f0ede8">🆕 新增功能</div>';
-   h += '<button class="ghost-btn" style="width:100%;justify-content:center" onclick="renderTimeline()">📅 时间线 — 对话记录与摘要</button>';
-  h += '<button class="ghost-btn" style="width:100%;justify-content:center" onclick="showImageGenHistory()">🎨 AI 生图 — SDXL/Flux/Midjourney</button>';
-  h += '<button class="ghost-btn" style="width:100%;justify-content:center" onclick="triggerMemorySummary()">🧹 记忆总结 — 生成时间线摘要</button>';
-  h += '<button class="ghost-btn" style="width:100%;justify-content:center" onclick="exportTimelines()">📤 导出时间线</button>';
-  h += '</div>';
 
   c().innerHTML = h;
   initApiSettings();
@@ -522,38 +510,6 @@ function filterMsgList() {
   });
 }
 
-// ---------- 联系人 ----------
-function renderContacts() {
-  setTitle('联系人');
-  c().innerHTML = `
-    <div class="stack">
-      <button class="primary-btn" onclick="renderCharacterEditor('new')">＋ 新建角色卡</button>
-      <input class="search-field" id="contactSearch" placeholder="🔍 搜索联系人" oninput="filterContacts()">
-      <div id="contactWrap">
-        <div class="subtle" style="padding:4px 2px">我认识的角色（${state.roles.length}）</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        ${state.roles.map(char => `
-          <div class="card char-cell" onclick="openChat('${char.id}', 'comic')">
-            <div class="avatar" style="position:relative;margin:0 auto 6px">${renderAvatar(char.avatar, char.name)}${char.online ? '<span class="online-dot"></span>' : '<span class="offline-dot"></span>'}</div>
-            <div style="text-align:center;font-weight:700">${escapeHTML(char.name)}</div>
-            <div class="subtle" style="text-align:center;font-size:12px;margin-top:2px">${escapeHTML(char.relation || char.aliases || '角色')}</div>
-            <div style="display:flex;gap:6px;margin-top:8px">
-              <button class="ghost-btn" style="flex:1;padding:4px;font-size:12px" onclick="event.stopPropagation();renderCharacterEditor('${char.id}')">编辑</button>
-            </div>
-          </div>`).join('')}
-        </div>
-      </div>
-    </div>`;
-}
-
-function filterContacts() {
-  const q = ($('contactSearch').value || '').toLowerCase();
-  document.querySelectorAll('#contactWrap .list-card').forEach((el, i) => {
-    const char = state.roles[i];
-    el.style.display = (!q || (char && char.name.toLowerCase().includes(q))) ? '' : 'none';
-  });
-}
-
 // ---------- 角色编辑器 ----------
 function renderCharacterEditor(id) {
   const isNew = id === 'new';
@@ -597,7 +553,7 @@ function renderCharacterEditor(id) {
         <label class="label">开场白</label>
         <textarea class="textarea" id="charGreeting" placeholder="第一次聊天时角色说的话">${escapeHTML(char.greeting)}</textarea>
         <div class="grid2" style="margin-top:10px">
-          <button class="ghost-btn" onclick="switchTab('contact', document.querySelectorAll('.tab-item')[1])">返回</button>
+          <button class="ghost-btn" onclick="switchTab('msg', document.querySelectorAll('.tab-item')[0])">返回</button>
           <button class="primary-btn" onclick="saveCharacter('${isNew ? 'new' : char.id}')">保存角色</button>
         </div>
         ${deleteButton}
@@ -657,7 +613,7 @@ function saveCharacter(id) {
     state.activeRoleId = char.id;
   }
   saveState();
-  renderContacts();
+  renderMessageList();
 }
 
 async function uploadAvatar(event, inputId, previewId) {
@@ -705,7 +661,7 @@ async function deleteCharacter(id) {
   state.roles = state.roles.filter(char => char.id !== id);
   if (state.activeRoleId === id) state.activeRoleId = state.roles[0].id;
   saveState();
-  renderContacts();
+  renderMessageList();
 }
 
 function addMemory(charId) {
@@ -4073,8 +4029,6 @@ function renderGame() {
             <div onclick="gameMode='puzzle';renderGame()" style="display:flex;justify-content:space-between;align-items:center;padding:11px 2px;cursor:pointer">
               <b>🧩 拼图</b><span class="subtle">用你们的合照拼</span></div>
          </div>
-           <button class="ghost-btn" style="margin-top:6px" onclick="renderTimeline()">📅 时间线</button>
-         <button class="ghost-btn" style="margin-top:6px" onclick="showImageGenHistory()">🎨 AI 生图记录</button>
        </div>
      </div>`;
     return;

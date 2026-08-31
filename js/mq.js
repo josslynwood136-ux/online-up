@@ -52,9 +52,9 @@ function renderMQ() {
   if (!mqApiOk()) {
     if (mqView === 'chat') mqView = 'msg';
   }
-  const tabs = ['消息', '联系人', '动态', '我的'];
+  const tabs = ['消息', '动态', '我的'];
   const html = '<div class="mq-app' + (mqView === 'chat' ? ' chat' : '') + (mqEditRole ? ' editing' : '') + '"><div class="mq-topbar"><button class="mq-back" onclick="mqBack()">‹ 返回</button><span class="mq-title" id="mqTopTitle"></span></div><div class="mq-body" id="mqBody"></div><div class="mq-tabs">' +
-    tabs.map(t => '<div class="mq-tab ' + ((t === '消息' && mqView === 'msg') || (t === '联系人' && mqView === 'contact') || (t === '动态' && mqView === 'moment') || (t === '我的' && mqView === 'me') ? 'on' : '') + '" onclick="mqSwitch(\'' + ({ '消息': 'msg', '联系人': 'contact', '动态': 'moment', '我的': 'me' }[t]) + '\')">' + t + '</div>').join('') +
+    tabs.map(t => '<div class="mq-tab ' + ((t === '消息' && mqView === 'msg') || (t === '动态' && mqView === 'moment') || (t === '我的' && mqView === 'me') ? 'on' : '') + '" onclick="mqSwitch(\'' + ({ '消息': 'msg', '动态': 'moment', '我的': 'me' }[t]) + '\')">' + t + '</div>').join('') +
     '</div></div>';
   c().innerHTML = html;
   mqRenderBody();
@@ -71,7 +71,7 @@ function toggleHeaderMenu() {
 function mqHeaderMenu() {
   const menu = document.getElementById('headerMenu');
   if (!menu) return;
-  if (mqView === 'contact') menu.innerHTML = '<div class="header-menu-item" onclick="mqNewRole()">新建角色</div>';
+  if (mqView === 'msg') menu.innerHTML = '<div class="header-menu-item" onclick="mqNewRole()">新建角色</div>';
   else menu.innerHTML = '';
 }
 
@@ -90,14 +90,13 @@ function mqRenderBody() {
   const app = document.querySelector('.mq-app'); if (app) app.classList.remove('chat');
   const tb = document.querySelector('.mq-topbar'); if (tb) tb.classList.remove('chat');
   if (mqView === 'msg') mqRenderMsg(b);
-  else if (mqView === 'contact') mqRenderContact(b);
   else if (mqView === 'moment') mqRenderMoment(b);
   else if (mqView === 'me') mqRenderMe(b);
 }
 
 function mqRenderMsg(b) {
   const roles = state.mq.roles;
-  if (!roles.length) { b.innerHTML = '<div class="mq-card"><div class="mq-empty">还没有角色</div><button class="mq-btn" style="width:100%;margin-top:10px" onclick="mqSwitch(\'contact\')">去「联系人」创建角色</button></div>'; return; }
+  if (!roles.length) { b.innerHTML = '<div class="mq-card"><div class="mq-empty">还没有角色</div><button class="mq-btn" style="width:100%;margin-top:10px" onclick="mqNewRole()">新建角色</button></div>'; return; }
   b.innerHTML = roles.map(r => {
     const id = r.id;
     const chat = state.mq.chats[id] || [];
@@ -228,7 +227,7 @@ function mqDelRole(id) {
   if (!confirm('删除该角色及所有记忆？')) return;
   state.mq.roles = state.mq.roles.filter(r => r.id !== id);
   delete state.mq.chats[id];
-  saveState(); mqRenderContact(document.getElementById('mqBody'));
+  saveState(); mqView = 'msg'; renderMQ();
 }
 
 // ===== 动态 / 朋友圈 =====

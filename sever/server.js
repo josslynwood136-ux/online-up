@@ -381,35 +381,7 @@ app.get('/api/webrtc/signal', function(req, res) {
   res.json({ messages: messages });
 });
 
-// ===== AI 图像生成 =====
 app.use('/api', express.json({ limit: '20mb' }));
-app.post('/api/imagegen', async function(req, res) {
-  const { prompt, model, width, height, charId } = req.body || {};
-  if (!prompt) return res.status(400).json({ error: '缺少 prompt' });
-  const apiKey = process.env.OPENAI_API_KEY || '';
-  const apiUrl = process.env.IMAGE_API_URL || 'https://api.openai.com/v1/images/generations';
-  if (!apiKey) return res.status(500).json({ error: '未配置图像生成 API Key' });
-  try {
-    const targetModel = model === 'flux' ? 'flux-pro' : model === 'midjourney' ? 'midjourney' : 'dall-e-2';
-    const r = await fetch(apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + apiKey },
-      body: JSON.stringify({
-        model: targetModel,
-        prompt: prompt,
-        n: 1,
-        size: (width && height) ? width + 'x' + height : '1024x1024',
-        quality: 'standard',
-        response_format: 'url'
-      })
-    });
-    if (!r.ok) { const ed = await r.json().catch(function() { return {} }); return res.status(502).json({ error: (ed.error && ed.error.message) || ('HTTP ' + r.status) }); }
-    const j = await r.json();
-    const imageUrl = j.data && j.data[0] && j.data[0].url;
-    if (!imageUrl) return res.status(502).json({ error: '生成失败：未获取到图片 URL' });
-    res.json({ ok: true, imageUrl: imageUrl, model: targetModel });
-  } catch(e) { res.status(502).json({ error: 'AI 请求失败：' + (e && e.message || e) }); }
-});
 
 // ===== 天气查询代理 =====
 app.get('/api/weather', async function(req, res) {

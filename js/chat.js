@@ -78,7 +78,8 @@ function closeChat() {
   var ob = $('aiBtn');
   if (ob) ob.remove();
   $('chatWindow').classList.remove('open');
-  $('chatWindow').classList.remove('comic-skin', 'imessage-skin');
+  $('chatWindow').classList.remove('comic-skin', 'imessage-skin', 'wechat-skin');
+  document.body.classList.remove('wx-mode');
   var cs = $('chatSettings'); if (cs) cs.classList.remove('open'); // 关闭聊天时一并收起设置，避免设置面板滞留覆盖
   hidePanels();
 }
@@ -431,9 +432,16 @@ function selectHereTo() {
 
 function renderChat() {
   const char = activeCharacter();
+  if (typeof tickCharacterLife === 'function') tickCharacterLife(char);
   $('chatName').innerText = char.name;
+  var navAv = $('imNavAv');
+  if (navAv) navAv.innerHTML = renderAvatar(char.avatar, char.name);
   const relEl = $('chatRel');
-  if (relEl) relEl.innerText = char.relation ? '· ' + char.relation : (char.online ? '· 在线' : '· 离线');
+  if (relEl) {
+    var lifeBit = (char.life && char.life.label) ? char.life.label : '';
+    var relBit = char.relation ? char.relation : (char.online ? '在线' : '离线');
+    relEl.innerText = '· ' + (lifeBit ? (lifeBit + ' · ' + relBit) : relBit);
+  }
   const typing = chatTyping ? `<div class="msg left"><div class="avatar">${renderAvatar(char.avatar, char.name)}</div><div class="bubble typing"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div></div>` : '';
   let lastDate = '';
   $('chatBody').innerHTML = (char.chat || []).map((msg, i) => {
@@ -620,11 +628,29 @@ function showQuoteMenu(index) {
   el.style.display = 'flex';
   var mask = $('quoteMenuMask'); if (mask) mask.classList.add('show');
   setTimeout(function() { el.classList.add('show'); }, 10);
+  if (document.body.classList.contains('wx-mode')) {
+    var msgEl = document.querySelector('.msg[data-idx="' + index + '"]');
+    var cw = $('chatWindow');
+    if (msgEl && cw) {
+      var cwRect = cw.getBoundingClientRect();
+      var msgRect = msgEl.getBoundingClientRect();
+      var menuW = el.offsetWidth || 260;
+      var menuH = el.offsetHeight || 44;
+      var top = msgRect.top - cwRect.top - menuH - 8;
+      if (top < 0) top = msgRect.bottom - cwRect.top + 8;
+      var left = msgRect.left - cwRect.left + (msgRect.width - menuW) / 2;
+      left = Math.max(8, Math.min(left, cwRect.width - menuW - 8));
+      el.style.position = 'absolute';
+      el.style.left = left + 'px';
+      el.style.top = top + 'px';
+      el.style.transform = 'none';
+    }
+  }
 }
 function hideQuoteMenu() {
   const el = $('quoteMenu');
   const mask = $('quoteMenuMask');
-  if (el) { el.classList.remove('show'); el.style.display = 'none'; }
+  if (el) { el.classList.remove('show'); el.style.display = 'none'; el.style.left = ''; el.style.top = ''; el.style.transform = ''; }
   if (mask) mask.classList.remove('show');
   clearQuotePress();
 }
@@ -946,9 +972,9 @@ async function sendVoiceMessage(text, dataUrl, mime, dur, wave) {
     // 纯打字当语音发：没有音频本体，只留文字
     media = { type: 'audio', noAudio: true, duration: 0, wave: null, played: true };
   }
-  appendBubble('user', text || '', media, null, null, quoteData);
+    appendBubble('user', text || '', media, null, null, quoteData);
   touchActiveChar();
-  return;
+  afterUserSpoke(char, text || '');
 }
 
 // 播放语音气泡（用户发的语音消息）
@@ -1114,6 +1140,18 @@ function toastVoice(msg) {
 })();
 
 // ===== AI 对话 =====
+function afterUserSpoke(char, text) {
+  if (!char) return;
+  if (typeof relateIngestUser === 'function') relateIngestUser(char, text);
+  if (typeof willowBlocksReplyFor === 'function' && willowBlocksReplyFor(char.id, char.name)) {
+    appendBubble('system', '（许愿柳生效中：' + char.name + ' 今天不回复你的消息。）');
+    return;
+  }
+  _manualAICall = true;
+  setChatTyping(true);
+  generateAndDeliver(text || '');
+}
+
 function sendChat() {
   const input = $('chatInput');
   const text = input.value.trim();
@@ -1141,6 +1179,7 @@ function sendChat() {
     appendBubble('user', text, null, null, null, quoteData);
     input.value = '';
     touchActiveChar();
+    afterUserSpoke(char, text);
     return;
   } else {
     const char = activeCharacter();
@@ -1193,10 +1232,16 @@ window.regenerateReply = regenerateReply;
 
 function randomDelay() {
   var r = Math.random();
-  if (r < 0.25) return 1200 + Math.random() * 1800;    // 快回
-  if (r < 0.6) return 2000 + Math.random() * 3500;     // 正常
-  if (r < 0.85) return 4000 + Math.random() * 5000;    // 慢
-  return 8000 + Math.random() * 9000;                  // 隔很久，像去忙别的了
+  var ms;
+  if (r < 0.25) ms = 1200 + Math.random() * 1800;
+  else if (r < 0.6) ms = 2000 + Math.random() * 3500;
+  else if (r < 0.85) ms = 4000 + Math.random() * 5000;
+  else ms = 8000 + Math.random() * 9000;
+  var mul = 1;
+  try {
+    if (typeof relateDelayMul === 'function') mul = relateDelayMul(activeCharacter()) || 1;
+  } catch (e) {}
+  return ms * mul;
 }
 
 function flushThinkBubble(char) {
@@ -1317,7 +1362,7 @@ async function streamDeliver(text, opts) {
   if (!isReasoner) {
     var tk = await callAIThink(char, userContent, systemPrompt, built.history, cfg);
     lastRetract = (tk.retract !== null) ? tk.retract : null;
-    lastThinkText = tk.note || '';
+    lastThinkText = (typeof formatInnerVoiceThink === 'function') ? (formatInnerVoiceThink(tk) || tk.note || '') : (tk.note || '');
   }
   // 撤回：仅按角色性格判断
   var doRetract = (lastRetract === true);
@@ -1517,6 +1562,10 @@ async function generateAndDeliver(text, opts) {
       await deliverReply(out);
     }
     if (opts.onDone) opts.onDone(raw || out);
+    try {
+      var _rc = opts.forChar || activeCharacter();
+      if (_rc && typeof relateIngestReply === 'function') relateIngestReply(_rc, raw || out);
+    } catch (e2) {}
   } catch (err) {
     if (err && err.name === 'AbortError') { setChatTyping(false); return; }
     setChatTyping(false);
@@ -1585,7 +1634,8 @@ function toggleThink(i) {
 function showInnerVoice(charId) {
   var char = getCharacter(charId);
   if (!char) return;
-  ensureCharLive(char);
+  if (typeof tickCharacterLife === 'function') tickCharacterLife(char);
+  else ensureCharLive(char);
   var old = document.getElementById('innerVoiceOverlay');
   if (old) old.remove();
 
@@ -1594,11 +1644,15 @@ function showInnerVoice(charId) {
   overlay.className = 'inner-voice-overlay';
   overlay.addEventListener('click', function(e) { if (e.target === overlay) closeInnerVoice(); });
 
-  var moodKey = char._moodKey || 'calm';
+  var moodKey = (typeof relateMoodKey === 'function') ? relateMoodKey(char) : (char._moodKey || 'calm');
   var moodEmoji = MOOD_EMOJI[moodKey] || '🙂';
   var moodName = MOOD_NAME[moodKey] || '平静';
-  var moodText = char._moodText || '比较平静';
-  var lifeText = char._lifeText || '没什么特别的，在等你消息';
+  var moodText = (typeof relateMoodLine === 'function') ? relateMoodLine(char) : (char._moodText || '比较平静');
+  var lifeText = (char.life && char.life.detail) || char._lifeText || '没什么特别的';
+  var iv = char.innerVoice || {};
+  var unsaid = iv.unsaid || moodText;
+  var feeling = iv.feeling || moodText;
+  var retractWhy = iv.retractWhy || '无';
 
   var ago = timeAgoMinutes(char);
   var waitTxt = '';
@@ -1632,13 +1686,22 @@ function showInnerVoice(charId) {
     '<div class="iv-wait">' + escapeHTML(waitTxt) + '</div>' +
     '<div class="inner-voice-body">' +
       '<div class="inner-voice-row">' +
-        '<span class="inner-voice-tag"><i></i>心声</span>' +
-        '<span class="inner-voice-text">' + escapeHTML(moodText) + '</span>' +
+        '<span class="inner-voice-tag"><i></i>没说出口</span>' +
+        '<span class="inner-voice-text">' + escapeHTML(unsaid) + '</span>' +
+      '</div>' +
+      '<div class="inner-voice-row">' +
+        '<span class="inner-voice-tag"><i></i>真正情绪</span>' +
+        '<span class="inner-voice-text">' + escapeHTML(feeling) + '</span>' +
+      '</div>' +
+      '<div class="inner-voice-row">' +
+        '<span class="inner-voice-tag"><i></i>想撤回</span>' +
+        '<span class="inner-voice-text">' + escapeHTML(retractWhy) + '</span>' +
       '</div>' +
       '<div class="inner-voice-row">' +
         '<span class="inner-voice-tag"><i></i>此刻</span>' +
         '<span class="inner-voice-text">' + escapeHTML(lifeText) + '</span>' +
       '</div>' +
+      (typeof relateBarHtml === 'function' ? '<div class="iv-bars">' + relateBarHtml(char) + '</div>' : '') +
     '</div>';
   overlay.appendChild(card);
   document.body.appendChild(overlay);
@@ -1902,7 +1965,9 @@ function buildAIMessages(char, text, proactive, retryReason) {
   }
   var userContent;
     if (proactive) {
-      userContent = '用户没有输入文字。请你以当前角色身份，主动发起一句自然的消息。你可以从下面的【相关记忆】里挑一条，自然地提起相关话题（比如「突然想起你之前说…」「今天路过那家店就想到你」），像真的突然记起某事一样带进对话，但别机械复述记忆原文，要自然化成你自己的话；如果用户刚和你聊过，也可以延续上次话题。不要每次都引用记忆，偶尔发点当下随感也行。';
+      userContent = (typeof relateProactiveHint === 'function')
+        ? relateProactiveHint(char)
+        : '用户没有输入文字。请你以当前角色身份，主动发起一句自然的消息。你可以从下面的【相关记忆】里挑一条，自然地提起相关话题（比如「突然想起你之前说…」「今天路过那家店就想到你」），像真的突然记起某事一样带进对话，但别机械复述记忆原文，要自然化成你自己的话；如果用户刚和你聊过，也可以延续上次话题。不要每次都引用记忆，偶尔发点当下随感也行。';
   } else {
     userContent = '对方刚给你发了这条消息：「' + text + '」\n请先直接、具体地回应这句话本身，接住它讲的内容和情绪，不许绕开它、不许无视它、不许重复你之前说过的寒暄话；回应完这句再自然地继续往下聊。';
   }
@@ -1945,7 +2010,7 @@ async function callAI(text, shortTest = false, proactive = false, forChar = null
   if (!shortTest && !isReasoner) {
     const probe = buildAIMessages(char, text, proactive, '');
     const tk = await callAIThink(char, probe.userContent, systemPrompt, shortTest ? [] : probe.history, cfg);
-    thinkNote = tk.note || '';
+    thinkNote = (typeof formatInnerVoiceThink === 'function') ? (formatInnerVoiceThink(tk) || tk.note || '') : (tk.note || '');
     lastRetract = (tk.retract !== null) ? tk.retract : null;
   }
   if (!shortTest) {
@@ -2040,9 +2105,9 @@ async function callAIThink(char, userContent, systemPrompt, history, cfg) {
       body: JSON.stringify({
         model: cfg.model,
         messages: [
-          { role: 'system', content: systemPrompt + '\n\n现在写一条只给用户查看的【心声】：用' + char.name + '第一人称，像心里一闪而过的念头，紧扣对方刚才那句话。可以别扭、嘴硬、害羞、走神或心软，但不要分析术语，不要列提纲，不要写正式回复，不要出现“我应该/我要先/接住话题”这类提示词痕迹。心声 1-2 句，30 字以内。写完后另起一行，只输出【撤回：是】或【撤回：否】。' },
+          { role: 'system', content: systemPrompt + '\n\n' + (typeof innerVoiceThinkInstruction === 'function' ? innerVoiceThinkInstruction(char) : ('现在写一条只给用户查看的【心声】：用' + char.name + '第一人称。写完后另起一行，只输出【撤回：是】或【撤回：否】。')) },
           ...history,
-          { role: 'user', content: userContent + '\n\n（写 TA 此刻没说出口的心声，不要写正式发出去的话。）' }
+          { role: 'user', content: userContent + '\n\n（写 TA 此刻没说出口的心声三行：未说出口 / 真正情绪 / 撤回原因，不要写正式发出去的话。）' }
         ],
         max_tokens: cfg.maxTokens ? Math.min(220, cfg.maxTokens) : 220,
         temperature: Math.min(1, (cfg.temp ?? 0.75) + 0.1),
@@ -2052,6 +2117,11 @@ async function callAIThink(char, userContent, systemPrompt, history, cfg) {
     clearTimeout(timer);
     const data = await response.json().catch(() => ({}));
     let note = (data.choices?.[0]?.message?.content || '').trim();
+    var parsed = (typeof parseInnerVoiceNote === 'function') ? parseInnerVoiceNote(note) : null;
+    if (parsed) {
+      if (typeof saveInnerVoice === 'function') saveInnerVoice(char, parsed);
+      return { note: parsed.unsaid || parsed.note || '', retract: parsed.retract, unsaid: parsed.unsaid, feeling: parsed.feeling, retractWhy: parsed.retractWhy };
+    }
     const m = note.match(/【撤回[:：]\s*(是|否)\s*】/);
     const retract = m ? (m[1] === '是') : null;
     note = note.replace(/【撤回[:：]\s*(是|否)\s*】/g, '').trim();
@@ -2451,6 +2521,10 @@ function timeAgoMinutes(char) {
 }
 // 确保角色有新鲜的"此刻状态"（超过20分钟重新生成一次）
 function ensureCharLive(char) {
+  if (typeof tickCharacterLife === 'function') {
+    tickCharacterLife(char);
+    return;
+  }
   var now = Date.now();
   if (char._liveTs && (now - char._liveTs) < 20 * 60000) return;
   char._liveTs = now;
@@ -2461,7 +2535,11 @@ function ensureCharLive(char) {
 }
 
 function replySplitInstruction() {
+  var name = arguments[0] || '';
+  var char = arguments[1] || null;
+  var forceShort = char && typeof relateForceShort === 'function' && relateForceShort(char);
   var mode = (state.settings && state.settings.replySplit) || 'auto';
+  if (forceShort) mode = '1';
   if (mode === '1') {
     return '用 ' + (arguments[0] || '') + ' 的身份自然回应，不要提 AI 相关话题，不要自我总结。你只发一条完整的消息，不要使用 ‖ 分隔符，也不要把内容硬拆成多条；线下模式用（）写动作表情，线上模式用更口语、更随手的语气。说话像真的在聊天，别把句子写得太工整。';
   }
@@ -2489,8 +2567,10 @@ function buildRoleSystemPrompt(char, userText) {
     '',
     '【此刻状态】',
     '你现在的心情：' + (char._moodText || '比较平静'),
-    '你正在做的事：' + (char._lifeText || '没什么特别的，在等你消息'),
-    '注意：这两行只是你此刻的背景氛围，绝不能用它替代对对方问题的回答——必须先接住对方刚说的话。除非和当前话题强相关，否则不要在回复里主动提起"正在做的事"（比如奶茶店、在走路这类），更不要答非所问地自言自语。',
+    '你正在做的事：' + ((char.life && char.life.detail) || char._lifeText || '过自己的日子'),
+    '注意：这两行只是你此刻的背景氛围，绝不能用它替代对对方问题的回答——必须先接住对方刚说的话。除非和当前话题强相关，否则不要在回复里主动提起"正在做的事"，更不要答非所问地自言自语。',
+    '',
+    (typeof relateSystemPrompt === 'function' ? relateSystemPrompt(char) : ''),
     '',
     '【用户信息】',
     '名字：' + profile.name,
@@ -2503,7 +2583,7 @@ function buildRoleSystemPrompt(char, userText) {
     memCtx,
     '',
     '【回复要求】',
-    replySplitInstruction(char.name),
+    replySplitInstruction(char.name, char),
     '你要像一个真的人在聊天：先接住对方刚说的话，再顺手往下聊；可以直接、可以嘴硬、可以有点小情绪，但别像客服，也别像在写总结。',
     '【对话质量红线】',
     '1. 先接住对方刚说的话：直接回应对方话里的具体点，再自然延伸；如果对方问的是明确问题，先给明确答复，再补一句自然展开，不要岔开去说别的。',
@@ -3215,17 +3295,50 @@ function setBubbleStyle(val) {
   saveState();
   applyBubbleStyle();
 }
+function applyImessageStacks() {
+  var body = $('chatBody');
+  if (!body) return;
+  var items = [];
+  for (var i = 0; i < body.children.length; i++) {
+    var el = body.children[i];
+    if (!el.classList || !el.classList.contains('msg')) continue;
+    if (!el.classList.contains('left') && !el.classList.contains('right')) continue;
+    items.push(el);
+  }
+  items.forEach(function (el) {
+    el.classList.remove('im-first', 'im-mid', 'im-last', 'im-solo');
+  });
+  var cw = $('chatWindow');
+  if (!cw || !cw.classList.contains('imessage-skin')) return;
+  items.forEach(function (el, i) {
+    var side = el.classList.contains('right') ? 'right' : 'left';
+    var prev = items[i - 1];
+    var next = items[i + 1];
+    var prevSame = prev && prev.classList.contains(side);
+    var nextSame = next && next.classList.contains(side);
+    if (!prevSame && !nextSame) el.classList.add('im-solo');
+    else if (!prevSame && nextSame) el.classList.add('im-first');
+    else if (prevSame && nextSame) el.classList.add('im-mid');
+    else el.classList.add('im-last');
+  });
+}
 function applyBubbleStyle() {
   var cw = $('chatWindow');
   if (!cw) return;
   var s = state.settings.bubbleStyle || 'default';
-  cw.classList.remove('bubble-style-comic', 'bubble-style-imessage');
+  cw.classList.remove('bubble-style-comic', 'bubble-style-imessage', 'bubble-style-wechat');
   cw.classList.add('bubble-style-' + s);
-  cw.classList.remove('comic-skin', 'imessage-skin');
+  cw.classList.remove('comic-skin', 'imessage-skin', 'wechat-skin');
   if (s === 'comic') cw.classList.add('comic-skin');
   else if (s === 'imessage') cw.classList.add('imessage-skin');
+  else if (s === 'wechat') cw.classList.add('wechat-skin');
+  document.body.classList.remove('wx-mode');
+  if (s === 'wechat') document.body.classList.add('wx-mode');
   var sel = $('bubbleStyleSelect');
   if (sel) sel.value = s;
+  var input = $('chatInput');
+  if (input) input.placeholder = (s === 'imessage') ? 'iMessage' : '发消息...';
+  applyImessageStacks();
 }
 async function clearHistory() {
   if (!await uiConfirm('清空聊天记录？')) return;
@@ -3718,16 +3831,18 @@ function idleProactiveTick() {
       if (m.role === 'user') { lastUserTs = m.ts || Date.parse(m.time || ''); break; }
     }
     if (!lastUserTs || isNaN(lastUserTs)) continue;
-    var idle = (now - lastUserTs) / 60000;
-    if (idle < _idleMin) continue;
     var lastPro = _idleMsgTimes[char.id] || 0;
-    if ((now - lastPro) / 60000 < _idleCooldown) continue;
+    var canFire = (typeof relateShouldProactive === 'function')
+      ? relateShouldProactive(char, _idleMin, _idleCooldown, lastPro, now)
+      : (((now - lastUserTs) / 60000 >= _idleMin) && ((now - lastPro) / 60000 >= _idleCooldown));
+    if (!canFire) continue;
     // 用户正在聊天窗口里（不管和谁）时不插话
     var cw = document.getElementById('chatWindow');
     if (cw && cw.classList.contains('open')) continue;
     if (chatTyping) continue;
     // 触发主动消息
     _idleMsgTimes[char.id] = now;
+    if (typeof relateClearWantPing === 'function') relateClearWantPing(char);
     fireProactive(char);
     return; // 每次 tick 只发一个角色，避免刷屏
   }
@@ -3774,6 +3889,7 @@ function fireProactive(char) {
     if (cw && (!cw.classList.contains('open') || state.activeRoleId !== char.id)) {
       showMsgNote(char.id, char.name, char.avatar, parts[0] || '发来一条消息');
     }
+    if (typeof relateIngestReply === 'function') relateIngestReply(char, txt);
     saveState();
     if (state.activeRoleId === char.id) renderChat();
   }).catch(function(err) {

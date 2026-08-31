@@ -39,6 +39,7 @@ function init() {
   if (typeof loadNcmState === 'function') loadNcmState();
   if (typeof loadQqState === 'function') loadQqState();
   if (typeof maybeProbeNcm === 'function') maybeProbeNcm();
+  if (typeof startRelateEngine === 'function') startRelateEngine();
   if (typeof startIdleProactive === 'function') startIdleProactive();
   if (typeof initPush === 'function') initPush();
   if (typeof checkinReminderTick === 'function') { checkinReminderTick(); setInterval(checkinReminderTick, 30000); }
@@ -184,8 +185,7 @@ _w.currentWillowWish = currentWillowWish; _w.currentWillowRule = currentWillowRu
 _w.startIdleProactive = startIdleProactive; _w.setIdleParams = setIdleParams;
 _w.showInnerVoice = showInnerVoice; _w.closeInnerVoice = closeInnerVoice;
 _w.toggleAutoVoice = toggleAutoVoice; _w.setTtsProvider = setTtsProvider; _w.setTtsUrl = setTtsUrl; _w.setTtsKey = setTtsKey; _w.setTtsModel = setTtsModel; _w.setCharTtsProvider = setCharTtsProvider; _w.setCharTtsVoice = setCharTtsVoice; _w.testTtsConnection = testTtsConnection; _w.toggleMsgVoice = toggleMsgVoice; _w.stopSpeak = stopSpeak; _w.speakText = speakText;
-_w.renderTimeline = renderTimeline; _w.triggerMemorySummary = triggerMemorySummary; _w.exportTimelines = exportTimelines;
-_w.startCall = startCall; _w.endCall = endCall; _w.genImageInChat = genImageInChat; _w.genImageForPost = genImageForPost; _w.showImageGenHistory = showImageGenHistory; _w.generateImage = generateImage;
+_w.startCall = startCall; _w.endCall = endCall;
 
 // 离开时保存
 window.addEventListener('beforeunload', saveState);

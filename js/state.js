@@ -244,7 +244,12 @@ function ensureStateShape(next, saved) {
       ttsVoices: (role.ttsVoices && typeof role.ttsVoices === 'object') ? role.ttsVoices : {},
       ttsStyle: typeof role.ttsStyle === 'string' ? role.ttsStyle : '',
       ttsTemp: (typeof role.ttsTemp === 'number') ? role.ttsTemp : (typeof role.ttsTemp === 'string' ? parseFloat(role.ttsTemp) || 0.6 : 0.6),
-      phone: (role.phone && typeof role.phone === 'object') ? role.phone : null
+      phone: (role.phone && typeof role.phone === 'object') ? role.phone : null,
+      proactivePush: role.proactivePush === true,
+      memReflection: typeof role.memReflection === 'string' ? role.memReflection : '',
+      bond: (typeof normalizeBond === 'function') ? normalizeBond(role.bond) : (role.bond && typeof role.bond === 'object' ? role.bond : null),
+      life: (role.life && typeof role.life === 'object') ? role.life : null,
+      innerVoice: (role.innerVoice && typeof role.innerVoice === 'object') ? role.innerVoice : null
     }));
   if (!next.activeRoleId || !next.roles.some(role => role.id === next.activeRoleId)) {
     next.activeRoleId = next.roles[0].id;

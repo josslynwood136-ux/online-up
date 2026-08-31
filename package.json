@@ -1,6 +1,7 @@
 {
   "name": "joss-phone",
   "version": "2.0.0",
+  "description": "美乐地：仿手机桌面的 AI 伴侣 Web App（PWA）",
   "private": true,
   "engines": {
     "node": ">=16"

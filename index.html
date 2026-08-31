@@ -24,9 +24,9 @@
   <link rel="apple-touch-icon" href="icon-512.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Cinzel:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Pacifico&family=Cinzel:wght@400;600;700&display=swap" rel="stylesheet">
   <title>美乐地</title>
-  <link rel="stylesheet" href="css/style.css?v=20260828d">
+  <link rel="stylesheet" href="css/style.css?v=20260831im2">
 </head>
 <body>
 
@@ -75,6 +75,7 @@
       <div class="chat-header">
         <button class="header-action" onclick="closeChat()">◁</button>
         <div class="chat-title-box" style="text-align:center;min-width:0">
+          <div class="im-nav-av" id="imNavAv" onclick="var c=activeCharacter();if(c)showInnerVoice(c.id)"></div>
           <b id="chatName" style="display:block">角色</b>
           <span id="chatRel" class="subtle"></span>
         </div>
@@ -105,28 +106,17 @@
           <div class="panel-item" onclick="regenerateReply()"><div class="panel-icon"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg></div>重新生成</div>
           <div class="panel-item" onclick="renderStickerManager()"><div class="panel-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></div>表情包</div>
           <div class="panel-item" onclick="openTextVoice()"><div class="panel-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>打字发语音</div>
-          <div class="panel-item" onclick="genImageInChat()"><div class="panel-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>AI 生图</div>
         </div>
         <div class="footer-main">
           <button class="icon-btn" id="voiceRecBtn" title="按住说话">🎤</button>
           <button class="icon-btn" onclick="toggleMore()">＋</button>
           <button class="icon-btn" onclick="toggleEmoji()">☺</button>
-          <button class="icon-btn" onclick="toggleAtPanel()">@</button>
           <div class="chat-input-wrapper">
             <input type="text" class="chat-input" id="chatInput" placeholder="发消息..." onkeydown="if(event.key==='Enter')sendChat()">
           </div>
           <button class="send-btn" id="sendBtn" title="发送" onclick="sendChat()"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
         </div>
         <div class="emoji-panel" id="emojiPanel"></div>
-<div id="atPanel" class="at-panel" style="display:none;padding:8px;border:1.5px solid #d8cfc4;border-radius:10px;background:#f7f5f2;margin-top:4px;">
-  <div style="font-size:12px;color:#6a5d4f;margin-bottom:8px;">快速提及</div>
-  <div style="display:flex;flex-wrap:wrap;gap:4px;">
-    <button class="at-item" onclick="insertAt('王')">王</button>
-    <button class="at-item" onclick="insertAt('李')">李</button>
-    <button class="at-item" onclick="insertAt('张')">张</button>
-    <button class="at-item" onclick="insertAt('测试')">测试</button>
-  </div>
-</div>
       </div>
       <div id="selectHereLine" class="select-here-line" style="display:none"></div>
       <button id="selectHereBtn" class="select-here-btn" style="display:none" title="拖动绿色滑块到目标消息，松手即选中该范围；点一下确认">
@@ -439,7 +429,8 @@
           </div>
           <select id="bubbleStyleSelect" onchange="setBubbleStyle(this.value)" style="border:none;background:transparent;color:#b8a99a;font-size:13px;outline:none;padding:2px 0">
             <option value="comic">正统美式</option>
-            <option value="imessage">i message</option>
+            <option value="imessage">iMessage</option>
+            <option value="wechat">微信</option>
           </select>
         </div>
         <div class="cs-row">
@@ -447,7 +438,7 @@
             <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M10 2l6 4v8l-6 4-6-4V6z"/><path d="M10 2l6 4-6 4-6-4 6-4z"/></svg>
             <div>
               <span>心声样式</span>
-              <div class="cs-hint">点头像弹出的心声小卡片外观，与气泡样式互不影响</div>
+              <div class="cs-hint">点聊天里头像：没说出口的话、真正情绪、想撤回的原因。和气泡样式互不影响</div>
             </div>
           </div>
         </div>
@@ -525,24 +516,6 @@
         </div>
       </div>
     </div>
-
-    <!-- ✨ 新增功能快捷入口 -->
-    <div class="cs-group-title">🆕 新增功能</div>
-      <div class="cs-section">
-        <div class="cs-row cs-action" onclick="renderTimeline()" style="cursor:pointer">
-          <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="10" cy="10" r="7"/><path d="M10 7v3l2 2"/></svg>
-          <span>时间线 — 对话摘要</span>
-        </div>
-        <div class="cs-row cs-action" onclick="showImageGenHistory()" style="cursor:pointer">
-          <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="3" width="14" height="14" rx="2"/><circle cx="10" cy="10" r="3"/></svg>
-          <span>AI 生图 — SDXL / Flux / Midjourney</span>
-        </div>
-        <div class="cs-row cs-action" onclick="triggerMemorySummary()" style="cursor:pointer">
-          <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M10 2a8 8 0 100 16 8 8 0 000-16z"/><path d="M10 6v4l2 2"/></svg>
-          <span>记忆总结 — 生成时间线摘要</span>
-        </div>
-      </div>
-  </div>
 
   <div id="quoteMenuMask" class="quote-menu-mask" onclick="hideQuoteMenu()"></div>
   <div id="quoteMenu" class="quote-menu" style="display:none">
@@ -651,16 +624,16 @@
   </script>
   <script src="js/ui.js?v=20260812e"></script>
   <script src="js/state.js?v=20260826a"></script>
-  <script src="js/chat.js?v=20260831-human"></script>
+  <script src="js/relate.js?v=20260831r"></script>
+  <script src="js/chat.js?v=20260831-im2"></script>
   <script src="js/tts.js?v=20260824n"></script>
   <script src="js/rag.js?v=20260831a"></script>
   <script src="js/webrtc.js?v=20260831a"></script>
-  <script src="js/imagegen.js?v=20260831a"></script>
   <script src="js/apps.js?v=20260828d"></script>
   <script src="js/liveroom.js?v=20260830a"></script>
   <script src="js/profile-ig.js?v=20260812e"></script>
   <script src="js/push.js?v=20260828b"></script>
-  <script src="js/init.js?v=20260812e"></script>
+  <script src="js/init.js?v=20260831r"></script>
   <script src="js/sync.js?v=20260821a"></script>
 </body>
 </html>

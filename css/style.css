@@ -674,6 +674,11 @@ button { border: 0; cursor: pointer; }
 }
 .inner-voice-tag i { width: 7px; height: 7px; border-radius: 2px; background: #1c1c1c; display: block; }
 .inner-voice-text { color: #1c1c1c; font-weight: 600; user-select: text; }
+.iv-bars { display: grid; gap: 7px; margin-top: 2px; padding-top: 10px; border-top: 2px dashed #1c1c1c; }
+.iv-bar { display: flex; align-items: center; gap: 8px; }
+.iv-bar-lab { flex: 0 0 4.6em; font-size: 11px; font-weight: 900; color: #3a3a3a; letter-spacing: .04em; }
+.iv-bar-track { flex: 1; height: 8px; background: #f4f1ec; border: 2px solid #1c1c1c; border-radius: 6px; overflow: hidden; box-shadow: 1.5px 1.5px 0 rgba(28,28,28,.2); }
+.iv-bar-track i { display: block; height: 100%; width: 0; background: var(--iv, #5aa8d8); }
 
 .bubble.left .trans-divider { border-top-color: rgba(200,170,150,.2) !important; }
 .bubble.right .trans-divider { border-top-color: rgba(180,170,200,.2) !important; }
@@ -3774,68 +3779,495 @@ button { border: 0; cursor: pointer; }
 #chatWindow.bubble-style-comic .bubble.typing { background:#fff; }
 #chatWindow.bubble-style-comic .typing-dot { background:#1c1c1c; }
 
-/* ===== i message 皮肤 ===== */
-#chatWindow.imessage-skin .chat-header {
+/* ===== iMessage：按 iOS 信息的结构，不是把微信涂成蓝 ===== */
+#chatWindow.imessage-skin {
   background: #fff;
-  border-bottom: 1px solid #e5e5ea;
+  font-family: "Noto Sans SC", "PingFang SC", "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --im-blue: #007aff;
+  --im-blue-press: #0066d6;
+  --im-gray: #e9e9eb;
+  --im-ink: #000;
+  --im-muted: #8e8e93;
+  --im-line: rgba(60, 60, 67, .18);
+  --im-fill: #f2f2f7;
 }
-#chatWindow.imessage-skin .chat-header .header-action { color: #007aff; }
-#chatWindow.imessage-skin #chatName { color: #1c1c1e; }
-#chatWindow.imessage-skin #chatRel { color: #8e8e93; }
-#chatWindow.imessage-skin .chat-header .icon-btn { color: #007aff; }
+.im-nav-av { display: none !important; }
+#chatWindow.imessage-skin .chat-header {
+  height: auto;
+  min-height: 48px;
+  flex-basis: auto;
+  padding: 6px 8px;
+  align-items: center;
+  background: #f9f9f9;
+  border-bottom: .33px solid var(--im-line);
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+}
+#chatWindow.imessage-skin .chat-header .header-action {
+  color: var(--im-blue);
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1;
+  width: 36px;
+  background: none;
+}
+#chatWindow.imessage-skin .im-nav-av {
+  width: 36px; height: 36px; border-radius: 50%; overflow: hidden;
+  margin: 0 auto 2px; background: #d8d8dc; cursor: pointer;
+}
+#chatWindow.imessage-skin .im-nav-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+#chatWindow.imessage-skin #chatName {
+  color: var(--im-ink);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+#chatWindow.imessage-skin #chatRel { display: none; }
+#chatWindow.imessage-skin .chat-header > div:last-child { gap: 2px; align-items: center; }
+#chatWindow.imessage-skin .chat-header .icon-btn {
+  width: 30px; height: 30px; font-size: 16px; color: var(--im-blue); background: none;
+}
+#chatWindow.imessage-skin .chat-header > div:last-child .icon-btn:nth-child(2),
+#chatWindow.imessage-skin .chat-header > div:last-child .icon-btn:nth-child(3) { display: none; }
+#chatWindow.imessage-skin .multi-bar {
+  background: #f9f9f9;
+  border-bottom: .33px solid var(--im-line);
+}
 #chatWindow.imessage-skin .chat-body {
-  background: #f2f2f7;
-  gap: 8px;
-  padding: 10px 12px;
+  background: #fff;
+  gap: 2px;
+  padding: 8px 10px 16px;
+}
+#chatWindow.imessage-skin .msg {
+  max-width: 100%;
+  width: 100%;
+  gap: 0;
+  margin: 0 0 2px;
+  align-items: flex-end;
+}
+#chatWindow.imessage-skin .msg.im-solo,
+#chatWindow.imessage-skin .msg.im-last { margin-bottom: 9px; }
+#chatWindow.imessage-skin .msg.system { margin: 10px 0; justify-content: center; }
+#chatWindow.imessage-skin .msg-avcol,
+#chatWindow.imessage-skin .msg .avatar,
+#chatWindow.imessage-skin .msg-time,
+#chatWindow.imessage-skin .read-tick { display: none !important; }
+#chatWindow.imessage-skin .msg.pressing .bubble { box-shadow: none; transform: none; }
+#chatWindow.imessage-skin .time-divider,
+#chatWindow.imessage-skin .time-stamp {
+  background: none; border: none; box-shadow: none;
+  color: var(--im-muted);
+  font-size: 11px;
+  font-weight: 400;
+  padding: 11px 8px 8px;
+  margin: 0;
 }
 #chatWindow.imessage-skin .chat-footer {
-  background: #fff;
-  border-top: 1px solid #e5e5ea;
+  background: #f9f9f9;
+  border-top: .33px solid var(--im-line);
+  padding: 6px 8px 10px;
 }
-#chatWindow.imessage-skin .chat-input-wrapper { background: #f2f2f7; }
-#chatWindow.imessage-skin .chat-input { color: #1c1c1e; }
-#chatWindow.imessage-skin .send-btn { color: #007aff; }
-#chatWindow.imessage-skin .emoji-panel,
-#chatWindow.imessage-skin .more-panel { background: #fff; border-top: 1px solid #e5e5ea; }
+#chatWindow.imessage-skin .footer-main { gap: 6px; }
+#chatWindow.imessage-skin #voiceRecBtn,
+#chatWindow.imessage-skin .footer-main > .icon-btn:nth-of-type(3),
+#chatWindow.imessage-skin .footer-main > .icon-btn:nth-of-type(4) { display: none; }
+#chatWindow.imessage-skin .chat-footer .icon-btn {
+  width: 32px; height: 32px; font-size: 20px; color: var(--im-blue); background: none; flex-shrink: 0;
+}
+#chatWindow.imessage-skin .chat-input-wrapper {
+  background: #fff;
+  border: .33px solid #c6c6c8;
+  border-radius: 17px;
+  min-height: 34px;
+  padding: 0 10px;
+}
+#chatWindow.imessage-skin .chat-input {
+  color: var(--im-ink);
+  font-size: 17px;
+  font-weight: 400;
+  padding: 6px 2px;
+}
+#chatWindow.imessage-skin .chat-input::placeholder {
+  color: var(--im-muted);
+  font-style: normal;
+  font-weight: 400;
+  font-size: 17px;
+}
+#chatWindow.imessage-skin .send-btn {
+  width: 32px; height: 32px;
+  background: var(--im-blue);
+  color: #fff;
+  box-shadow: none;
+  border-radius: 50%;
+}
+#chatWindow.imessage-skin .send-btn svg { display: none; }
+#chatWindow.imessage-skin .send-btn::after {
+  content: "";
+  width: 11px; height: 13px;
+  background: #fff;
+  clip-path: polygon(50% 0%, 100% 58%, 68% 58%, 68% 100%, 32% 100%, 32% 58%, 0% 58%);
+}
+#chatWindow.imessage-skin .send-btn:hover,
+#chatWindow.imessage-skin .send-btn:active { background: var(--im-blue-press); filter: none; transform: none; }
+#chatWindow.imessage-skin .emoji-panel { background: #f9f9f9; border-top: .33px solid var(--im-line); }
+#chatWindow.imessage-skin .more-panel {
+  background: #fff;
+  border: none;
+  border-radius: 14px;
+  box-shadow: 0 8px 30px rgba(0,0,0,.18);
+}
+#chatWindow.imessage-skin .panel-icon {
+  background: var(--im-gray);
+  border: none;
+  border-radius: 10px;
+  box-shadow: none;
+  width: 40px; height: 40px;
+}
+#chatWindow.imessage-skin .panel-icon svg { stroke: var(--im-blue); width: 18px; height: 18px; }
+#chatWindow.imessage-skin .panel-item { color: var(--im-ink); font-size: 10px; }
+#chatWindow.imessage-skin .reply-bar {
+  background: #eee;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+#chatWindow.imessage-skin .reply-bar::before { display: none; }
+#chatWindow.imessage-skin .reply-bar-name { color: var(--im-blue); font-weight: 600; }
+#chatWindow.imessage-skin .reply-bar-text { color: var(--im-muted); }
+#chatWindow.imessage-skin .quote-menu .q-sheet,
+#chatWindow.imessage-skin .quote-menu .q-cancel-sheet {
+  background: rgba(242,242,247,.92);
+  border: none;
+  box-shadow: 0 8px 28px rgba(0,0,0,.12);
+}
+#chatWindow.imessage-skin .quote-menu .q-opt { background: transparent; color: var(--im-ink); }
+#chatWindow.imessage-skin .quote-menu .q-opt:active { background: rgba(0,0,0,.05); }
+#chatWindow.imessage-skin .quote-menu .q-cancel { color: var(--im-blue); }
 
 #chatWindow.bubble-style-imessage .bubble {
   border: none;
   box-shadow: none;
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.35;
   font-weight: 400;
-  padding: 7px 13px;
-  border-radius: 18px;
-  color: #fff;
+  letter-spacing: .01em;
+  padding: 8px 14px;
+  max-width: 75%;
+  color: #000;
+  word-break: break-word;
 }
+#chatWindow.bubble-style-imessage .msg.left { justify-content: flex-start; padding-right: 18%; flex-direction: row; }
+#chatWindow.bubble-style-imessage .msg.right { justify-content: flex-end; padding-left: 18%; flex-direction: row; }
 #chatWindow.bubble-style-imessage .bubble.left {
-  background: #e9e9eb;
-  color: #1c1c1e;
-  border-radius: 18px 18px 4px 18px;
-  align-self: flex-start;
+  background: #E9E9EB;
+  color: #000;
+  border-radius: 20px 20px 20px 4px;
 }
 #chatWindow.bubble-style-imessage .bubble.right {
-  background: linear-gradient(180deg, #2f9bff, #0a84ff);
+  background: #007AFF;
   color: #fff;
-  border-radius: 18px 18px 18px 4px;
-  align-self: flex-end;
+  border-radius: 20px 20px 4px 20px;
 }
+#chatWindow.bubble-style-imessage .msg.im-first.left .bubble { border-radius: 20px 20px 20px 4px; }
+#chatWindow.bubble-style-imessage .msg.im-mid.left .bubble { border-radius: 4px 20px 20px 4px; }
+#chatWindow.bubble-style-imessage .msg.im-last.left .bubble { border-radius: 4px 20px 20px 20px; }
+#chatWindow.bubble-style-imessage .msg.im-solo.left .bubble { border-radius: 20px; }
+#chatWindow.bubble-style-imessage .msg.im-first.right .bubble { border-radius: 20px 20px 4px 20px; }
+#chatWindow.bubble-style-imessage .msg.im-mid.right .bubble { border-radius: 20px 4px 4px 20px; }
+#chatWindow.bubble-style-imessage .msg.im-last.right .bubble { border-radius: 20px 4px 20px 20px; }
+#chatWindow.bubble-style-imessage .msg.im-solo.right .bubble { border-radius: 20px; }
 #chatWindow.bubble-style-imessage .bubble.left::after,
 #chatWindow.bubble-style-imessage .bubble.right::after { content: none; }
 #chatWindow.bubble-style-imessage .bubble::before { content: none; }
-#chatWindow.bubble-style-imessage .bubble.system {
-  background: rgba(0,0,0,.06);
-  color: #8e8e93;
+#chatWindow.bubble-style-imessage .bubble.system,
+#chatWindow.bubble-style-imessage .bubble.retract-bubble {
+  background: none;
+  color: var(--im-muted);
   border: none;
   box-shadow: none;
   align-self: center;
-  border-radius: 10px;
+  max-width: 80%;
+  font-size: 12px;
+  font-weight: 400;
+  font-style: normal;
+  padding: 2px 10px;
+  line-height: 1.3;
+}
+#chatWindow.bubble-style-imessage .bubble.typing {
+  background: #E9E9EB; color: #8E8E93; padding: 10px 14px; max-width: none; border-radius: 20px;
+}
+#chatWindow.bubble-style-imessage .typing-dot { background: #8e8e93; width: 7px; height: 7px; }
+#chatWindow.bubble-style-imessage .bubble.left .trans-divider { border-top-color: rgba(0,0,0,.1) !important; }
+#chatWindow.bubble-style-imessage .bubble.right .trans-divider { border-top-color: rgba(255,255,255,.28) !important; }
+#chatWindow.bubble-style-imessage .bubble.right .quote-block { background: rgba(255,255,255,.18); }
+#chatWindow.bubble-style-imessage .bubble.left .quote-block { background: rgba(0,0,0,.06); }
+#chatWindow.bubble-style-imessage .chat-sticker-img { box-shadow: none; background: transparent; }
+
+/* ===== 微信 ===== */
+#chatWindow.wechat-skin {
+  background: #EDEDED;
+  font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+  --wx-green: #07C160;
+  --wx-green-dark: #06AD56;
+  --wx-bg: #EDEDED;
+  --wx-white: #fff;
+  --wx-text: #111;
+  --wx-muted: #999;
+  --wx-line: #E6E6E6;
+}
+#chatWindow.wechat-skin .chat-header {
+  background: #EDEDED;
+  border-bottom: .5px solid var(--wx-line);
+  height: auto;
+  min-height: 64px;
+  flex-basis: auto;
+  padding: 6px 12px 8px;
+  align-items: center;
+}
+#chatWindow.wechat-skin .chat-header .header-action {
+  color: var(--wx-text);
+  font-size: 22px;
+  font-weight: 400;
+  width: 36px;
+  background: none;
+}
+#chatWindow.wechat-skin #chatName {
+  color: var(--wx-text);
+  font-weight: 500;
+  font-size: 17px;
+  letter-spacing: 0;
+}
+#chatWindow.wechat-skin #chatRel { display: none; }
+#chatWindow.wechat-skin .chat-header > div:last-child .icon-btn { color: var(--wx-text); }
+#chatWindow.wechat-skin .chat-body {
+  background: var(--wx-bg);
+  gap: 4px;
+  padding: 10px 12px 16px;
+}
+#chatWindow.wechat-skin .msg {
+  max-width: 100%;
+  width: 100%;
+  gap: 8px;
+  margin: 0;
+  align-items: flex-start;
+}
+#chatWindow.wechat-skin .msg .avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  flex: 0 0 40px;
+  font-size: 18px;
+  border: none;
+  box-shadow: none;
+}
+#chatWindow.wechat-skin .msg .avatar img { border-radius: 6px; }
+#chatWindow.wechat-skin .msg-avcol { display: flex; flex-direction: column; align-items: center; flex: 0 0 auto; min-width: 40px; }
+#chatWindow.wechat-skin .msg-time { display: none !important; }
+#chatWindow.wechat-skin .read-tick { font-size: 10px; color: var(--wx-muted); align-self: flex-end; }
+#chatWindow.wechat-skin .time-divider {
+  background: rgba(0,0,0,.04);
+  color: var(--wx-muted);
+  font-size: 12px;
+  font-weight: 400;
+  padding: 4px 10px;
+  border-radius: 4px;
+  margin: 6px 0;
+}
+#chatWindow.wechat-skin .chat-footer {
+  background: #F7F7F7;
+  border-top: .5px solid var(--wx-line);
+  padding: 8px 10px 12px;
+}
+#chatWindow.wechat-skin .footer-main { gap: 8px; }
+#chatWindow.wechat-skin .chat-footer .icon-btn {
+  width: 34px;
+  height: 34px;
+  font-size: 22px;
+  color: var(--wx-text);
+  background: none;
+}
+#chatWindow.wechat-skin .chat-input-wrapper {
+  background: #fff;
+  border: .5px solid #E6E6E6;
+  border-radius: 6px;
+  min-height: 36px;
+  padding: 0 10px;
+}
+#chatWindow.wechat-skin .chat-input {
+  color: var(--wx-text);
+  font-size: 16px;
+  font-weight: 400;
+  padding: 7px 2px;
+}
+#chatWindow.wechat-skin .chat-input::placeholder {
+  color: #C0C0C0;
+  font-style: normal;
   font-weight: 400;
 }
-#chatWindow.bubble-style-imessage .bubble.typing { background: #e9e9eb; }
-#chatWindow.bubble-style-imessage .typing-dot { background: #8e8e93; }
-#chatWindow.bubble-style-imessage .msg-time { color: #8e8e93; }
-#chatWindow.bubble-style-imessage .read-tick { color: #8e8e93; }
+#chatWindow.wechat-skin .send-btn {
+  width: auto;
+  min-width: 56px;
+  height: 30px;
+  padding: 0 14px;
+  background: var(--wx-green);
+  color: #fff;
+  box-shadow: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+#chatWindow.wechat-skin .send-btn:hover,
+#chatWindow.wechat-skin .send-btn:active { background: var(--wx-green-dark); filter: none; transform: none; }
+#chatWindow.wechat-skin .send-btn svg { display: none; }
+#chatWindow.wechat-skin .send-btn::after { content: "发送"; font-size: 14px; }
+#chatWindow.wechat-skin .emoji-panel { background: #F7F7F7; border-top: .5px solid var(--wx-line); }
+#chatWindow.wechat-skin .more-panel {
+  background: #fff;
+  border: none;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.12);
+}
+#chatWindow.wechat-skin .panel-icon { background: var(--wx-bg); border: none; border-radius: 8px; box-shadow: none; width: 40px; height: 40px; }
+#chatWindow.wechat-skin .panel-item { color: var(--wx-text); font-size: 10px; }
+#chatWindow.wechat-skin .reply-bar { background: #F7F7F7; border: none; border-radius: 6px; padding: 6px 8px; }
+#chatWindow.wechat-skin .reply-bar::before { display: none; }
+#chatWindow.wechat-skin .reply-bar-name { color: var(--wx-green); font-weight: 500; }
+#chatWindow.wechat-skin .reply-bar-text { color: var(--wx-muted); }
+
+/* 微信气泡 */
+#chatWindow.bubble-style-wechat .bubble {
+  border: none;
+  box-shadow: none;
+  font-size: 16px;
+  line-height: 1.4;
+  font-weight: 400;
+  letter-spacing: 0;
+  padding: 9px 12px;
+  max-width: 70%;
+  color: var(--wx-text);
+  word-break: break-word;
+}
+#chatWindow.bubble-style-wechat .bubble.left {
+  background: var(--wx-white);
+  color: var(--wx-text);
+  border-radius: 4px;
+}
+#chatWindow.bubble-style-wechat .bubble.right {
+  background: #95EC69;
+  color: var(--wx-text);
+  border-radius: 4px;
+}
+#chatWindow.bubble-style-wechat .bubble::after {
+  content: none;
+}
+#chatWindow.bubble-style-wechat .bubble::before {
+  content: none;
+}
+#chatWindow.bubble-style-wechat .bubble.left::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: -6px;
+  width: 0;
+  height: 0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-right: 6px solid var(--wx-white);
+}
+#chatWindow.bubble-style-wechat .bubble.right::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  right: -6px;
+  width: 0;
+  height: 0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-left: 6px solid #95EC69;
+}
+#chatWindow.bubble-style-wechat .msg.system {
+  justify-content: center;
+}
+#chatWindow.bubble-style-wechat .bubble.system,
+#chatWindow.bubble-style-wechat .bubble.retract-bubble {
+  background: rgba(0,0,0,.04);
+  color: var(--wx-muted);
+  border: none;
+  box-shadow: none;
+  align-self: center;
+  max-width: 80%;
+  font-size: 12px;
+  font-weight: 400;
+  font-style: normal;
+  padding: 4px 10px;
+  line-height: 1.4;
+  border-radius: 4px;
+}
+#chatWindow.bubble-style-wechat .bubble.typing {
+  background: var(--wx-white);
+  color: var(--wx-muted);
+  padding: 10px 14px;
+  max-width: none;
+  border-radius: 4px;
+}
+#chatWindow.bubble-style-wechat .typing-dot { background: #C0C0C0; width: 6px; height: 6px; }
+#chatWindow.bubble-style-wechat .bubble.left .trans-divider { border-top-color: rgba(0,0,0,.06) !important; }
+#chatWindow.bubble-style-wechat .bubble.right .trans-divider { border-top-color: rgba(0,0,0,.06) !important; }
+#chatWindow.bubble-style-wechat .bubble.right .quote-block { background: rgba(255,255,255,.3); }
+#chatWindow.bubble-style-wechat .bubble.left .quote-block { background: rgba(0,0,0,.04); }
+#chatWindow.bubble-style-wechat .chat-sticker-img { box-shadow: none; background: transparent; max-width: 120px; max-height: 120px; }
+
+/* 微信长按菜单 */
+body.wx-mode .quote-menu-mask { background: rgba(0,0,0,.15); backdrop-filter: none; -webkit-backdrop-filter: none; }
+body.wx-mode .quote-menu {
+  position: absolute;
+  z-index: 6000;
+  pointer-events: none;
+  width: auto;
+  opacity: 0;
+  transition: opacity .12s ease;
+}
+body.wx-mode .quote-menu.show { opacity: 1; pointer-events: auto; }
+body.wx-mode .quote-menu .q-sheet {
+  background: #4C4C4C;
+  border: none;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0,0,0,.3);
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+  padding: 0;
+}
+body.wx-mode .quote-menu .q-cut { display: none !important; }
+body.wx-mode .quote-menu .q-opt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: row;
+  gap: 0;
+  padding: 8px 8px;
+  font-size: 12px;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 400;
+  background: transparent;
+  letter-spacing: 0;
+  white-space: nowrap;
+  flex: 1;
+}
+body.wx-mode .quote-menu .q-opt + .q-opt { border-left: .5px solid rgba(255,255,255,.15); }
+body.wx-mode .quote-menu .q-opt:active { background: rgba(255,255,255,.1); }
+body.wx-mode .quote-menu .q-opt-ico { display: none !important; }
+body.wx-mode .quote-menu .q-opt svg { display: none !important; }
+body.wx-mode .quote-menu .q-opt-label { flex: none; font-size: 15px; color: #fff; }
+body.wx-mode .quote-menu .q-del .q-opt-label { color: #fff; }
+body.wx-mode .quote-menu .q-cancel-sheet {
+  display: none !important;
+}
+body.wx-mode .quote-menu .q-cancel { display: none !important; }
 
 /* ===== 许愿柳 · One Wish Willow (假装老玩具包装盒) ===== */
 .wl-wrap { display:flex; flex-direction:column; align-items:center; padding-top:14px; gap:14px; text-align:center; }
