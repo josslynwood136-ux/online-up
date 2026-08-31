@@ -250,7 +250,7 @@ function triggerMemorySummary() {
 
 // ===== 导出 =====
 function exportTimelines() {
-  const data = { timelines: loadTimelines(), summaries: loadTimelineSummaries(), relationships: loadRelationships() };
+  const data = { timelines: loadTimelines(), summaries: loadTimelineSummaries() };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

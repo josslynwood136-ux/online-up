@@ -40,8 +40,6 @@ function openApp(name) {
       '许愿柳': renderWillow, '许愿流': renderWillow, '游戏': renderGame, '游戏房': renderGame,
       'QQ': renderIGProfile,
       'IG': renderIGProfile,
-      '群聊': openGroupChat,
-      '小组件': renderWidgetsPanel,
       '时间线': renderTimeline,
       '生图': showImageGenHistory,
       '直播间': renderLiveHall
@@ -229,9 +227,7 @@ function renderApiSettings() {
   // ===== 新增功能入口 =====
   h += '<div style="background:#fff;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px">';
   h += '<div style="font-size:13px;font-weight:600;color:#4a3f35;padding-bottom:2px;border-bottom:1px solid #f0ede8">🆕 新增功能</div>';
-  h += '<button class="primary-btn" style="width:100%;justify-content:center" onclick="openGroupChat()">👥 群聊模式 — 多角色一起聊天</button>';
-  h += '<button class="ghost-btn" style="width:100%;justify-content:center" onclick="renderWidgetsPanel()">📱 小组件 — 天气/倒数日/打卡/计时</button>';
-  h += '<button class="ghost-btn" style="width:100%;justify-content:center" onclick="renderTimeline()">📅 时间线 — 对话记录与摘要</button>';
+   h += '<button class="ghost-btn" style="width:100%;justify-content:center" onclick="renderTimeline()">📅 时间线 — 对话记录与摘要</button>';
   h += '<button class="ghost-btn" style="width:100%;justify-content:center" onclick="showImageGenHistory()">🎨 AI 生图 — SDXL/Flux/Midjourney</button>';
   h += '<button class="ghost-btn" style="width:100%;justify-content:center" onclick="triggerMemorySummary()">🧹 记忆总结 — 生成时间线摘要</button>';
   h += '<button class="ghost-btn" style="width:100%;justify-content:center" onclick="exportTimelines()">📤 导出时间线</button>';
@@ -494,7 +490,7 @@ function renderMessageList() {
     <div class="stack msg-list-page">
       <input class="search-field glass-input" id="msgSearch" placeholder="🔍 搜索角色 / 消息" oninput="filterMsgList()">
       <div id="msgListWrap">
-      ${(chars.length ? chars : [{ id: '', name: '', avatar: '', relation: '', chat: [], unread: 0, online: false }]).map(char => {
+       ${(chars.length ? chars : [{ id: '', name: '', avatar: '', relation: '', chat: [], unread: 0, online: false }]).map(char => {
         if (!char.id) return '<div class="glass-empty">还没有和任何角色聊过，去「联系人」认识他们吧。</div>';
         const last = (char.chat || [])[char.chat.length - 1];
         const time = last && last.time ? last.time.slice(11, 16) : '';
@@ -4077,9 +4073,7 @@ function renderGame() {
             <div onclick="gameMode='puzzle';renderGame()" style="display:flex;justify-content:space-between;align-items:center;padding:11px 2px;cursor:pointer">
               <b>🧩 拼图</b><span class="subtle">用你们的合照拼</span></div>
          </div>
-         <button class="primary-btn" style="margin-top:10px" onclick="openGroupChat()">👥 群聊模式</button>
-         <button class="ghost-btn" style="margin-top:6px" onclick="renderWidgetsPanel()">📱 小组件</button>
-         <button class="ghost-btn" style="margin-top:6px" onclick="renderTimeline()">📅 时间线</button>
+           <button class="ghost-btn" style="margin-top:6px" onclick="renderTimeline()">📅 时间线</button>
          <button class="ghost-btn" style="margin-top:6px" onclick="showImageGenHistory()">🎨 AI 生图记录</button>
        </div>
      </div>`;

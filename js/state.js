@@ -159,7 +159,6 @@ const defaultState = {
   profilePosts: [],
   viewedStories: {},
   willow: { date: '', text: '', rule: '' },
-  widgets: { weather: { enabled: true, city: '上海', unit: 'c' }, countdown: { enabled: true, events: [] }, checkin: { enabled: true }, timer: { enabled: true }, nextMsg: { enabled: true } },
   relationships: {},
   lastActiveTime: Date.now(),
   ragTimeline: { summaries: [], entries: [] }

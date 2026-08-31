@@ -20,64 +20,6 @@ function showIGToast(msg) {
 
 function filterIGContacts() { renderIGContacts(); }
 
-// ====== IG Group Creation ======
-let igGroupSelecting = false;
-let igGroupSelected = {};
-
-function igStartCreateGroup() {
-  const chars = state.roles.filter(r => r.id !== 'role-default');
-  if (chars.length < 2) { showIGToast('至少需要 2 个角色才能建群'); return; }
-  igGroupSelecting = true;
-  igGroupSelected = {};
-  const mask = $('igGroupSheetMask');
-  const sheet = $('igGroupSheet');
-  const list = $('igGroupSheetList');
-  if (mask) mask.style.display = '';
-  if (sheet) sheet.style.display = '';
-  if (list) {
-    list.innerHTML = chars.map(c => {
-      return '<div class="ig-group-item" data-id="' + c.id + '" onclick="igToggleGroupMember(\'' + c.id + '\')">' +
-        '<div class="ig-group-item-avatar">' + renderAvatar(c.avatar, c.name) + '</div>' +
-        '<div class="ig-group-item-name">' + escapeHTML(c.name) + '</div>' +
-        '<div class="ig-group-item-check"></div>' +
-      '</div>';
-    }).join('');
-  }
-  igUpdateGroupConfirm();
-}
-
-function igCancelCreateGroup() {
-  igGroupSelecting = false;
-  igGroupSelected = {};
-  const mask = $('igGroupSheetMask');
-  const sheet = $('igGroupSheet');
-  if (mask) mask.style.display = 'none';
-  if (sheet) sheet.style.display = 'none';
-}
-
-function igToggleGroupMember(id) {
-  if (igGroupSelected[id]) { delete igGroupSelected[id]; }
-  else { igGroupSelected[id] = true; }
-  const item = document.querySelector('.ig-group-item[data-id="' + id + '"]');
-  if (item) item.classList.toggle('selected', !!igGroupSelected[id]);
-  igUpdateGroupConfirm();
-}
-
-function igUpdateGroupConfirm() {
-  const count = Object.keys(igGroupSelected).length;
-  const btn = $('igGroupConfirmBtn');
-  const hint = $('igGroupHint');
-  if (btn) { btn.disabled = count < 2; btn.textContent = count >= 2 ? '创建群聊 (' + count + ')' : '至少选 2 人'; }
-  if (hint) hint.textContent = count >= 2 ? '已选 ' + count + ' 人' : '至少选 2 人';
-}
-
-function igConfirmCreateGroup() {
-  const ids = Object.keys(igGroupSelected);
-  if (ids.length < 2) return;
-  igCancelCreateGroup();
-  openGroupChat(ids);
-}
-
 function renderIGProfile() {
   const mc = c();
   if (mc) { mc.style.padding = '0'; mc.style.height = '100%'; mc.style.overflow = 'hidden'; }
@@ -139,17 +81,8 @@ function renderIGProfile() {
                 <span class="ig-contacts-search-icon">🔍</span>
                 <input type="text" class="ig-contacts-search-input" id="igContactsSearchInput" placeholder="搜索联系人..." oninput="filterIGContacts()" />
               </div>
-              <button class="ig-contacts-create-btn" id="igCreateGroupBtn" onclick="igStartCreateGroup()">＋建群</button>
             </div>
             <div class="ig-contacts-list" id="igContactsList"></div>
-          </div>
-          <div class="ig-group-sheet-mask" id="igGroupSheetMask" style="display:none" onclick="igCancelCreateGroup()"></div>
-          <div class="ig-group-sheet" id="igGroupSheet" style="display:none">
-            <div class="ig-group-sheet-handle"></div>
-            <div class="ig-group-sheet-title">选择群聊成员</div>
-            <div class="ig-group-sheet-hint" id="igGroupHint">至少选 2 人</div>
-            <div class="ig-group-sheet-list" id="igGroupSheetList"></div>
-            <button class="ig-group-confirm-btn" id="igGroupConfirmBtn" disabled onclick="igConfirmCreateGroup()">创建群聊</button>
           </div>
         </div>
       </div>
