@@ -97,7 +97,7 @@ body {
   margin: 0;
   background: linear-gradient(135deg, #cbefff, #f7d9e6 52%, #d9f5df);
   color: var(--ink);
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family: "LXGW WenKai", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
   user-select: none;
   overflow-x: hidden;
 }
@@ -515,8 +515,10 @@ button { border: 0; cursor: pointer; }
 .bubble {
   max-width: 82%;
   padding: 6px 10px;
-  font-size: 12px;
-  line-height: 1.38;
+  font-size: 13px;
+  line-height: 1.45;
+  font-family: "LXGW WenKai", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-weight: 600;
   user-select: text;
   white-space: pre-wrap;
   word-break: break-word;
@@ -917,7 +919,7 @@ button { border: 0; cursor: pointer; }
 .quote-menu .q-cancel { text-align: center; padding: 15px 16px; font-size: 15.5px; font-weight: 600; color: #5a554d; cursor: pointer; letter-spacing: .5px; }
 .quote-menu .q-cancel:active { background: #f3efe8; }
 .chat-input-wrapper { flex: 1; background: #efefef; border-radius: 20px; display: flex; align-items: center; padding: 0 12px; }
-.chat-input { flex: 1; border: 0; padding: 8px 4px; outline: none; font-size: 14px; background: transparent; user-select: text; }
+.chat-input { flex: 1; border: 0; padding: 8px 4px; outline: none; font-size: 14px; background: transparent; user-select: text; font-family: "LXGW WenKai", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; font-weight: 600; }
 .send-btn { background:#53a6f5;border:none;color:#fff;width:38px;height:38px;border-radius:50%;cursor:pointer;transition:background .12s;display:grid;place-items:center;flex-shrink:0; }
 .send-btn:hover { background:#4a97e0; }
 .send-btn:active { background:#3f86c9; }
@@ -4077,8 +4079,12 @@ button { border: 0; cursor: pointer; }
   background: #F7F7F7;
   border-top: .5px solid var(--wx-line);
   padding: 8px 10px 12px;
+  display: flex;
+  flex-direction: column;
+  overflow-x: clip;
+  position: relative;
 }
-#chatWindow.wechat-skin .footer-main { gap: 8px; }
+#chatWindow.wechat-skin .footer-main { gap: 8px; min-width: 0; }
 #chatWindow.wechat-skin .chat-footer .icon-btn {
   width: 34px;
   height: 34px;
@@ -4105,6 +4111,7 @@ button { border: 0; cursor: pointer; }
   font-weight: 400;
 }
 #chatWindow.wechat-skin .send-btn {
+  position: relative;
   width: auto;
   min-width: 56px;
   height: 30px;

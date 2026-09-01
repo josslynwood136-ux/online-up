@@ -513,7 +513,7 @@ function renderChat() {
     const textHtml = msg.content ? `<div>${escapeHTML(msg.content)}</div>` : '';
     var transHtml = '';
     if (!isUser && msg.translatedText) {
-      transHtml = '<div style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(0,0,0,.06);font-size:11px;color:#000">' + escapeHTML(msg.translatedText) + '</div>';
+      transHtml = '<div style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(0,0,0,.06);font-size:13px;color:#000;font-weight:600;font-family:inherit">' + escapeHTML(msg.translatedText) + '</div>';
     }
     const quoteHtml = quoteBlock(msg.quote);
     const tick = isUser ? `<div class="read-tick">${msg.status === 'read' ? '已读' : '已发送'}</div>` : '';
@@ -1160,8 +1160,19 @@ function sendChat() {
     return;
   }
   hidePanels();
-  if (text) {
-    const char = activeCharacter();
+  const char = activeCharacter();
+  
+  if (!text) {
+    // 空内容点发送 → 触发对方主动回复
+    if (typeof willowBlocksReplyFor === 'function' && willowBlocksReplyFor(char.id, char.name)) {
+      appendBubble('system', '（许愿柳生效中：' + char.name + ' 今天不回复你的消息。）');
+      return;
+    }
+    _manualAICall = true;
+    setChatTyping(true);
+    generateAndDeliver('', { proactive: true });
+  } else {
+    // 有内容点发送 → 只发送用户消息，不触发对方回复
     const prof = activeProfile();
     let quoteData = null;
     if (pendingQuote) {
@@ -1179,17 +1190,7 @@ function sendChat() {
     appendBubble('user', text, null, null, null, quoteData);
     input.value = '';
     touchActiveChar();
-    afterUserSpoke(char, text);
-    return;
-  } else {
-    const char = activeCharacter();
-    if (typeof willowBlocksReplyFor === 'function' && willowBlocksReplyFor(char.id, char.name)) {
-      appendBubble('system', '（许愿柳生效中：' + char.name + ' 今天不回复你的消息。）');
-      return;
-    }
-    _manualAICall = true;
-    setChatTyping(true);
-    generateAndDeliver('', { proactive: true });
+    // 不调用 afterUserSpoke，对方不回复
   }
 }
 
