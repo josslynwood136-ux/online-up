@@ -41,7 +41,6 @@ const defaultState = {
       proactivePush: false
     }
   ],
-  moments: [],
   chat: [],
   checkins: [],
   habits: [
@@ -215,8 +214,6 @@ function ensureStateShape(next, saved) {
     background: role.background || '',
     prompt: role.prompt || '',
     examples: role.examples || '',
-    autoPost: role.autoPost === true,
-    igPosts: Array.isArray(role.igPosts) ? role.igPosts : [],
     persona: role.persona || '',
     greeting: role.greeting || '你好，我在。',
     mood: role.mood || '😊',
@@ -559,7 +556,7 @@ function secondaryApiConfig() {
   return null;
 }
 
-// useSecondary=true 时优先用「副 API」（记忆总结 / 空间回复等轻活），否则/未配置时回退主 API
+// useSecondary=true 时优先用「副 API」（记忆总结等轻活），否则/未配置时回退主 API
 function resolveApiConfig(useSecondary) {
   if (useSecondary) {
     var s = secondaryApiConfig();

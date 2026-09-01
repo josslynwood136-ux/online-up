@@ -2860,7 +2860,6 @@ function openSettings() {
   $('chatSettings').classList.add('open');
   $('pinSwitch').classList.toggle('on', state.settings.pinned);
   var char = activeCharacter();
-  $('autoPostSwitch').classList.toggle('on', char && char.autoPost);
   if (char) {
     $('charLang').value = char.lang || '中文';
     $('translateSwitch').classList.toggle('on', char.translate === true);
@@ -3212,13 +3211,6 @@ function setProactiveQuiet() {
   state.settings.proactiveQuiet = [s, e];
   saveState();
   if (typeof uploadPushConfig === 'function') uploadPushConfig();
-}
-function toggleAutoPost() {
-  var char = activeCharacter();
-  if (!char) return;
-  char.autoPost = !char.autoPost;
-  saveState();
-  $('autoPostSwitch').classList.toggle('on', char.autoPost);
 }
 function setCharLang(val) {
   var char = activeCharacter();
@@ -4049,7 +4041,6 @@ function renderPhoneHome(char, ov) {
   var apps = [
     { id: 'ig', icon: '💬', name: 'ig', bg: 'linear-gradient(135deg,#feda75,#d62976,#962fbf)' },
     { id: 'album', icon: '🖼️', name: '相册', bg: 'linear-gradient(135deg,#ff9a76,#ff5e62)' },
-    { id: 'moments', icon: '🌈', name: '朋友圈', bg: 'linear-gradient(135deg,#ffd24d,#ff9d2e)' },
     { id: 'notes', icon: '📝', name: '备忘录', bg: 'linear-gradient(135deg,#ffe08a,#ffc24d)' },
     { id: 'browser', icon: '🌐', name: '浏览器', bg: 'linear-gradient(135deg,#5ad1fa,#1f8bff)' }
   ];
@@ -4080,7 +4071,6 @@ function phoneOpenApp(app) {
   ov.querySelector('#phoneScreen').classList.add('app-open');
   if (app === 'ig') return renderPhoneIg(char, screen);
   if (app === 'album') return renderPhoneAlbum(char, screen);
-  if (app === 'moments') return renderPhoneMoments(char, screen);
   if (app === 'notes') return renderPhoneNotes(char, screen);
   if (app === 'browser') return renderPhoneBrowser(char, screen);
 }
@@ -4112,14 +4102,10 @@ function phoneIgAvatarHtml(a) {
   if (a && (a.indexOf('http') === 0 || a.indexOf('data:') === 0)) return '<img src="' + escapeHTML(a) + '">';
   return escapeHTML(a || '👤');
 }
-function phoneIgMyAvatarHtml() {
-  return phoneIgAvatarHtml(phoneMyAvatar());
-}
 
 function renderPhoneIg(char, screen) {
   var homeSvg = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v9a1 1 0 001 1h3m-4-5a1 1 0 011-1h2a1 1 0 011 1v5m0 0a1 1 0 001 1h3a1 1 0 001-1v-9"/></svg>';
   var dmSvg = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>';
-  var postSvg = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></svg>';
   var meSvg = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
   function navItem(t, label, svg) {
     return '<div class="nav-item" data-tab="' + t + '"><span class="nav-icon">' + svg + '</span><span class="nav-label">' + label + '</span></div>';
@@ -4129,11 +4115,10 @@ function renderPhoneIg(char, screen) {
   h += '<div class="ig-panels">';
   h += '<div class="profile-panel active" id="piHome"></div>';
   h += '<div class="profile-panel" id="piDm"></div>';
-  h += '<div class="profile-panel" id="piPost"></div>';
   h += '<div class="profile-panel" id="piMe"></div>';
   h += '</div>';
   h += '<div class="profile-nav" id="piNav">';
-  h += navItem('home', '首页', homeSvg) + navItem('dm', '私信', dmSvg) + navItem('post', '发布', postSvg) + navItem('me', '我的', meSvg);
+  h += navItem('home', '首页', homeSvg) + navItem('dm', '私信', dmSvg) + navItem('me', '我的', meSvg);
   h += '</div>';
   h += '</div>';
   screen.innerHTML = h;
@@ -4156,34 +4141,11 @@ function switchPhoneIgTab(char, tab) {
   if (panel) panel.classList.add('active');
   if (tab === 'home') renderPhoneIgHome(char, c.querySelector('#piHome'));
   else if (tab === 'dm') renderPhoneIgDm(char, c.querySelector('#piDm'));
-  else if (tab === 'post') renderPhoneIgPosts(char, c.querySelector('#piPost'));
   else if (tab === 'me') renderPhoneIgMe(char, c.querySelector('#piMe'));
 }
 
 function renderPhoneIgHome(char, panel) {
-  var items = [];
-  (char.igPosts || []).forEach(function (p) { items.push({ who: 'char', p: p }); });
-  (state.profilePosts || []).forEach(function (p) { items.push({ who: 'me', p: p }); });
-  items.sort(function (a, b) { return (b.p.time || 0) - (a.p.time || 0); });
-  if (!items.length) { panel.innerHTML = '<div class="profile-panel-content"><div class="phone-empty">（还没有动态）</div></div>'; return; }
-  var h = '<div class="profile-panel-content">';
-  items.forEach(function (it) {
-    var p = it.p;
-    var isChar = it.who === 'char';
-    var av = isChar ? phoneIgAvatarHtml(char.avatar) : phoneIgMyAvatarHtml();
-    var name = isChar ? (char.name || 'TA') : phoneMyName();
-    var content = p.image
-      ? '<img src="' + p.image + '" style="width:100%;border-radius:8px;display:block">'
-      : '<div style="font-size:60px;text-align:center;padding:18px 0">' + escapeHTML(p.emoji || '📝') + '</div>';
-    var time = (typeof formatPostTime === 'function') ? formatPostTime(p.time) : '';
-    h += '<div class="phone-moment"><div class="phone-moment-ava">' + av + '</div>' +
-      '<div class="phone-moment-body"><div class="phone-moment-name">' + escapeHTML(name) + '</div>' +
-      content + '<div class="phone-moment-text">' + escapeHTML(p.caption || '') + '</div>' +
-      '<div class="phone-moment-time">' + escapeHTML(time) + '</div>' +
-      '<div class="phone-moment-actions"><span class="phone-moment-like">♥ ' + (p.likes || 0) + '</span></div></div></div>';
-  });
-  h += '</div>';
-  panel.innerHTML = h;
+  panel.innerHTML = '<div class="profile-panel-content"><div class="phone-empty">（空）</div></div>';
 }
 
 function renderPhoneIgDm(char, panel) {
@@ -4200,24 +4162,11 @@ function renderPhoneIgDm(char, panel) {
   if (sc) phoneScrollToBottom(sc);
 }
 
-function renderPhoneIgPosts(char, panel) {
-  var posts = (char.igPosts || []);
-  if (!posts.length) { panel.innerHTML = '<div class="profile-panel-content"><div class="phone-empty">（还没有发布过内容）</div></div>'; return; }
-  var h = '<div class="profile-panel-content"><div class="phone-album-grid">';
-  posts.forEach(function (p) {
-    var inner = p.image ? '<img src="' + p.image + '" style="width:100%;height:100%;object-fit:cover">' : (p.emoji || '🖼️');
-    h += '<div class="phone-album-cell">' + inner + (p.caption ? '<div class="phone-album-cap">' + escapeHTML(p.caption) + '</div>' : '') + '</div>';
-  });
-  h += '</div></div>';
-  panel.innerHTML = h;
-}
-
 function renderPhoneIgMe(char, panel) {
   var av = phoneIgAvatarHtml(char.avatar);
   var name = char.name || 'TA';
   var username = char.username || ('@' + (char.name || 'ta'));
   var bio = char.bio || (char.persona ? char.persona.slice(0, 80) : '这个人很神秘，什么都没留下…');
-  var posts = (char.igPosts || []);
   var h = '<div class="profile-panel-content">';
   h += '<div style="display:flex;gap:16px;align-items:center;padding:18px 16px;background:#fff">';
   h += '<div style="width:64px;height:64px;border-radius:50%;overflow:hidden;background:#f0f0f0;display:flex;align-items:center;justify-content:center;font-size:34px;flex:0 0 auto">' + av + '</div>';
@@ -4225,69 +4174,22 @@ function renderPhoneIgMe(char, panel) {
   h += '<div style="font-size:12px;color:#8e8e8e;margin-top:2px">' + escapeHTML(username) + '</div>';
   h += '<div style="font-size:13px;color:#262626;margin-top:6px;line-height:1.5">' + escapeHTML(bio) + '</div></div></div>';
   h += '<div style="display:flex;background:#fff;border-top:1px solid #f0f0f0;border-bottom:1px solid #f0f0f0;margin-bottom:8px">';
-  h += '<div style="flex:1;text-align:center;padding:10px 0"><div style="font-weight:600;color:#262626">' + posts.length + '</div><div style="font-size:11px;color:#8e8e8e">发布</div></div>';
   h += '<div style="flex:1;text-align:center;padding:10px 0"><div style="font-weight:600;color:#262626">' + (char.followers || 0) + '</div><div style="font-size:11px;color:#8e8e8e">粉丝</div></div>';
   h += '<div style="flex:1;text-align:center;padding:10px 0"><div style="font-weight:600;color:#262626">' + (char.following || 0) + '</div><div style="font-size:11px;color:#8e8e8e">关注</div></div></div>';
-  if (posts.length) {
-    h += '<div class="phone-album-grid">';
-    posts.forEach(function (p) {
-      var inner = p.image ? '<img src="' + p.image + '" style="width:100%;height:100%;object-fit:cover">' : (p.emoji || '🖼️');
-      h += '<div class="phone-album-cell">' + inner + '</div>';
-    });
-    h += '</div>';
-  }
   h += '</div>';
   panel.innerHTML = h;
 }
 
-function phoneOpenIgYou() {
-  var char = activeCharacter();
-  var ov = document.getElementById('phoneOverlay');
-  if (!char || !ov) return;
-  var screen = ov.querySelector('#phoneContent');
-  ov.querySelector('#phoneScreen').classList.add('app-open');
-  var msgs = (char.chat || []).filter(function (m) { return m && (m.content || m.text); });
-  screen.innerHTML = phoneAppBar(phoneMyName());
-  var body = document.createElement('div');
-  body.className = 'phone-scroll';
-  var myAvObj = phoneMyAvatarObj();
-  body.innerHTML = phoneChatHtml(msgs, function (m) { return m.role === 'assistant' ? 'right' : 'left'; }, {
-    leftAvatar: myAvObj,
-    rightAvatar: char.avatar ? { src: char.avatar } : { emoji: '😊' }
-  });
-  screen.appendChild(body);
-  phoneScrollToBottom(screen);
-}
-
 function renderPhoneAlbum(char, screen) {
   screen.innerHTML = phoneAppBar('相册');
-  var posts = (char.igPosts || []);
-  if (!posts.length) { screen.innerHTML += '<div class="phone-empty">（相册里还没有照片）</div>'; return; }
+  var photos = (char.phone && char.phone.photos) || [];
+  if (!photos.length) { screen.innerHTML += '<div class="phone-empty">（相册里还没有照片）</div>'; return; }
   var h = '<div class="phone-album-grid">';
-  posts.forEach(function (p) {
-    var inner = p.image ? '<img src="' + p.image + '" style="width:100%;height:100%;object-fit:cover">' : (p.emoji || '🖼️');
-    h += '<div class="phone-album-cell">' + inner + (p.caption ? '<div class="phone-album-cap">' + escapeHTML(p.caption) + '</div>' : '') + '</div>';
-  });
-  h += '</div>';
-  screen.innerHTML += h;
-}
-
-function renderPhoneMoments(char, screen) {
-  screen.innerHTML = phoneAppBar('朋友圈');
-  var posts = (char.igPosts || []).slice().reverse();
-  if (!posts.length) { screen.innerHTML += '<div class="phone-empty">（还没有发过朋友圈）</div>'; return; }
-  var h = '<div class="phone-moments">';
-  posts.forEach(function (p) {
-    var ava = char.avatar ? '<img src="' + char.avatar + '" style="width:100%;height:100%;object-fit:cover">' : '👤';
-    var time = (typeof formatPostTime === 'function') ? formatPostTime(p.time) : '';
-    h += '<div class="phone-moment"><div class="phone-moment-ava">' + ava + '</div>' +
-      '<div class="phone-moment-body">' +
-        '<div class="phone-moment-name">' + escapeHTML(char.name || 'TA') + '</div>' +
-        '<div class="phone-moment-emoji">' + (p.emoji || '') + '</div>' +
-        '<div class="phone-moment-text">' + escapeHTML(p.caption || '') + '</div>' +
-        '<div class="phone-moment-time">' + escapeHTML(time) + '</div>' +
-        '<div class="phone-moment-actions"><span class="phone-moment-like">♥ ' + (p.likes || 0) + '</span><span class="phone-moment-cmt">💬 评论</span></div>' +
-      '</div></div>';
+  photos.forEach(function (p) {
+    var src = typeof p === 'string' ? p : (p.image || p.src || '');
+    var cap = typeof p === 'string' ? '' : (p.caption || '');
+    var inner = src ? '<img src="' + src + '" style="width:100%;height:100%;object-fit:cover">' : '🖼️';
+    h += '<div class="phone-album-cell">' + inner + (cap ? '<div class="phone-album-cap">' + escapeHTML(cap) + '</div>' : '') + '</div>';
   });
   h += '</div>';
   screen.innerHTML += h;

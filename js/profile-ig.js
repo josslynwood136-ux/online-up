@@ -5,8 +5,6 @@
 let selectedProfileAvatar = '🌸';
 let selectedProfileAvatarImage = '';
 let selectedProfileCoverImage = '';
-let pendingPostImage = null;
-let viewPostId = null;
 let currentProfileTab = 'home';
 
 function showIGToast(msg) {
@@ -83,10 +81,6 @@ function renderIGProfile() {
           <span class="nav-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v9a1 1 0 001 1h3m-4-5a1 1 0 011-1h2a1 1 0 011 1v5m0 0a1 1 0 001 1h3a1 1 0 001-1v-9"/></svg></span>
           <span class="nav-label">空间</span>
         </div>
-        <div class="nav-item" data-tab="post" onclick="openPostCreator()">
-          <span class="nav-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></svg></span>
-          <span class="nav-label">发布</span>
-        </div>
         <div class="nav-item" data-tab="profile" onclick="switchProfileTab('profile')">
           <span class="nav-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
           <span class="nav-label">我的</span>
@@ -99,7 +93,6 @@ function renderIGProfile() {
 
 // ====== Tab Switching ======
 function switchProfileTab(tab) {
-  if (tab === 'post') { openPostCreator(); return; }
   currentProfileTab = tab;
   document.querySelectorAll('#igProfileNav .nav-item').forEach(item => item.classList.remove('active'));
   const activeNav = document.querySelector(`#igProfileNav .nav-item[data-tab="${tab}"]`);
@@ -120,76 +113,6 @@ function switchProfileTab(tab) {
 // ====== Feed / Home ======
 function getCharInfo(charId) {
   return (state.roles || []).find(function(r) { return r.id === charId; });
-}
-
-var _genPostPending = false;
-
-function ensureCharAutoPosts() {
-  if (typeof willowBlocksProactive === 'function' && willowBlocksProactive()) return;
-  (state.roles || []).forEach(function(char) {
-    if (!char.autoPost) return;
-    if (!char.igPosts) char.igPosts = [];
-    var today = new Date().toDateString();
-    var hasToday = char.igPosts.some(function(p) { return new Date(p.time).toDateString() === today; });
-    if (hasToday) return;
-    generateCharPost(char);
-  });
-}
-
-async function generateCharPost(char) {
-  var cfg = resolveApiConfig(true);
-  if (!cfg.key || !cfg.url || !cfg.model) return;
-  var prompt = '你是一个角色。根据以下角色设定，发一条 Instagram 动态（一句话 + 一个emoji）。只输出动态内容，不要解释，不要加引号。\n\n角色名：' + char.name + '\n性格：' + (char.personality || '普通') + '\n说话风格：' + (char.style || '普通') + '\n背景：' + (char.background || '无');
-  var memText = '';
-  if (typeof pickRelevantMemories === 'function') {
-    var mems = pickRelevantMemories(char, '').slice(0, 6);
-    if (mems.length) memText = '\n【你对用户的记忆】\n' + mems.map(function(m) { return '- ' + (m.title ? m.title + '：' : '') + m.text; }).join('\n');
-  }
-  prompt += '\n\n这些记忆是你和对方之间真实发生过 / 对方说过的。如果合适，可以基于其中一条发一条动态（比如「路过那家你说想去的店啦🏪」），自然地让粉丝看到你们的小故事；也可以完全不提记忆，发当下随感。\n\n示例输出：\n今天天气真好，出去走走🌤️';
-  if (memText) prompt += '\n\n' + memText;
-  var wishCtx = (typeof willowContextText === 'function') ? willowContextText() : '';
-  if (wishCtx) prompt += '\n\n' + wishCtx;
-  var controller = new AbortController();
-  var timer = setTimeout(function() { controller.abort(); }, 15000);
-  try {
-    var res = await aiRequest(joinUrl(cfg.url, 'chat/completions'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + cfg.key },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model: cfg.model,
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 80,
-        temperature: 0.8
-      })
-    });
-    var data = await res.json().catch(function() { return {}; });
-    if (!res.ok) return;
-    var text = (data.choices?.[0]?.message?.content || '').trim();
-    if (!text) return;
-    var emojiMatch = text.match(/([\u2600-\u27ff\u{1F000}-\u{1FFFF}]|[\u2700-\u27BF])/u);
-    var caption = text;
-    var emoji = '💬';
-    if (emojiMatch) {
-      emoji = emojiMatch[0];
-      caption = text.replace(emoji, '').replace(/\s*\n\s*/g, ' ').trim();
-    }
-    if (!char.igPosts) char.igPosts = [];
-    char.igPosts.push({
-      id: 'cp_' + char.id + '_' + Date.now(),
-      caption: caption,
-      emoji: (emoji ? emoji[0] : '💬'),
-      time: Date.now() - Math.floor(Math.random() * 3600000),
-      likes: Math.floor(Math.random() * 18) + 1,
-      liked: false
-    });
-    saveState();
-    renderFeed();
-  } catch (e) {
-    // 忽略失败
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 function bindStoryItems() {
@@ -228,8 +151,6 @@ function renderFeed() {
   var chars = state.roles || [];
   var myProfile = state.myProfile || {};
 
-  ensureCharAutoPosts();
-
   // Stories
   var storyUsers = [{ id: '_self', avatar: myProfile.avatarImage || myProfile.avatar || '👤', name: '你的快拍', isSelf: true }];
   chars.forEach(function(char) {
@@ -244,227 +165,12 @@ function renderFeed() {
     var dataAttr = u.isSelf ? '' : 'data-char="' + u.id + '"';
     storiesHtml += '<div class="ig-story-item" ' + dataAttr + '><div class="ig-story-ring ' + ringCls + '"><div class="ig-story-avatar">' + avatarContent + '</div></div><div class="ig-story-name">' + escapeHTML(u.isSelf ? '你的快拍' : (u.name || '')) + '</div></div>';
   });
-  // 加角色按钮（右侧）
+// 加角色按钮（右侧）
   storiesHtml += '<div class="ig-story-item" onclick="createCharFromLib()"><div class="ig-story-ring ig-story-ring-add"><div class="ig-story-avatar ig-story-add-avatar">＋</div></div><div class="ig-story-name">添加</div></div>';
   storiesHtml += '</div></div>';
 
-  // 汇总所有帖子
-  var allPosts = [];
-  var myImg = myProfile.avatarImage || '';
-  var myAvatarHtml = myImg ? '<img src="' + myImg + '" />' : escapeHTML(myProfile.avatar || '👤');
-  var myDisplayName = myProfile.username || '@my_username';
-
-  (state.profilePosts || []).forEach(function(p) {
-     allPosts.push({
-       type: 'self', id: p.id,
-       avatarHtml: myAvatarHtml, displayName: myDisplayName,
-       content: p.image ? '<img src="' + p.image + '" style="filter:' + (p.filter || 'none') + '" />' : '<div style="font-size:80px;display:flex;align-items:center;justify-content:center;height:100%;background:var(--bg-gray,#f0ede8);">📝</div>',
-       caption: p.caption || '', time: p.time, likes: p.likes || 0, liked: p.liked || false, comments: p.comments || []
-     });
-  });
-
-  chars.forEach(function(char) {
-    if (!char.autoPost || !char.igPosts) return;
-    var isImg = char.avatar && char.avatar.startsWith && (char.avatar.startsWith('http') || char.avatar.startsWith('data:'));
-    var avatarHtml = isImg ? '<img src="' + char.avatar + '" />' : escapeHTML(char.avatar || '👤');
-    char.igPosts.forEach(function(p) {
-      allPosts.push({
-        type: 'char', id: p.id, charId: char.id,
-        avatarHtml: avatarHtml, displayName: char.name || char.username || '用户',
-        content: '<div style="font-size:80px;display:flex;align-items:center;justify-content:center;height:100%;background:var(--bg-gray,#f0ede8);">' + p.emoji + '</div>',
-        caption: p.caption || '', time: p.time, likes: p.likes, liked: p.liked
-      });
-    });
-  });
-
-  allPosts.sort(function(a, b) { return b.time - a.time; });
-
-  if (allPosts.length === 0) {
-    container.innerHTML = storiesHtml + '<div class="feed-empty">📷 还没有帖子<br><span style="font-size:12px;color:#bbb;">点击底部 + 发布第一条动态</span></div>';
-    bindStoryItems();
-    return;
-  }
-
-   var feedHtml = '';
-   allPosts.forEach(function(post) {
-     var likeBtn = post.liked ? '❤️' : '♡';
-     var likeCls = post.liked ? 'action-btn liked' : 'action-btn';
-     var likeHandler = post.type === 'self'
-       ? 'toggleSelfPostLike(\'' + post.id + '\')'
-       : 'igLikeAutoPost(\'' + post.id + '\',\'' + post.charId + '\')';
-     var cmtCount = (post.comments || []).length;
-     var commentBtn = post.type === 'self'
-       ? '<button class="action-btn" onclick="openPostComments(\'' + post.id + '\')">💬' + (cmtCount ? ' <span class="feed-cmt-count">' + cmtCount + '</span>' : '') + '</button>'
-       : '<button class="action-btn" onclick="showIGToast(\'💬 评论\')">💬</button>';
-     feedHtml += '<div class="feed-post">';
-     feedHtml += '<div class="feed-post-header"><div class="feed-avatar">' + post.avatarHtml + '</div><span class="feed-username">' + escapeHTML(post.displayName) + '</span><button class="feed-more">⋯</button></div>';
-     feedHtml += '<div class="feed-post-image">' + post.content + '</div>';
-     feedHtml += '<div class="feed-post-actions"><button class="' + likeCls + '" onclick="' + likeHandler + '">' + likeBtn + '</button>' + commentBtn + '<button class="action-btn save-btn" onclick="showIGToast(\'已保存\')">🏷️</button></div>';
-     feedHtml += '<div class="feed-post-likes" onclick="' + (post.type === 'self' ? 'openPostComments(\'' + post.id + '\')' : '') + '">❤️ ' + post.likes + ' 次赞</div>';
-     feedHtml += '<div class="feed-post-caption"><span class="cap-user">' + escapeHTML(post.displayName) + '</span>' + escapeHTML(post.caption) + '</div>';
-     feedHtml += '<div class="feed-post-time">' + formatPostTime(post.time) + '</div></div>';
-   });
-  container.innerHTML = storiesHtml + feedHtml;
+container.innerHTML = storiesHtml;
   bindStoryItems();
-}
-
-function igLikeAutoPost(postId, charId) {
-  var chars = state.roles || [];
-  for (var c = 0; c < chars.length; c++) {
-    var char = chars[c];
-    if (char.id !== charId || !char.igPosts) continue;
-    for (var i = 0; i < char.igPosts.length; i++) {
-      if (char.igPosts[i].id === postId) {
-        char.igPosts[i].liked = !char.igPosts[i].liked;
-        char.igPosts[i].likes += char.igPosts[i].liked ? 1 : -1;
-        saveState();
-        renderFeed();
-        return;
-      }
-    }
-  }
-}
-
-// ====== 自己动态的 点赞 / 评论 ======
-function findSelfPost(postId) {
-  return (state.profilePosts || []).find(function(p) { return p.id === postId; });
-}
-
-function toggleSelfPostLike(postId) {
-  var post = findSelfPost(postId);
-  if (!post) return;
-  post.liked = !post.liked;
-  post.likes = (post.likes || 0) + (post.liked ? 1 : -1);
-  if (post.likes < 0) post.likes = 0;
-  saveState();
-  renderFeed();
-  if (window._openCommentPostId === postId) refreshPostDetail();
-}
-
-function openPostComments(postId) {
-  var post = findSelfPost(postId);
-  if (!post) { showIGToast('动态不存在'); return; }
-  if (!post.comments) post.comments = [];
-  window._openCommentPostId = postId;
-  var overlay = document.getElementById('igCommentOverlay');
-  if (overlay) overlay.remove();
-  overlay = document.createElement('div');
-  overlay.className = 'ig-comment-overlay';
-  overlay.id = 'igCommentOverlay';
-  overlay.innerHTML = `
-    <div class="ig-comment-mask" onclick="closePostComments()"></div>
-    <div class="ig-comment-sheet">
-      <div class="ig-comment-head"><span>评论 · ${(post.comments || []).length}</span><button class="ig-comment-close" onclick="closePostComments()">✕</button></div>
-      <div class="ig-comment-list" id="igCommentList"></div>
-      <div class="ig-comment-input-row">
-        <input class="ig-comment-input" id="igCommentInput" placeholder="说点什么..." onkeydown="if(event.key==='Enter')sendSelfComment('${postId}')" />
-        <button class="ig-comment-send" onclick="sendSelfComment('${postId}')">发送</button>
-      </div>
-    </div>`;
-  document.body.appendChild(overlay);
-  renderCommentList(postId);
-  setTimeout(function() { var i = document.getElementById('igCommentInput'); if (i) i.focus(); }, 120);
-}
-
-function renderCommentList(postId) {
-  var post = findSelfPost(postId);
-  var list = document.getElementById('igCommentList');
-  if (!list || !post) return;
-  if (!post.comments || post.comments.length === 0) {
-    list.innerHTML = '<div class="ig-comment-empty">还没有评论，快来抢沙发~</div>';
-    return;
-  }
-  list.innerHTML = post.comments.map(function(c) {
-    var isMe = c.author === '我';
-    var av = c.avatar && c.avatar.startsWith && (c.avatar.startsWith('http') || c.avatar.startsWith('data:'))
-      ? '<img src="' + c.avatar + '"/>' : escapeHTML(c.avatar || '👤');
-    return '<div class="ig-comment-item' + (isMe ? ' me' : '') + '"><div class="ig-comment-av">' + av + '</div><div class="ig-comment-body"><div class="ig-comment-name">' + escapeHTML(c.author) + '</div><div class="ig-comment-text">' + escapeHTML(c.text) + '</div></div><div class="ig-comment-time">' + formatPostTime(c.time) + '</div></div>';
-  }).join('');
-  list.scrollTop = list.scrollHeight;
-}
-
-function sendSelfComment(postId) {
-  var input = document.getElementById('igCommentInput');
-  if (!input) return;
-  var text = input.value.trim();
-  if (!text) return;
-  var post = findSelfPost(postId);
-  if (!post) return;
-  if (!post.comments) post.comments = [];
-  post.comments.push({
-    author: '我',
-    avatar: (state.myProfile && (state.myProfile.avatarImage || state.myProfile.avatar)) || '👤',
-    text: text, time: Date.now()
-  });
-  saveState();
-  input.value = '';
-  renderCommentList(postId);
-  renderFeed();
-  if (window._openCommentPostId === postId && viewPostId === postId) refreshPostDetail();
-}
-
-function closePostComments() {
-  var o = document.getElementById('igCommentOverlay');
-  if (o) o.remove();
-  window._openCommentPostId = null;
-}
-
-// ====== 角色互动（点赞 / 评论，AI 生成）======
-
-async function genFriendComment(char, post) {
-  var cfg = resolveApiConfig(true);
-  if (!cfg || !cfg.key || !cfg.url || !cfg.model) return null;
-  var cap = post.caption || (post.image ? '（发了一张图片）' : '（发了一条动态）');
-  var prompt = '你是角色『' + char.name + '』。'
-    + (char.relation ? '你和用户的关系是：' + char.relation + '。' : '')
-    + (char.personality ? '你的性格：' + char.personality + '。' : '')
-    + (char.style ? '你的说话风格：' + char.style + '。' : '')
-    + '\n用户在朋友圈发了一条动态：' + cap
-    + '\n请用' + char.name + '的口吻，回一句简短的评论（一句话，可带一个 emoji，像真的在刷朋友圈顺手评论那样；只输出评论内容，不要解释，不要加引号）。';
-  try {
-    var res = await aiRequest(joinUrl(cfg.url, 'chat/completions'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + cfg.key },
-      body: JSON.stringify({
-        model: cfg.model,
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 60,
-        temperature: 0.9
-      })
-    });
-    if (!res.ok) return null;
-    var data = await res.json().catch(function() { return {}; });
-    var text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '').trim();
-    text = text.replace(/^["'「『]+|["'」』]+$/g, '').trim();
-    return text || null;
-  } catch (e) {
-    return null;
-  }
-}
-
-function simulateFriendsReaction(post) {
-  if (!post) return;
-  var roles = (state.roles || []).filter(function(r) { return r && r.name; });
-  if (roles.length === 0) return;
-  var n = Math.min(roles.length, 1 + Math.floor(Math.random() * 2));
-  roles = roles.slice().sort(function() { return Math.random() - 0.5; }).slice(0, n);
-  roles.forEach(function(char, idx) {
-    setTimeout(async function() {
-      if (!post) return;
-      if (Math.random() < 0.7) post.likes = (post.likes || 0) + 1;
-      if (Math.random() < 0.6) {
-        var text = await genFriendComment(char, post);
-        if (text) {
-          if (!post.comments) post.comments = [];
-          post.comments.push({ author: char.name, avatar: char.avatar || '👤', text: text, time: Date.now() });
-        }
-      }
-      saveState();
-      renderFeed();
-      if (window._openCommentPostId === post.id) renderCommentList(post.id);
-      if (viewPostId === post.id) refreshPostDetail();
-    }, 1500 + idx * 1200 + Math.random() * 1500);
-  });
 }
 
 var IG_STORY_ITEMS = [
@@ -699,9 +405,7 @@ function saveIGCharEditor() {
     unread: 0,
     read: true,
     pinned: false,
-    online: true,
-    autoPost: false,
-    igPosts: []
+    online: true
   } : state.roles.find(r => r.id === igEditingCharId);
   if (!char) return;
   char.avatar = igCharAvatarData;
@@ -803,17 +507,9 @@ function renderDmList() {
       <div class="bio-location">${escapeHTML(p.location)}</div>
     </div>
     <button class="profile-edit-btn" onclick="openProfileEditor()"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg> 编辑资料</button>
-    <button class="profile-edit-btn" onclick="openPostCreator()" style="margin-top:8px;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg> 发动态</button>
     <div class="profile-posts-header"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg> 我的帖子</div>
     <div class="profile-posts-grid">
-      ${state.profilePosts && state.profilePosts.length > 0
-        ? state.profilePosts.slice(0, 9).map(p => `
-          <div class="profile-post" onclick="viewPost('${p.id}')" style="background:#f7f5f0;">
-            ${p.image ? `<img src="${p.image}" style="width:100%;height:100%;object-fit:cover;filter:${p.filter || 'none'};" />` : '<span style="font-size:24px;color:#fff;opacity:.6">📝</span>'}
-          </div>
-        `).join('')
-        : (postEmojis.map(e => `<div class="profile-post">${e}</div>`).join(''))
-      }
+      ${postEmojis.map(e => `<div class="profile-post">${e}</div>`).join('')}
     </div>
   `;
 }
@@ -908,135 +604,9 @@ function saveProfile() {
   showIGToast('资料已更新 ✅');
 }
 
-// ====== Post Creator ======
-function openPostCreator() {
-  pendingPostImage = null;
-  $('postCreator').classList.add('active');
-  $('postCreatorPlaceholder').style.display = 'block';
-  $('postCreatorImage').style.display = 'none';
-  $('postCreatorFilters').style.display = 'none';
-  $('postCreatorCaptionArea').classList.add('active');
-  $('postCreatorNext').textContent = '发布';
-  $('postCreatorNext').classList.add('ready');
-  $('postCreatorCaption').value = '';
-  setTimeout(() => $('postCreatorCaption').focus(), 100);
-}
 
-function closePostCreator() {
-  $('postCreator').classList.remove('active');
-  pendingPostImage = null;
-}
 
-function handlePostImageSelect(event) {
-  var file = event.target.files[0];
-  if (!file) return;
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    pendingPostImage = e.target.result;
-    var img = $('postCreatorImage');
-    img.src = pendingPostImage;
-    img.style.display = 'block';
-    img.style.filter = 'none';
-    $('postCreatorPlaceholder').style.display = 'none';
-    $('postCreatorFilters').style.display = 'flex';
-    $('postCreatorNext').classList.add('ready');
-    document.querySelectorAll('#postCreatorFilters .filter-option').forEach(function(f) { f.classList.remove('active'); });
-    var first = document.querySelector('#postCreatorFilters .filter-option[data-filter="none"]');
-    if (first) first.classList.add('active');
-  };
-  reader.readAsDataURL(file);
-  event.target.value = '';
-}
 
-function setPostFilter(filter) {
-  var img = $('postCreatorImage');
-  if (img) img.style.filter = filter;
-  document.querySelectorAll('#postCreatorFilters .filter-option').forEach(function(f) { f.classList.remove('active'); });
-  var opt = document.querySelector('#postCreatorFilters .filter-option[data-filter="' + filter + '"]');
-  if (opt) opt.classList.add('active');
-}
-
-function postCreatorNext() {
-  publishPost();
-}
-
-function publishPost() {
-  var caption = $('postCreatorCaption').value.trim();
-  var filter = pendingPostImage ? ($('postCreatorImage').style.filter || 'none') : 'none';
-  if (!caption && !pendingPostImage) { showIGToast('写点什么吧'); return; }
-  var post = {
-    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
-    image: pendingPostImage || '',
-    filter: filter,
-    caption: caption,
-    time: Date.now(),
-    likes: 0,
-    liked: false,
-    comments: []
-  };
-  state.profilePosts.unshift(post);
-  $('postCreatorCaption').value = '';
-  closePostCreator();
-  saveState();
-  renderMyProfileContent();
-  renderFeed();
-  showIGToast('已发布 ✨');
-  simulateFriendsReaction(post);
-}
-
-// ====== Post Detail ======
-function viewPost(postId) {
-  var post = state.profilePosts.find(function(p) { return p.id === postId; });
-  if (!post) return;
-  viewPostId = postId;
-  $('postDetailImg').innerHTML = post.image ? '<img src="' + post.image + '" style="filter:' + (post.filter || 'none') + ';" />' : '<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:80px;color:rgba(255,255,255,.2)">📝</div>';
-  $('postDetailCaption').textContent = post.caption || '无标题';
-  $('postDetailTime').textContent = formatPostTime(post.time);
-  $('postDetailDelete').style.display = 'block';
-  refreshPostDetail();
-  $('postDetail').classList.add('active');
-}
-
-function refreshPostDetail() {
-  var post = viewPostId ? findSelfPost(viewPostId) : null;
-  if (!post) return;
-  var likeBtn = $('postDetailLike');
-  if (likeBtn) {
-    likeBtn.classList.toggle('liked', !!post.liked);
-    likeBtn.innerHTML = (post.liked ? '❤️' : '♡') + ' <span id="postDetailLikeCount">' + (post.likes || 0) + '</span>';
-  }
-  var cmtEl = $('postDetailCmtCount');
-  if (cmtEl) cmtEl.textContent = (post.comments || []).length;
-  var list = $('postDetailComments');
-  if (list) {
-    if (!post.comments || post.comments.length === 0) {
-      list.innerHTML = '<div class="pd-comments-empty">还没有评论</div>';
-    } else {
-      list.innerHTML = post.comments.map(function(c) {
-        var isMe = c.author === '我';
-        var av = c.avatar && c.avatar.startsWith && (c.avatar.startsWith('http') || c.avatar.startsWith('data:'))
-          ? '<img src="' + c.avatar + '"/>' : escapeHTML(c.avatar || '👤');
-        return '<div class="pd-comment-item' + (isMe ? ' me' : '') + '"><div class="pd-comment-av">' + av + '</div><div class="pd-comment-body"><span class="pd-comment-name">' + escapeHTML(c.author) + '</span><span class="pd-comment-text">' + escapeHTML(c.text) + '</span></div><div class="pd-comment-time">' + formatPostTime(c.time) + '</div></div>';
-      }).join('');
-    }
-  }
-}
-
-function closePostDetail() {
-  $('postDetail').classList.remove('active');
-  viewPostId = null;
-}
-
-async function deletePost() {
-  if (!viewPostId) return;
-  if (!await uiConfirm('确定删除这条帖子？')) return;
-  state.profilePosts = state.profilePosts.filter(function(p) { return p.id !== viewPostId; });
-  closePostDetail();
-  saveState();
-  renderMyProfileContent();
-  renderFeed();
-  showIGToast('已删除');
-}
 
 // ====== Utils ======
 function formatPostTime(ts) {

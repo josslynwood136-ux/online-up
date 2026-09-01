@@ -96,10 +96,9 @@ function switchTab(t, el) {
   closeSettings();
   document.querySelectorAll('.tab-item').forEach(i => i.classList.remove('active'));
   el.classList.add('active');
-  const title = t === 'msg' ? '消息' : t === 'moment' ? '动态' : '我的';
+  const title = t === 'msg' ? '消息' : '我的';
   setTitle(title);
   if (t === 'msg') renderMessageList();
-  if (t === 'moment') renderMoments();
   if (t === 'me') renderMyProfile();
 }
 
@@ -164,8 +163,8 @@ function renderApiSettings() {
 
   // 副 API（记忆总结 / 空间回复）
   h += '<div style="background:#fff;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px">';
-  h += '<div style="font-size:13px;font-weight:600;color:#4a3f35;padding-bottom:2px;border-bottom:1px solid #f0ede8">副 API（记忆总结 / 空间动态·评论）</div>';
-  h += '<div style="font-size:11px;color:#b8a99a;line-height:1.5">用差一点的模型做「总结记忆库」和「空间动态/评论」这类轻活，把好一点的主 API 留给正式聊天。选「与主 API 相同」则不单独分流。</div>';
+  h += '<div style="font-size:13px;font-weight:600;color:#4a3f35;padding-bottom:2px;border-bottom:1px solid #f0ede8">副 API（记忆总结）</div>';
+  h += '<div style="font-size:11px;color:#b8a99a;line-height:1.5">用差一点的模型做「总结记忆库」这类轻活，把好一点的主 API 留给正式聊天。选「与主 API 相同」则不单独分流。</div>';
   h += '<div><div style="font-size:11px;color:#b8a99a;margin-bottom:4px">副 API 配置</div><select class="field" id="secondaryApiSelect" onchange="setSecondaryApi(this.value)">';
   var _secId = state.secondaryApiProfile || '';
   h += '<option value=""' + (_secId === '' ? ' selected' : '') + '>与主 API 相同（不分）</option>';
@@ -513,7 +512,7 @@ function filterMsgList() {
 // ---------- 角色编辑器 ----------
 function renderCharacterEditor(id) {
   const isNew = id === 'new';
-  const char = isNew ? { id: 'char-' + Date.now(), memories: [], chat: [], unread: 0, read: true, name: '', avatar: '', aliases: '', relation: '', personality: '', style: '', background: '', prompt: '', examples: '', greeting: '', autoPost: false, igPosts: [] } : getCharacter(id);
+  const char = isNew ? { id: 'char-' + Date.now(), memories: [], chat: [], unread: 0, read: true, name: '', avatar: '', aliases: '', relation: '', personality: '', style: '', background: '', prompt: '', examples: '', greeting: '' } : getCharacter(id);
   const deleteButton = isNew ? '' : `<button class="danger-btn" style="width:100%;margin-top:10px" onclick="deleteCharacter('${char.id}')">删除角色</button>`;
   setTitle(isNew ? '新建角色' : '编辑角色');
   c().innerHTML = `
@@ -596,7 +595,7 @@ function renderMemoryEditor(char) {
 
 function saveCharacter(id) {
   const isNew = id === 'new';
-  const char = isNew ? { id: 'char-' + Date.now(), memories: [], chat: [], unread: 0, read: true, autoPost: false, igPosts: [] } : getCharacter(id);
+  const char = isNew ? { id: 'char-' + Date.now(), memories: [], chat: [], unread: 0, read: true } : getCharacter(id);
   char.avatar = $('charAvatar').value.trim();
   char.name = $('charName').value.trim() || '未命名角色';
   char.aliases = $('charAliases').value.trim();
@@ -687,98 +686,6 @@ function deleteMemory(charId, memoryId) {
   char.memories = char.memories.filter(mem => mem.id !== memoryId);
   saveState();
   renderCharacterEditor(charId);
-}
-
-// ---------- 动态 ----------
-const CHAR_MOMENT_IDEAS = [
-  '今天天气不错，想和你一起出去走走。',
-  '刚发呆了一会儿，脑子里全是你。',
-  '有点累了，但想到你就又有了力气。',
-  '偷偷学了首歌，下次唱给你听。',
-  '今天也觉得能遇见你真好。',
-  '如果我在你身边，现在应该正靠着你吧。'
-];
-
-function renderMoments() {
-  setTitle('动态');
-  const char = activeCharacter();
-  c().innerHTML = `
-    <div class="stack">
-      <div class="card" style="background:var(--qq-grad);color:#fff">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-          <div class="avatar">${renderAvatar(char.avatar, char.name)}</div>
-          <div><b style="color:#fff">${escapeHTML(char.name)}</b><div class="subtle" style="color:#e3f0f6">以 TA 的身份发一条动态</div></div>
-        </div>
-        <textarea class="textarea" id="momentText" placeholder="写点 ${escapeHTML(char.name)} 想说的话...（留空则随机生成）" style="color:#18212f"></textarea>
-        <div class="grid2" style="margin-top:8px">
-          <button class="ghost-btn" style="background:rgba(255,255,255,.2);color:#fff" onclick="postMoment('user')">我发</button>
-          <button class="primary-btn" style="background:#fff;color:var(--qq-blue)" onclick="postMoment('character')">${escapeHTML(char.name)}发</button>
-        </div>
-      </div>
-      ${state.moments.map(moment => renderMomentCard(moment)).join('') || '<div class="card subtle">还没有动态，发一条试试？</div>'}
-    </div>`;
-}
-
-function renderMomentCard(moment) {
-  const char = moment.characterId ? getCharacter(moment.characterId) : null;
-  const prof = activeProfile();
-  const avatar = moment.author === 'character' && char ? char.avatar : prof.avatar;
-  const name = moment.author === 'character' && char ? char.name : prof.name;
-  const likes = moment.likes || 0;
-  const liked = moment.likedByMe;
-  const comments = (moment.comments || []).map(cm => `<div class="comment-box">${escapeHTML(cm.name)}：${escapeHTML(cm.text)}</div>`).join('');
-  return `<div class="card">
-    <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
-      <div class="avatar">${renderAvatar(avatar, name)}</div>
-      <div><b>${escapeHTML(name)}</b><div class="subtle">${escapeHTML(moment.date)}</div></div>
-    </div>
-    <div>${escapeHTML(moment.text)}</div>
-    <div class="moment-actions">
-      <span onclick="likeMoment('${moment.id}')">${liked ? '❤️' : '🤍'} ${likes}</span>
-      <span onclick="addComment('${moment.id}')">💬 评论 ${moment.comments ? moment.comments.length : 0}</span>
-    </div>
-    ${comments}
-  </div>`;
-}
-
-function postMoment(author) {
-  let text = $('momentText').value.trim();
-  if (author === 'character' && !text) {
-    text = CHAR_MOMENT_IDEAS[Math.floor(Math.random() * CHAR_MOMENT_IDEAS.length)];
-  }
-  if (!text) return alert('先写动态内容');
-  state.moments.unshift({
-    id: 'moment-' + Date.now(),
-    author,
-    characterId: author === 'character' ? activeCharacter().id : '',
-    text,
-    date: new Date().toLocaleString(),
-    likes: 0,
-    likedByMe: false,
-    comments: []
-  });
-  saveState();
-  renderMoments();
-}
-
-function likeMoment(id) {
-  const m = state.moments.find(x => x.id === id);
-  if (!m) return;
-  if (m.likedByMe) { m.likedByMe = false; m.likes = Math.max(0, (m.likes || 0) - 1); }
-  else { m.likedByMe = true; m.likes = (m.likes || 0) + 1; }
-  saveState();
-  renderMoments();
-}
-
-async function addComment(id) {
-  const m = state.moments.find(x => x.id === id);
-  if (!m) return;
-  const text = await uiPrompt('写评论：');
-  if (!text || !text.trim()) return;
-  m.comments = m.comments || [];
-  m.comments.push({ name: activeProfile().name || '我', text: text.trim() });
-  saveState();
-  renderMoments();
 }
 
 // ---------- 我的 ----------

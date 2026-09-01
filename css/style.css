@@ -1166,12 +1166,6 @@ button { border: 0; cursor: pointer; }
 .tab-item i { font-style: normal; font-size: 19px; }
 .tab-item.active { color: var(--qq-blue); }
 
-/* ===== 动态/朋友圈 ===== */
-.moment-actions { display: flex; gap: 16px; margin-top: 8px; color: #7d8592; font-size: 12px; font-weight: 700; }
-.moment-actions span { cursor: pointer; }
-.moment-actions span:active { opacity: .6; }
-.comment-box { margin-top: 6px; font-size: 12px; color: #444; background: #f0f2f5; border-radius: 10px; padding: 6px 9px; }
-
 /* ===== 个人资料 ===== */
 .profile-hero { text-align: center; background: var(--qq-grad); color: #fff; border-radius: var(--radius-lg); padding: 22px 14px; box-shadow: var(--shadow); }
 .profile-hero .avatar { width: 72px; height: 72px; border-radius: 22px; margin: 0 auto 10px; background: rgba(255,255,255,.25); }
@@ -2156,28 +2150,6 @@ button { border: 0; cursor: pointer; }
 .feed-container { flex:1;overflow-y:auto;background:#f5f5f5; }
 .feed-container::-webkit-scrollbar { width:0; }
 .feed-empty { text-align:center;padding:60px 20px;color:#999;font-size:14px; }
-.feed-post { background:#fff;margin-bottom:8px;border-bottom:1px solid #efefef; }
-.feed-post-header {
-  display:flex;align-items:center;padding:10px 14px;gap:10px;
-}
-.feed-post-header .feed-avatar {
-  width:32px;height:32px;border-radius:50%;background:#f0f2f5;
-  display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;overflow:hidden;
-}
-.feed-post-header .feed-avatar img { width:100%;height:100%;object-fit:cover; }
-.feed-post-header .feed-username { font-size:13px;font-weight:600;color:#262626;flex:1; }
-.feed-post-header .feed-more { font-size:16px;color:#262626;cursor:pointer;background:none;border:none; }
-.feed-post-image { width:100%;aspect-ratio:1;overflow:hidden;background:#f0f0f0;display:flex;align-items:center;justify-content:center; }
-.feed-post-image img { width:100%;height:100%;object-fit:cover; }
-.feed-post-actions { display:flex;align-items:center;gap:14px;padding:8px 14px; }
-.feed-post-actions .action-btn { background:none;border:none;font-size:22px;cursor:pointer;color:#262626;transition:transform .12s;line-height:1; }
-.feed-post-actions .action-btn:active { transform:scale(.85); }
-.feed-post-actions .action-btn.liked { color:#ed4956; }
-.feed-post-actions .save-btn { margin-left:auto; }
-.feed-post-likes { padding:0 14px 4px;font-size:13px;font-weight:600;color:#262626; }
-.feed-post-caption { padding:0 14px 6px;font-size:13px;color:#262626;line-height:1.5; }
-.feed-post-caption .cap-user { font-weight:600;margin-right:4px; }
-.feed-post-time { padding:0 14px 10px;font-size:10px;color:#999;letter-spacing:0.2px; }
 
 /* Search */
 .search-container { flex:1;overflow-y:auto;background:#f5f5f5;padding:12px; }
@@ -2425,51 +2397,13 @@ button { border: 0; cursor: pointer; }
 .profile-avatar-reset { display:inline-block;padding:8px 14px;background:#f0f2f5;color:#888;border:none;border-radius:8px;font-size:12px;cursor:pointer;margin-left:6px; }
 .profile-cover-preview { width:100%;height:80px;border-radius:10px;overflow:hidden;background:linear-gradient(180deg,#ffffff,#f7f5f0);border:1.5px solid #e0dbd4;box-sizing:border-box;margin-bottom:4px;background-size:cover;background-position:center; }
 
-/* Post Creator */
-.post-creator-overlay {
-  position:fixed;inset:0;z-index:1000;background:#000;
-  display:none;flex-direction:column;animation:fadeIn .2s ease;
-}
-.post-creator-overlay.active { display:flex; }
-.post-creator-header {
-  display:flex;align-items:center;justify-content:space-between;
-  padding:12px 16px;color:#fff;font-size:16px;flex-shrink:0;
-}
-.post-creator-header .cancel { background:none;border:none;color:#fff;font-size:16px;cursor:pointer; }
-.post-creator-header .title { font-weight:600; }
-.post-creator-header .next { background:none;border:none;color:#3897f0;font-size:16px;font-weight:700;cursor:pointer;opacity:.5;transition:opacity .2s; }
-.post-creator-header .next.ready { opacity:1; }
-.post-creator-image-area { flex:1;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden; }
-.post-creator-image-area img { max-width:100%;max-height:100%;object-fit:contain;transition:filter .3s; }
-.post-creator-image-area .placeholder { color:rgba(255,255,255,.3);font-size:80px;text-align:center; }
-.post-creator-filters { display:flex;gap:12px;padding:12px 16px;overflow-x:auto;flex-shrink:0; }
-.post-creator-filters::-webkit-scrollbar { display:none; }
-.filter-option { text-align:center;cursor:pointer;flex-shrink:0;transition:transform .15s; }
-.filter-option:active { transform:scale(.95); }
-.filter-option .filter-preview { width:64px;height:64px;border-radius:8px;overflow:hidden;border:2px solid transparent;background:#333; }
-.filter-option.active .filter-preview { border-color:#fff; }
-.filter-option .filter-label { color:#999;font-size:11px;margin-top:4px; }
-.filter-option.active .filter-label { color:#fff; }
-.post-creator-caption-area { padding:16px;flex-shrink:0;background:#111;display:none; }
-.post-creator-caption-area.active { display:block; }
-.post-creator-caption-area textarea { width:100%;background:transparent;border:none;color:#fff;font-size:15px;outline:none;resize:none;font-family:inherit;line-height:1.5;min-height:80px; }
-.post-creator-caption-area textarea::placeholder { color:#666; }
 
-/* Post Detail */
-.post-detail-overlay { position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.95);display:none;flex-direction:column; }
-.post-detail-overlay.active { display:flex; }
-.post-detail-img { flex:1;display:flex;align-items:center;justify-content:center;padding:20px; }
-.post-detail-img img { max-width:100%;max-height:100%;object-fit:contain;border-radius:4px; }
-.post-detail-info { background:#111;padding:16px 20px 30px;flex-shrink:0; }
-.post-detail-caption { color:#fff;font-size:14px;line-height:1.6;margin-bottom:8px; }
-.post-detail-time { color:#888;font-size:12px; }
-.post-detail-close { position:absolute;top:16px;right:16px;z-index:10;background:rgba(255,255,255,.15);border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center; }
-.post-detail-delete { background:none;border:none;color:#e74c3c;font-size:14px;cursor:pointer;margin-top:12px; }
 
 /* Toast for IG */
 .ig-toast {
   position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
   background:rgba(0,0,0,.75);color:#fff;padding:10px 20px;border-radius:20px;font-size:14px;
+}
   z-index:9999;pointer-events:none;opacity:0;transition:opacity .3s;
 }
 .ig-toast.show { opacity:1; }
@@ -4598,15 +4532,6 @@ body.wx-mode .quote-menu .q-cancel { display: none !important; }
 .phone-album-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 10px; }
 .phone-album-cell { aspect-ratio: 1 / 1; border-radius: 10px; background: rgba(255,255,255,.9); display: flex; align-items: center; justify-content: center; font-size: 40px; box-shadow: 0 3px 10px rgba(80,60,120,.18); }
 
-.phone-moments { padding: 4px 0; }
-.phone-moment { display: flex; gap: 10px; padding: 12px 12px; background: rgba(255,255,255,.72); border-radius: 14px; margin-bottom: 10px; }
-.phone-moment-ava { width: 38px; height: 38px; border-radius: 8px; overflow: hidden; background: #ddd; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-.phone-moment-body { flex: 1 1 auto; min-width: 0; }
-.phone-moment-name { font-weight: 700; color: #3a3340; font-size: 13px; }
-.phone-moment-emoji { font-size: 34px; margin: 4px 0; }
-.phone-moment-text { color: #3a3340; font-size: 13px; line-height: 1.5; }
-.phone-moment-time { color: #9a8a90; font-size: 11px; margin-top: 4px; }
-
 .phone-notes { padding: 6px 0; }
 .phone-note { background: rgba(255,255,255,.8); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; color: #3a3340; font-size: 14px; line-height: 1.55; box-shadow: 0 2px 8px rgba(80,60,120,.1); }
 
@@ -4653,10 +4578,6 @@ body.wx-mode .quote-menu .q-cancel { display: none !important; }
 .phone-bubble-row.right .phone-bubble { background: #95ec69; color: #1c2b12; border-bottom-right-radius: 4px; }
 .phone-bubble-row.left .phone-bubble { border-bottom-left-radius: 4px; }
 
-/* 朋友圈操作行 */
-.phone-moment-actions { display: flex; gap: 18px; margin-top: 9px; color: #8a7a8a; font-size: 12px; }
-.phone-moment-like, .phone-moment-cmt { cursor: default; }
-
 /* 相册 caption */
 .phone-album-cell { position: relative; aspect-ratio: 1 / 1; border-radius: 10px; background: rgba(255,255,255,.9); display: flex; align-items: center; justify-content: center; font-size: 40px; box-shadow: 0 3px 10px rgba(80,60,120,.18); overflow: hidden; }
 .phone-album-cap { position: absolute; left: 0; right: 0; bottom: 0; font-size: 10px; color: #fff; background: linear-gradient(0deg, rgba(0,0,0,.5), transparent); padding: 10px 6px 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -4671,45 +4592,3 @@ body.wx-mode .quote-menu .q-cancel { display: none !important; }
 .phone-search-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .voice-msg-text { cursor: default; }
-
-/* IG 点赞/评论 */
-.feed-cmt-count { font-size: 11px; color: #8e8e8e; }
-.feed-post-likes { cursor: pointer; }
-
-.ig-comment-overlay { position: fixed; left: 0; right: 0; top: 0; bottom: 0; z-index: 1200; display: flex; align-items: flex-end; justify-content: center; }
-.ig-comment-mask { position: absolute; inset: 0; background: rgba(0,0,0,.45); }
-.ig-comment-sheet { position: relative; width: 100%; max-width: 480px; background: #fff; border-radius: 16px 16px 0 0; max-height: 72%; display: flex; flex-direction: column; animation: igSheetUp .22s ease; }
-@keyframes igSheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-.ig-comment-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; font-size: 14px; font-weight: 600; color: #262626; border-bottom: 1px solid #f0f0f0; }
-.ig-comment-close { border: none; background: none; font-size: 16px; color: #8e8e8e; cursor: pointer; }
-.ig-comment-list { flex: 1; overflow-y: auto; padding: 8px 16px 12px; }
-.ig-comment-empty { text-align: center; color: #bbb; font-size: 13px; padding: 30px 0; }
-.ig-comment-item { display: flex; gap: 10px; padding: 8px 0; align-items: flex-start; }
-.ig-comment-item.me { flex-direction: row-reverse; }
-.ig-comment-av { width: 34px; height: 34px; border-radius: 50%; background: #f0f0f0; display: flex; align-items: center; justify-content: center; font-size: 18px; overflow: hidden; flex: 0 0 auto; }
-.ig-comment-av img { width: 100%; height: 100%; object-fit: cover; }
-.ig-comment-body { flex: 1; min-width: 0; }
-.ig-comment-name { font-size: 12px; color: #8e8e8e; margin-bottom: 2px; }
-.ig-comment-item.me .ig-comment-name { text-align: right; }
-.ig-comment-text { font-size: 14px; color: #262626; line-height: 1.5; word-break: break-word; background: #f5f5f5; padding: 8px 12px; border-radius: 14px; display: inline-block; }
-.ig-comment-item.me .ig-comment-text { background: #daf5e0; }
-.ig-comment-time { font-size: 11px; color: #bbb; margin-top: 4px; }
-.ig-comment-input-row { display: flex; gap: 8px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid #f0f0f0; background: #fafafa; }
-.ig-comment-input { flex: 1; border: 1px solid #e6e6e6; background: #fff; border-radius: 20px; padding: 9px 14px; font-size: 14px; outline: none; }
-.ig-comment-send { border: none; background: #0095f6; color: #fff; border-radius: 20px; padding: 0 16px; font-size: 14px; font-weight: 600; cursor: pointer; }
-
-.pd-action { border: none; background: none; font-size: 14px; color: #8e8e8e; cursor: pointer; padding: 6px 4px; }
-.pd-action.liked { color: #ed4956; }
-.post-detail-actions { display: flex; gap: 16px; padding: 10px 0 4px; border-top: 1px solid #f0f0f0; margin-top: 8px; }
-.post-detail-comments { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
-.pd-comments-empty { font-size: 12px; color: #bbb; padding: 6px 0; }
-.pd-comment-item { display: flex; gap: 8px; align-items: flex-start; }
-.pd-comment-av { width: 28px; height: 28px; border-radius: 50%; background: #f0f0f0; display: flex; align-items: center; justify-content: center; font-size: 15px; overflow: hidden; flex: 0 0 auto; }
-.pd-comment-av img { width: 100%; height: 100%; object-fit: cover; }
-.pd-comment-body { flex: 1; min-width: 0; font-size: 13px; color: #262626; line-height: 1.5; }
-.pd-comment-name { color: #8e8e8e; margin-right: 6px; font-size: 12px; }
-.pd-comment-item.me { flex-direction: row-reverse; }
-.pd-comment-item.me .pd-comment-body { text-align: right; }
-.pd-comment-time { font-size: 11px; color: #bbb; margin-top: 3px; }
-
-

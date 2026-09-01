@@ -154,17 +154,6 @@
           </div>
           <div class="switch" id="pinSwitch" onclick="togglePin()"></div>
         </div>
-        <div class="cs-row">
-          <div class="cs-row-left">
-            <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="10" cy="10" r="7"/><path d="M10 7v3l2 2"/></svg>
-            <div>
-              <span>角色自主发动态</span>
-              <div class="cs-hint">允许角色在 IG 首页自动发布动态</div>
-            </div>
-          </div>
-          <div class="switch" id="autoPostSwitch" onclick="toggleAutoPost()"></div>
-        </div>
-      </div>
       <div class="cs-group-title">对话</div>
       <div class="cs-section">
         <div class="cs-row">
@@ -571,45 +560,9 @@
     </div>
   </div>
 
-  <!-- IG Post Creator -->
-  <div class="post-creator-overlay" id="postCreator">
-    <div class="post-creator-header">
-      <button class="cancel" onclick="closePostCreator()">✕</button>
-      <span class="title">新建帖子</span>
-      <button class="next" id="postCreatorNext" onclick="postCreatorNext()">下一步</button>
-    </div>
-    <div class="post-creator-image-area" id="postCreatorImageArea" onclick="document.getElementById('postCreatorFileInput').click()">
-      <div class="placeholder" id="postCreatorPlaceholder">🖼️<br><span style="font-size:16px;color:rgba(255,255,255,.5)">点击选择图片</span></div>
-      <img id="postCreatorImage" style="display:none;" />
-      <input type="file" id="postCreatorFileInput" accept="image/*" style="display:none;" onchange="handlePostImageSelect(event)">
-    </div>
-    <div class="post-creator-filters" id="postCreatorFilters" style="display:none;">
-      <div class="filter-option active" data-filter="none" onclick="setPostFilter('none')"><div class="filter-preview" style="filter:none;background:#333;"></div><div class="filter-label">原图</div></div>
-      <div class="filter-option" data-filter="grayscale(100%)" onclick="setPostFilter('grayscale(100%)')"><div class="filter-preview" style="filter:grayscale(100%);background:#555;"></div><div class="filter-label">黑白</div></div>
-      <div class="filter-option" data-filter="sepia(80%)" onclick="setPostFilter('sepia(80%)')"><div class="filter-preview" style="filter:sepia(80%);background:#885;"></div><div class="filter-label">暖色</div></div>
-      <div class="filter-option" data-filter="saturate(150%) hue-rotate(-10deg)" onclick="setPostFilter('saturate(150%) hue-rotate(-10deg)')"><div class="filter-preview" style="filter:saturate(150%) hue-rotate(-10deg);background:#553;"></div><div class="filter-label">冷色</div></div>
-      <div class="filter-option" data-filter="contrast(120%) brightness(110%)" onclick="setPostFilter('contrast(120%) brightness(110%)')"><div class="filter-preview" style="filter:contrast(120%) brightness(110%);background:#444;"></div><div class="filter-label">鲜明</div></div>
-    </div>
-    <div class="post-creator-caption-area" id="postCreatorCaptionArea">
-      <textarea id="postCreatorCaption" placeholder="写一段文字..."></textarea>
-    </div>
-  </div>
 
-  <!-- IG Post Detail Viewer -->
-  <div class="post-detail-overlay" id="postDetail">
-    <button class="post-detail-close" onclick="closePostDetail()">✕</button>
-    <div class="post-detail-img" id="postDetailImg"></div>
-    <div class="post-detail-info">
-      <div class="post-detail-actions">
-        <button class="pd-action" id="postDetailLike" onclick="toggleSelfPostLike(viewPostId);refreshPostDetail()">❤️ <span id="postDetailLikeCount">0</span></button>
-        <button class="pd-action" onclick="openPostComments(viewPostId)">💬 <span id="postDetailCmtCount">0</span></button>
-      </div>
-      <div class="post-detail-caption" id="postDetailCaption"></div>
-      <div class="post-detail-time" id="postDetailTime"></div>
-      <div class="post-detail-comments" id="postDetailComments"></div>
-      <button class="post-detail-delete" id="postDetailDelete" onclick="deletePost()">🗑️ 删除</button>
-    </div>
-  </div>
+
+
 
   <!-- IG Toast -->
   <div class="ig-toast" id="igToast"></div>
