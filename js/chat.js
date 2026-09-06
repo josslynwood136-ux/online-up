@@ -1302,12 +1302,18 @@ async function deliverReply(reply) {
 }
 
 // 完全按 AI 主动插入的分隔符拆（‖ / | / ｜）；AI 不分段就整段作为一条。
+// 也支持 \n\n 双换行分段，避免多段内容全塞在一个气泡里。
 // replySplit 设置可硬性限制最大条数：auto=不限(由模型决定 2~4)，1/2/3=最多这么多条
 function splitReply(txt) {
   txt = (txt || '').trim();
   if (!txt) return [''];
   var parts = txt.split(/\s*[‖|｜]+\s*/).map(function (s) { return s.trim(); }).filter(Boolean);
   if (!parts.length) return [txt];
+  // 如果 ‖ 分割后只有一段，但内容里有双换行，也按双换行拆分
+  if (parts.length === 1 && txt.indexOf('\n\n') !== -1) {
+    var _np = txt.split(/\n\n+/).map(function (s) { return s.trim(); }).filter(Boolean);
+    if (_np.length > 1) parts = _np;
+  }
   var cap = (state.settings && state.settings.replySplit);
   if (cap === '1' || cap === '2' || cap === '3') {
     var n = parseInt(cap, 10);
@@ -1453,6 +1459,10 @@ async function streamDeliver(text, opts) {
           if (delta) { full += delta; allText += delta; }
         }
         var segs = full.split(/\s*[‖|｜]+\s*/);
+        // 如果 ‖ 没分出，且内容有双换行，也按 \n\n 拆
+        if (segs.length === 1 && full.indexOf('\n\n') !== -1) {
+          segs = full.split(/\n\n+/).map(function (s) { return s.trim(); }).filter(Boolean);
+        }
         if (segs.length > 1) {
           for (var k = 0; k < segs.length - 1; k++) {
             var seg = segs[k].trim();
@@ -1488,7 +1498,7 @@ async function streamDeliver(text, opts) {
     await emitStreamSegment(_tailBuf, char);
   }
   setChatTyping(false);
-  try { if (typeof autoSpeakReply === 'function') autoSpeakReply(allText.replace(/\s*[‖|｜]+\s*/g, ' ')); } catch (e) {}
+  try { if (typeof autoSpeakReply === 'function') autoSpeakReply(allText.replace(/\s*[‖|｜]+\s*/g, ' ').replace(/\n\n+/g, ' ')); } catch (e) {}
   return allText.trim();
 }
 
