@@ -2335,14 +2335,22 @@ async function aiTranslate(text, srcLang) {
 
 async function translateText(text, srcLang) {
   if (!text) return null;
-  // 默认优先用免费机翻（不消耗聊天 API）；LLM 只作为最后的兜底
   var pref = (state.settings && state.settings.translateProvider) || 'deeplweb';
-  if (pref === 'ai') pref = 'deeplweb';
+  // 选了 AI 翻译：优先调用已配置的大模型，失败再退回机翻
+  if (pref === 'ai') {
+    var ai = await aiTranslate(text, srcLang);
+    if (ai) return ai;
+    for (var k in TRANSLATE_PROVIDERS) {
+      if (!Object.prototype.hasOwnProperty.call(TRANSLATE_PROVIDERS, k)) continue;
+      try { var r2 = await TRANSLATE_PROVIDERS[k](text, srcLang); if (r2) return r2; } catch (e) {}
+    }
+    return null;
+  }
   var mt = ['deeplweb', 'mymemory', 'yandex', 'google', 'libre', 'lingva'];
   var order = [];
   if (pref) order.push(pref);
   mt.forEach(function (p) { if (order.indexOf(p) === -1) order.push(p); });
-  order.push('ai'); // 所有免费机翻都失败才用 LLM
+  order.push('ai'); // 免费机翻都失败时用 LLM 兜底
   for (var i = 0; i < order.length; i++) {
     var name = order[i];
     try {
