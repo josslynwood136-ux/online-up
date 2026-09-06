@@ -116,9 +116,11 @@ function onMsgDown(ev, index) {
 }
 function onMsgMove(ev) {
   if (!_quotePressTimer) return;
-  var dx = Math.abs((ev.clientX || 0) - _quoteStartX);
-  var dy = Math.abs((ev.clientY || 0) - _quoteStartY);
-  if (dx > 10 || dy > 10) clearQuotePress();
+  var clientX = ev.clientX || (ev.touches && ev.touches[0] ? ev.touches[0].clientX : 0);
+  var clientY = ev.clientY || (ev.touches && ev.touches[0] ? ev.touches[0].clientY : 0);
+  var dx = Math.abs(clientX - _quoteStartX);
+  var dy = Math.abs(clientY - _quoteStartY);
+  if (dx > 20 || dy > 20) clearQuotePress();
 }
 function onMsgTap(ev, index) {
   if (ev && ev.stopPropagation) ev.stopPropagation();
@@ -481,7 +483,7 @@ function renderChat() {
       const note = msg.note || '';
       const amtText = amount.toFixed(amount % 1 ? 2 : 0);
       const tick = isUser ? `<div class="read-tick">${msg.status === 'read' ? '已读' : '已发送'}</div>` : '';
-      return `${divider}<div class="msg ${isUser ? 'right' : 'left'}${multiCls(i)}" data-idx="${i}" oncontextmenu="askDeleteMessage('${char.id}',${i})" onclick="onMsgTap(event,${i})" ontouchstart="onMsgDown(event,${i})" onmousedown="onMsgDown(event,${i})">${msgCheck(isUser, i)}${avCol(`<div class="avatar">${renderAvatar(av, nm)}</div>`)}<div class="rp-card ${opened ? 'rp-opened' : ''} rp-msg-${i}" ${!isUser && !opened ? `onclick="_multiSelect?onMsgTap(event,${i}):openRedPacket('${char.id}',${i})"` : ''}>
+      return `${divider}<div class="msg ${isUser ? 'right' : 'left'}${multiCls(i)}" data-idx="${i}" oncontextmenu="event.preventDefault();onMsgRightClick(event,${i})" onclick="onMsgTap(event,${i})" ontouchstart="onMsgDown(event,${i})" onmousedown="onMsgDown(event,${i})">${msgCheck(isUser, i)}${avCol(`<div class="avatar">${renderAvatar(av, nm)}</div>`)}<div class="rp-card ${opened ? 'rp-opened' : ''} rp-msg-${i}" ${!isUser && !opened ? `onclick="_multiSelect?onMsgTap(event,${i}):openRedPacket('${char.id}',${i})"` : ''}>
         <span class="rp-card-icon">🧧</span>
         <span class="rp-card-label">${isUser ? '你' : escapeHTML(nm)}</span>
         ${opened ? `<div class="rp-card-amount">¥ ${amtText}</div>` : `<div class="rp-card-btn">開</div>`}
@@ -491,7 +493,7 @@ function renderChat() {
     if (msg.type === 'sticker') {
       const stickerSrc = msg.media && msg.media.src ? msg.media.src : '';
       const tick = isUser ? `<div class="read-tick">${msg.status === 'read' ? '已读' : '已发送'}</div>` : '';
-      return `${divider}<div class="msg ${isUser ? 'right' : 'left'}${multiCls(i)}" data-idx="${i}" onclick="onMsgTap(event,${i})" ontouchstart="onMsgDown(event,${i})" onmousedown="onMsgDown(event,${i})" oncontextmenu="return false;">${msgCheck(isUser, i)}${avCol(`<div class="avatar">${renderAvatar(av, nm)}</div>`)}${stickerSrc ? `<img src="${escapeHTML(stickerSrc)}" class="chat-sticker-img" alt="表情包" referrerpolicy="no-referrer" data-fb="${escapeHTML(msg.media.src || stickerSrc)}" onerror="stickerImgFallback(this)">` : ''}${tick}</div>`;
+      return `${divider}<div class="msg ${isUser ? 'right' : 'left'}${multiCls(i)}" data-idx="${i}" onclick="onMsgTap(event,${i})" ontouchstart="onMsgDown(event,${i})" onmousedown="onMsgDown(event,${i})" oncontextmenu="event.preventDefault();onMsgRightClick(event,${i})">${msgCheck(isUser, i)}${avCol(`<div class="avatar">${renderAvatar(av, nm)}</div>`)}${stickerSrc ? `<img src="${escapeHTML(stickerSrc)}" class="chat-sticker-img" alt="表情包" referrerpolicy="no-referrer" data-fb="${escapeHTML(msg.media.src || stickerSrc)}" onerror="stickerImgFallback(this)">` : ''}${tick}</div>`;
     }
     let mediaHtml = '';
     if (msg.media && msg.media.type === 'image') {
@@ -519,7 +521,7 @@ function renderChat() {
     const tick = isUser ? `<div class="read-tick">${msg.status === 'read' ? '已读' : '已发送'}</div>` : '';
     const voiceBtnHtml = '';
     const avHtml = !isUser ? `<div class="avatar voice-avatar" onclick="event.stopPropagation();showInnerVoice('${char.id}')">${renderAvatar(av, nm)}</div>` : `<div class="avatar">${renderAvatar(av, nm)}</div>`;
-    return `${divider}<div class="msg ${isUser ? 'right' : 'left'}${multiCls(i)}" data-idx="${i}" oncontextmenu="return false;" ontouchstart="onMsgDown(event,${i})" onmousedown="onMsgDown(event,${i})" onclick="onMsgTap(event,${i})">${msgCheck(isUser, i)}${avCol(avHtml)}<div class="bubble ${isUser ? 'right' : 'left'}">${quoteHtml}${textHtml}${mediaHtml}${transHtml}${voiceBtnHtml}</div>${tick}</div>`;
+    return `${divider}<div class="msg ${isUser ? 'right' : 'left'}${multiCls(i)}" data-idx="${i}" oncontextmenu="event.preventDefault();onMsgRightClick(event,${i})" ontouchstart="onMsgDown(event,${i})" onmousedown="onMsgDown(event,${i})" onclick="onMsgTap(event,${i})">${msgCheck(isUser, i)}${avCol(avHtml)}<div class="bubble ${isUser ? 'right' : 'left'}">${quoteHtml}${textHtml}${mediaHtml}${transHtml}${voiceBtnHtml}</div>${tick}</div>`;
   }).join('') + typing;
   if (!_multiSelect) $('chatBody').scrollTop = $('chatBody').scrollHeight;
   applyBubbleStyle();
@@ -597,6 +599,11 @@ function quotePress(ev, el, index) {
   clearTimeout(_quotePressTimer);
   _quotePressTimer = setTimeout(function() { showQuoteMenu(index); }, 450);
 }
+function onMsgRightClick(ev, index) {
+  if (ev && ev.preventDefault) ev.preventDefault();
+  clearQuotePress();
+  showQuoteMenu(index);
+}
 function clearQuotePress() {
   clearTimeout(_quotePressTimer);
   _quotePressTimer = null;
@@ -604,6 +611,7 @@ function clearQuotePress() {
 }
 function showQuoteMenu(index) {
   clearQuotePress();
+  _quoteMenuShowTime = Date.now();
   if (navigator.vibrate) { try { navigator.vibrate(18); } catch (e) {} }
   const char = activeCharacter();
   const msg = char.chat[index];
@@ -654,9 +662,11 @@ function hideQuoteMenu() {
   if (mask) mask.classList.remove('show');
   clearQuotePress();
 }
+let _quoteMenuShowTime = 0;
 document.addEventListener('click', function(e) {
   const el = $('quoteMenu');
   if (!el || el.style.display === 'none') return;
+  if (Date.now() - _quoteMenuShowTime < 500) return;
   if (!el.contains(e.target)) hideQuoteMenu();
 });
 
