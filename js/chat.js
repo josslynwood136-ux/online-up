@@ -12,6 +12,10 @@ let lastRetract = null;
 let _idleProactiveTimer = null;
 
 // 长按引用：事件委托，在 chatBody 上统一处理
+// 长按/右键菜单只在「内容区」触发（气泡/表情贴图/红包卡片）；头像、时间、留白不触发
+function isQuotePressArea(el) {
+  return !!(el && el.closest && (el.closest('.bubble') || el.closest('.chat-sticker-img') || el.closest('.rp-card')));
+}
 (function bindChatLongPress() {
   var cb = document.getElementById('chatBody');
   if (!cb) return;
@@ -23,6 +27,7 @@ let _idleProactiveTimer = null;
   cb.addEventListener('pointerdown', function(ev) {
     var msgEl = ev.target.closest && ev.target.closest('.msg');
     if (!msgEl || _multiSelect) return;
+    if (!isQuotePressArea(ev.target)) return;
     var idx = parseInt(msgEl.getAttribute('data-idx'));
     if (isNaN(idx)) return;
     var c = activeCharacter();
@@ -79,7 +84,7 @@ let _idleProactiveTimer = null;
           e.style.setProperty('color', '#fff', 'important');
         });
       }
-    }, 450);
+    }, 650);
   });
 
   cb.addEventListener('pointermove', function(ev) {
@@ -434,6 +439,7 @@ function selectHereTo() {
 let _quoteMenuShowTime = 0;
 function onMsgRightClick(ev, index) {
   if (ev && ev.preventDefault) ev.preventDefault();
+  if (ev && ev.target && !isQuotePressArea(ev.target)) return;
   clearQuotePress();
   showQuoteMenu(index);
 }
