@@ -884,7 +884,8 @@ button { border: 0; cursor: pointer; }
   overflow-x: clip;
   position: relative;
 }
-.footer-main { display: flex; align-items: center; gap: 4px; width: 100%; min-width: 0; flex-shrink: 0; }
+.footer-main { display: flex; align-items: center; gap: 4px; width: 100%; min-width: 0; flex-shrink: 0; overflow-x: hidden; }
+.icon-btn { width: 32px; height: 32px; font-size: 16px; }
 
 
 /* ===== 引用/回复 ===== */
@@ -932,8 +933,8 @@ button { border: 0; cursor: pointer; }
 .quote-menu .q-cancel-sheet { background: #faf9f6; border: 1px solid #ece9e3; border-radius: 20px; overflow: hidden; box-shadow: 0 8px 30px rgba(60,52,44,.10); }
 .quote-menu .q-cancel { text-align: center; padding: 15px 16px; font-size: 15.5px; font-weight: 600; color: #5a554d; cursor: pointer; letter-spacing: .5px; }
 .quote-menu .q-cancel:active { background: #f3efe8; }
-.chat-input-wrapper { flex: 1; background: #efefef; border-radius: 20px; display: flex; align-items: center; padding: 0 12px; }
-.chat-input { flex: 1; border: 0; padding: 8px 4px; outline: none; font-size: 14px; background: transparent; user-select: text; font-family: "LXGW WenKai", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; font-weight: 600; }
+.chat-input-wrapper { flex: 1; min-width: 0; max-width: 100%; background: #efefef; border-radius: 20px; display: flex; align-items: center; padding: 0 12px; }
+.chat-input { flex: 1; min-width: 0; border: 0; padding: 8px 4px; outline: none; font-size: 14px; background: transparent; user-select: text; font-family: "LXGW WenKai", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; font-weight: 600; }
 .send-btn { background:#53a6f5;border:none;color:#fff;width:38px;height:38px;border-radius:50%;cursor:pointer;transition:background .12s;display:grid;place-items:center;flex-shrink:0; }
 .send-btn:hover { background:#4a97e0; }
 .send-btn:active { background:#3f86c9; }
