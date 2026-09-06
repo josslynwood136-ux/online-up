@@ -919,3 +919,30 @@ function liveMic() {
   }
   saveState();
 }
+
+// ---------- 小游戏 ----------
+function startLiveMiniGame() {
+  if (!state.live) state.live = {};
+  state.live.miniGameActive = true;
+  saveState();
+  livePush('', 'sys', '🎮 小游戏开始了！');
+}
+
+function handleMiniGameHit(event) {
+  if (!state.live || !state.live.miniGameActive) return;
+  var line = $('liveLine');
+  if (line) line.textContent = '🎯 命中！好厉害！';
+  livePush('', 'me', '🎯 命中了目标！');
+  state.live.coins = (state.live.coins || 0) + 10;
+  liveRefreshChips();
+  saveState();
+}
+
+function toggleLiveTheme() {
+  var cw = $('chatWindow');
+  if (cw) {
+    cw.classList.toggle('dark-theme');
+    var isDark = cw.classList.contains('dark-theme');
+    livePush('', 'sys', isDark ? '🌙 夜间模式' : '☀️ 日间模式');
+  }
+}

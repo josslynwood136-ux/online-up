@@ -118,12 +118,7 @@
         </div>
         <div class="emoji-panel" id="emojiPanel"></div>
       </div>
-      <div id="selectHereLine" class="select-here-line" style="display:none"></div>
-      <button id="selectHereBtn" class="select-here-btn" style="display:none" title="拖动绿色滑块到目标消息，松手即选中该范围；点一下确认">
-        <svg class="sph-ico" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3l4-3 4 3M8 21l4 3 4-3M12 0v24"/></svg>
-        <span class="sph-txt">选到这里</span>
-        <span class="sph-cnt" id="selectHereCount"></span>
-      </button>
+
       <div id="voiceRecUI" class="voice-rec-ui" style="display:none">
         <button class="voice-rec-cancel" onclick="cancelVoiceRecord()" title="取消">✕</button>
         <div class="voice-rec-main">
@@ -138,6 +133,12 @@
           <button class="voice-rec-send" id="voiceRecSend" onclick="confirmVoiceSend()">发送</button>
         </div>
       </div>
+      <div id="selectHereLine" class="select-here-line" style="display:none"></div>
+      <button id="selectHereBtn" class="select-here-btn" style="display:none" title="拖动到目标消息，松手即选中该范围；点一下确认">
+        <svg class="sph-ico" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3l4-3 4 3M8 21l4 3 4-3M12 0v24"/></svg>
+        <span class="sph-txt">选到这里</span>
+        <span class="sph-cnt" id="selectHereCount"></span>
+      </button>
     </div>
 
     <div id="chatSettings">
@@ -505,20 +506,9 @@
         </div>
       </div>
     </div>
+    </div>
 
-  <div id="quoteMenuMask" class="quote-menu-mask" onclick="hideQuoteMenu()"></div>
-  <div id="quoteMenu" class="quote-menu" style="display:none">
-    <div class="q-sheet">
-      <div class="q-cut"><div class="q-cut-icon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg></div><div class="q-cut-txt"></div></div>
-      <div class="q-opt q-reply"><span class="q-opt-ico"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg></span><span class="q-opt-label">回复</span></div>
-      <div class="q-opt q-multi"><span class="q-opt-ico"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L20 6"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg></span><span class="q-opt-label">多选</span></div>
-      <div class="q-opt q-voice"><span class="q-opt-ico"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></span><span class="q-opt-label">生成语音</span></div>
-      <div class="q-opt q-del"><span class="q-opt-ico"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></span><span class="q-opt-label">删除</span></div>
-    </div>
-    <div class="q-sheet q-cancel-sheet">
-      <div class="q-cancel" onclick="hideQuoteMenu()">取消</div>
-    </div>
-  </div>
+
 
   <div class="mem-link-overlay" id="memLinkOverlay" style="display:none">
     <div class="mem-link-sheet">
@@ -563,6 +553,20 @@
 
 
 
+
+  <div id="quoteMenuMask" class="quote-menu-mask" onclick="hideQuoteMenu()"></div>
+  <div id="quoteMenu" class="quote-menu" style="display:none">
+    <div class="q-sheet">
+      <div class="q-cut"><div class="q-cut-icon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg></div><div class="q-cut-txt"></div></div>
+      <div class="q-opt q-reply"><span class="q-opt-ico"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg></span><span class="q-opt-label">回复</span></div>
+      <div class="q-opt q-multi"><span class="q-opt-ico"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L20 6"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg></span><span class="q-opt-label">多选</span></div>
+      <div class="q-opt q-voice"><span class="q-opt-ico"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></span><span class="q-opt-label">生成语音</span></div>
+      <div class="q-opt q-del"><span class="q-opt-ico"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></span><span class="q-opt-label">删除</span></div>
+    </div>
+    <div class="q-sheet q-cancel-sheet">
+      <div class="q-cancel" onclick="hideQuoteMenu()">取消</div>
+    </div>
+  </div>
 
   <!-- IG Toast -->
   <div class="ig-toast" id="igToast"></div>

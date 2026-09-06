@@ -11,78 +11,96 @@ let lastThinkText = '';
 let lastRetract = null;
 let _idleProactiveTimer = null;
 
-// 长按引用：在聊天体上监听滑动，一旦移动超过阈值就取消长按（避免误触/滚动触发）
+// 长按引用：事件委托，在 chatBody 上统一处理
 (function bindChatLongPress() {
   var cb = document.getElementById('chatBody');
-  if (cb && !cb._lpBound) {
-    cb._lpBound = true;
-    cb.addEventListener('touchmove', function (ev) { onMsgMove(ev); }, { passive: true });
-    cb.addEventListener('touchend', function () { clearQuotePress(); }, { passive: true });
-    cb.addEventListener('touchcancel', function () { clearQuotePress(); }, { passive: true });
-  }
-})();
+  if (!cb) return;
+  var _pressTimer = null;
+  var _pressIndex = -1;
+  var _pressStartX = 0;
+  var _pressStartY = 0;
 
-// ===== 消息弹窗 =====
-function showMsgNote(charId, name, avatar, text) {
-  var exist = document.getElementById('msgNote');
-  if (exist) { clearTimeout(noteTimer); exist.remove(); noteTimer = null; }
-  var n = document.createElement('div');
-  n.id = 'msgNote';
-  n.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:99999;background:#fdfaf6;border-radius:14px;padding:8px 14px 8px 10px;display:flex;align-items:center;gap:9px;box-shadow:0 6px 20px rgba(120,100,80,.12),0 0 0 1px rgba(200,185,165,.15);max-width:250px;width:auto;cursor:pointer;animation:msgNoteIn .3s ease';
-  n.onclick = function() { this.remove(); clearTimeout(noteTimer); noteTimer = null; openChat(charId, 'comic'); };
-  n.innerHTML = '<div style="width:22px;height:22px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#ede4d8;font-size:12px;display:flex;align-items:center;justify-content:center">' + renderAvatar(avatar, name).replace('<img', '<img style="width:100%;height:100%;object-fit:cover"') + '</div><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;color:#5a5045">' + escapeHTML(name) + '</div><div style="font-size:11px;color:#a09588;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px">' + escapeHTML(text || '发来一条消息') + '</div></div><div style="font-size:8px;color:#c8b8a8;flex-shrink:0;align-self:flex-start;margin-top:2px">now</div>';
-  document.body.appendChild(n);
-  noteTimer = setTimeout(function() { var el = document.getElementById('msgNote'); if (el) el.remove(); noteTimer = null; }, 4000);
-}
-// ===== 聊天窗口 =====
-function openChat(characterId, skin) {
-  let char = null;
-  if (characterId) {
-    state.activeRoleId = characterId;
-    char = getCharacter(characterId);
-    char.unread = 0;
-    char.read = true;
-    // 兼容老存档：没有 status 的旧消息，若其后已有对方回复，则补标已读
-    const chat = char.chat || [];
-    let seenReply = false;
-    for (let i = chat.length - 1; i >= 0; i--) {
-      const m = chat[i];
-      if (m.role === 'assistant' || m.role === 'system') { seenReply = true; continue; }
-      if (m.role === 'user') {
-        if (!m.status) m.status = seenReply ? 'read' : 'sent';
-        if (m.status === 'sent' && seenReply) m.status = 'read';
+  cb.addEventListener('pointerdown', function(ev) {
+    var msgEl = ev.target.closest && ev.target.closest('.msg');
+    if (!msgEl || _multiSelect) return;
+    var idx = parseInt(msgEl.getAttribute('data-idx'));
+    if (isNaN(idx)) return;
+    var c = activeCharacter();
+    var m = c && c.chat && c.chat[idx];
+    if (!m) return;
+    _pressStartX = ev.clientX || 0;
+    _pressStartY = ev.clientY || 0;
+    _pressIndex = idx;
+    msgEl.classList.add('pressing');
+    _pressTimer = setTimeout(function() {
+      var el = $('quoteMenu');
+      if (!el) return;
+      var char = activeCharacter();
+      var msg = char && char.chat && char.chat[idx];
+      if (!msg) return;
+      var prof = activeProfile();
+      var isUser = msg.role === 'user';
+      var isSystem = msg.role === 'system';
+      var name = isSystem ? '系统' : (isUser ? prof.name : char.name);
+      var text = (msg.content || (msg.media ? '[图片]' : '')).slice(0, 60);
+      el.querySelector('.q-cut-txt').textContent = name + '：' + text;
+      var replyOpt = el.querySelector('.q-reply');
+      var voiceOpt = el.querySelector('.q-voice');
+      if (replyOpt) replyOpt.style.display = isSystem ? 'none' : '';
+      if (voiceOpt) voiceOpt.style.display = isSystem ? 'none' : '';
+      if (replyOpt) replyOpt.onclick = function() { hideQuoteMenu(); quoteMessage(idx); };
+      var qMulti = el.querySelector('.q-multi');
+      if (qMulti) qMulti.onclick = function() { hideQuoteMenu(); enterMultiSelect(idx); };
+      if (voiceOpt) voiceOpt.onclick = function() { hideQuoteMenu(); if (typeof speakText === 'function') speakText((msg.content || (msg.media ? '[图片]' : '')), null, msgEl); };
+      el.querySelector('.q-del').onclick = function() { hideQuoteMenu(); deleteMessage(char.id, idx); };
+      el.style.display = 'flex';
+      var mask = $('quoteMenuMask'); if (mask) mask.classList.add('show');
+      setTimeout(function() { el.classList.add('show'); }, 10);
+      if (document.body.classList.contains('wx-mode')) {
+        var cw = $('chatWindow');
+        if (cw) {
+          var cwRect = cw.getBoundingClientRect();
+          var msgRect = msgEl.getBoundingClientRect();
+          var menuW = el.offsetWidth || 260;
+          var menuH = el.offsetHeight || 44;
+          var top = msgRect.top - cwRect.top - menuH - 8;
+          if (top < 0) top = msgRect.bottom - cwRect.top + 8;
+          var left = msgRect.left - cwRect.left + (msgRect.width - menuW) / 2;
+          left = Math.max(8, Math.min(left, cwRect.width - menuW - 8));
+          el.style.position = 'absolute';
+          el.style.left = left + 'px';
+          el.style.top = top + 'px';
+          el.style.transform = 'none';
+        }
+        el.querySelectorAll('.q-cut, .q-opt-ico, .q-opt svg, .q-cancel').forEach(function(e) {
+          e.style.setProperty('display', 'flex', 'important');
+        });
+        el.querySelectorAll('.q-opt-label').forEach(function(e) {
+          e.style.setProperty('color', '#fff', 'important');
+        });
       }
-    }
-  }
-  saveState();
-  pendingReply = false;
-  _manualAICall = false;
-  $('sendBtn').style.display = '';
-  var ob = $('aiBtn');
-  if (ob) ob.remove();
-  $('chatWindow').classList.add('open');
-  var cs = $('chatSettings'); if (cs) cs.classList.remove('open'); // 进入聊天时确保设置面板已收起
-  renderChat();
-  // 打卡监督：打开与该角色聊天时，若 TA 监督的打卡今天还没打且今天还没催过，让 TA 顺手催一下
-  if (char && (state.checkins || []).some(function (c) { return c.charId === characterId && isCheckinDueToday(c) && c.lastNagDate !== todayStr(); })) {
-    setTimeout(function () { if (typeof nudgeCheckin === 'function') nudgeCheckin(characterId); }, 1200);
-  }
-}
+    }, 450);
+  });
 
-function closeChat() {
-  pendingReply = false;
-  _manualAICall = false;
-  exitMultiSelect();
-  if (typeof stopSpeak === 'function') stopSpeak();
-  $('sendBtn').style.display = '';
-  var ob = $('aiBtn');
-  if (ob) ob.remove();
-  $('chatWindow').classList.remove('open');
-  $('chatWindow').classList.remove('comic-skin', 'imessage-skin', 'wechat-skin');
-  document.body.classList.remove('wx-mode');
-  var cs = $('chatSettings'); if (cs) cs.classList.remove('open'); // 关闭聊天时一并收起设置，避免设置面板滞留覆盖
-  hidePanels();
-}
+  cb.addEventListener('pointermove', function(ev) {
+    if (!_pressTimer) return;
+    var dx = Math.abs((ev.clientX || 0) - _pressStartX);
+    var dy = Math.abs((ev.clientY || 0) - _pressStartY);
+    if (dx > 20 || dy > 20) { clearTimeout(_pressTimer); _pressTimer = null; }
+  });
+
+  cb.addEventListener('pointerup', function() {
+    document.querySelectorAll('.msg.pressing').forEach(function(e) { e.classList.remove('pressing'); });
+  });
+
+  cb.addEventListener('pointercancel', function() {
+    document.querySelectorAll('.msg.pressing').forEach(function(e) { e.classList.remove('pressing'); });
+  });
+
+  cb.addEventListener('pointerleave', function() {
+    document.querySelectorAll('.msg.pressing').forEach(function(e) { e.classList.remove('pressing'); });
+  });
+})();
 
 // ===== 多选删除 =====
 let _multiSelect = false;
@@ -104,28 +122,9 @@ function multiCls(i) {
   if (!_multiSelect) return '';
   return ' multi-mode' + (_selectedMsgs[i] ? ' msg-selected' : '');
 }
-function onMsgDown(ev, index) {
-  if (_multiSelect) return;
-  if (ev.target && ev.target.closest && ev.target.closest('.voice-avatar')) return;
-  var c = activeCharacter();
-  var m = c && c.chat && c.chat[index];
-  if (!m) return;
-  _pressEl = ev.currentTarget;
-  if (_pressEl && _pressEl.classList) _pressEl.classList.add('pressing');
-  quotePress(ev, ev.currentTarget, index);
-}
-function onMsgMove(ev) {
-  if (!_quotePressTimer) return;
-  var clientX = ev.clientX || (ev.touches && ev.touches[0] ? ev.touches[0].clientX : 0);
-  var clientY = ev.clientY || (ev.touches && ev.touches[0] ? ev.touches[0].clientY : 0);
-  var dx = Math.abs(clientX - _quoteStartX);
-  var dy = Math.abs(clientY - _quoteStartY);
-  if (dx > 20 || dy > 20) clearQuotePress();
-}
 function onMsgTap(ev, index) {
   if (ev && ev.stopPropagation) ev.stopPropagation();
   if (_multiSelect) { toggleMsgSelect(index); return; }
-  clearQuotePress();
 }
 function enterMultiSelect(anchorIndex) {
   _multiSelect = true;
@@ -432,6 +431,137 @@ function selectHereTo() {
   renderPreviewVisual();
 }
 
+let _quoteMenuShowTime = 0;
+function onMsgRightClick(ev, index) {
+  if (ev && ev.preventDefault) ev.preventDefault();
+  clearQuotePress();
+  showQuoteMenu(index);
+}
+function clearQuotePress() {
+  document.querySelectorAll('.msg.pressing').forEach(function(e) { e.classList.remove('pressing'); });
+}
+function showQuoteMenu(index) {
+  clearQuotePress();
+  _quoteMenuShowTime = Date.now();
+  if (navigator.vibrate) { try { navigator.vibrate(18); } catch (e) {} }
+  const char = activeCharacter();
+  const msg = char.chat[index];
+  if (!msg) return;
+  const prof = activeProfile();
+  const el = $('quoteMenu');
+  if (!el) return;
+  const isUser = msg.role === 'user';
+  const isSystem = msg.role === 'system';
+  const name = isSystem ? '系统' : (isUser ? prof.name : char.name);
+  const text = (msg.content || (msg.media ? '[图片]' : '')).slice(0, 60);
+  el.querySelector('.q-cut-txt').textContent = name + '：' + text;
+  var replyOpt = el.querySelector('.q-reply');
+  var voiceOpt = el.querySelector('.q-voice');
+  if (replyOpt) replyOpt.style.display = isSystem ? 'none' : '';
+  if (voiceOpt) voiceOpt.style.display = isSystem ? 'none' : '';
+  if (replyOpt) replyOpt.onclick = function() { hideQuoteMenu(); quoteMessage(index); };
+  var qMulti = el.querySelector('.q-multi');
+  if (qMulti) qMulti.onclick = function() { hideQuoteMenu(); enterMultiSelect(index); };
+  if (voiceOpt) voiceOpt.onclick = function() { hideQuoteMenu(); if (typeof speakText === 'function') speakText((msg.content || (msg.media ? '[图片]' : '')), null, document.querySelector('.msg[data-idx="' + index + '"]')); };
+  el.querySelector('.q-del').onclick = function() { hideQuoteMenu(); deleteMessage(char.id, index); };
+  el.style.display = 'flex';
+  var mask = $('quoteMenuMask'); if (mask) mask.classList.add('show');
+  setTimeout(function() { el.classList.add('show'); }, 10);
+  if (document.body.classList.contains('wx-mode')) {
+    var msgEl = document.querySelector('.msg[data-idx="' + index + '"]');
+    var cw = $('chatWindow');
+    if (msgEl && cw) {
+      var cwRect = cw.getBoundingClientRect();
+      var msgRect = msgEl.getBoundingClientRect();
+      var menuW = el.offsetWidth || 260;
+      var menuH = el.offsetHeight || 44;
+      var top = msgRect.top - cwRect.top - menuH - 8;
+      if (top < 0) top = msgRect.bottom - cwRect.top + 8;
+      var left = msgRect.left - cwRect.left + (msgRect.width - menuW) / 2;
+      left = Math.max(8, Math.min(left, cwRect.width - menuW - 8));
+      el.style.position = 'absolute';
+      el.style.left = left + 'px';
+      el.style.top = top + 'px';
+      el.style.transform = 'none';
+    }
+  }
+}
+function hideQuoteMenu() {
+  const el = $('quoteMenu');
+  const mask = $('quoteMenuMask');
+  if (el) { el.classList.remove('show'); el.style.display = 'none'; el.style.left = ''; el.style.top = ''; el.style.transform = ''; }
+  if (mask) mask.classList.remove('show');
+  clearQuotePress();
+}
+document.addEventListener('click', function(e) {
+  const el = $('quoteMenu');
+  if (!el || el.style.display === 'none') return;
+  if (Date.now() - _quoteMenuShowTime < 500) return;
+  if (!el.contains(e.target)) hideQuoteMenu();
+});
+
+// ===== 消息弹窗 =====
+function showMsgNote(charId, name, avatar, text) {
+  var exist = document.getElementById('msgNote');
+  if (exist) { clearTimeout(noteTimer); exist.remove(); noteTimer = null; }
+  var n = document.createElement('div');
+  n.id = 'msgNote';
+  n.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:99999;background:#fdfaf6;border-radius:14px;padding:8px 14px 8px 10px;display:flex;align-items:center;gap:9px;box-shadow:0 6px 20px rgba(120,100,80,.12),0 0 0 1px rgba(200,185,165,.15);max-width:250px;width:auto;cursor:pointer;animation:msgNoteIn .3s ease';
+  n.onclick = function() { this.remove(); clearTimeout(noteTimer); noteTimer = null; openChat(charId, 'comic'); };
+  n.innerHTML = '<div style="width:22px;height:22px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#ede4d8;font-size:12px;display:flex;align-items:center;justify-content:center">' + renderAvatar(avatar, name).replace('<img', '<img style="width:100%;height:100%;object-fit:cover"') + '</div><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;color:#5a5045">' + escapeHTML(name) + '</div><div style="font-size:11px;color:#a09588;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px">' + escapeHTML(text || '发来一条消息') + '</div></div><div style="font-size:8px;color:#c8b8a8;flex-shrink:0;align-self:flex-start;margin-top:2px">now</div>';
+  document.body.appendChild(n);
+  noteTimer = setTimeout(function() { var el = document.getElementById('msgNote'); if (el) el.remove(); noteTimer = null; }, 4000);
+}
+// ===== 聊天窗口 =====
+function openChat(characterId, skin) {
+  let char = null;
+  if (characterId) {
+    state.activeRoleId = characterId;
+    char = getCharacter(characterId);
+    char.unread = 0;
+    char.read = true;
+    // 兼容老存档：没有 status 的旧消息，若其后已有对方回复，则补标已读
+    const chat = char.chat || [];
+    let seenReply = false;
+    for (let i = chat.length - 1; i >= 0; i--) {
+      const m = chat[i];
+      if (m.role === 'assistant' || m.role === 'system') { seenReply = true; continue; }
+      if (m.role === 'user') {
+        if (!m.status) m.status = seenReply ? 'read' : 'sent';
+        if (m.status === 'sent' && seenReply) m.status = 'read';
+      }
+    }
+  }
+  saveState();
+  pendingReply = false;
+  _manualAICall = false;
+  $('sendBtn').style.display = '';
+  var ob = $('aiBtn');
+  if (ob) ob.remove();
+  $('chatWindow').classList.add('open');
+  var cs = $('chatSettings'); if (cs) cs.classList.remove('open'); // 进入聊天时确保设置面板已收起
+  renderChat();
+  // 打卡监督：打开与该角色聊天时，若 TA 监督的打卡今天还没打且今天还没催过，让 TA 顺手催一下
+  if (char && (state.checkins || []).some(function (c) { return c.charId === characterId && isCheckinDueToday(c) && c.lastNagDate !== todayStr(); })) {
+    setTimeout(function () { if (typeof nudgeCheckin === 'function') nudgeCheckin(characterId); }, 1200);
+  }
+}
+
+function closeChat() {
+  pendingReply = false;
+  _manualAICall = false;
+  exitMultiSelect();
+  if (typeof stopSpeak === 'function') stopSpeak();
+  $('sendBtn').style.display = '';
+  var ob = $('aiBtn');
+  if (ob) ob.remove();
+  $('chatWindow').classList.remove('open');
+  $('chatWindow').classList.remove('comic-skin', 'imessage-skin', 'wechat-skin');
+  document.body.classList.remove('wx-mode');
+  var cs = $('chatSettings'); if (cs) cs.classList.remove('open'); // 关闭聊天时一并收起设置，避免设置面板滞留覆盖
+  hidePanels();
+}
+
 function renderChat() {
   const char = activeCharacter();
   if (typeof tickCharacterLife === 'function') tickCharacterLife(char);
@@ -461,21 +591,21 @@ function renderChat() {
     if (msg.role === 'system') {
       if (msg.type === 'think') {
         const open = !msg.collapsed;
-        return `${divider}<div class="msg system${multiCls(i)}" data-idx="${i}" ontouchstart="onMsgDown(event,${i})" onmousedown="onMsgDown(event,${i})" onclick="onMsgTap(event,${i})">
+        return `${divider}<div class="msg system${multiCls(i)}" data-idx="${i}" onclick="onMsgTap(event,${i})">
           <div class="bubble system" style="cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px" onclick="event.stopPropagation();toggleThink(${i})">
             <span style="display:inline-block;transition:transform .15s;transform:rotate(${open ? 90 : 0}deg)">▸</span> 💭 思考过程${open ? '' : '（点开看）'}
           </div>
           ${open ? `<div class="bubble system" style="white-space:pre-wrap;word-break:break-word;opacity:.85;margin-top:5px">${escapeHTML(msg.content)}</div>` : ''}
         </div>`;
       }
-      return `${divider}<div class="msg system${multiCls(i)}" data-idx="${i}" ontouchstart="onMsgDown(event,${i})" onmousedown="onMsgDown(event,${i})" onclick="onMsgTap(event,${i})">${msgCheck(false, i)}<div class="bubble system">${escapeHTML(msg.content)}</div></div>`;
+      return `${divider}<div class="msg system${multiCls(i)}" data-idx="${i}" onclick="onMsgTap(event,${i})">${msgCheck(false, i)}<div class="bubble system">${escapeHTML(msg.content)}</div></div>`;
     }
     const prof = activeProfile();
     const av = isUser ? prof.avatar : char.avatar;
     const nm = isUser ? prof.name : char.name;
     if (msg.type === 'retract') {
       const retractTxt = msg.content || '撤回了一条消息';
-      return `${divider}<div class="msg system${multiCls(i)}" data-idx="${i}" ontouchstart="onMsgDown(event,${i})" onmousedown="onMsgDown(event,${i})" onclick="onMsgTap(event,${i})">${msgCheck(false, i)}<div class="bubble system retract-bubble">${escapeHTML(nm)} ${escapeHTML(retractTxt)}</div>${timeStamp}</div>`;
+      return `${divider}<div class="msg system${multiCls(i)}" data-idx="${i}" onclick="onMsgTap(event,${i})">${msgCheck(false, i)}<div class="bubble system retract-bubble">${escapeHTML(nm)} ${escapeHTML(retractTxt)}</div>${timeStamp}</div>`;
     }
     if (msg.type === 'redpacket') {
       const opened = msg.opened;
@@ -483,7 +613,7 @@ function renderChat() {
       const note = msg.note || '';
       const amtText = amount.toFixed(amount % 1 ? 2 : 0);
       const tick = isUser ? `<div class="read-tick">${msg.status === 'read' ? '已读' : '已发送'}</div>` : '';
-      return `${divider}<div class="msg ${isUser ? 'right' : 'left'}${multiCls(i)}" data-idx="${i}" oncontextmenu="event.preventDefault();onMsgRightClick(event,${i})" onclick="onMsgTap(event,${i})" ontouchstart="onMsgDown(event,${i})" onmousedown="onMsgDown(event,${i})">${msgCheck(isUser, i)}${avCol(`<div class="avatar">${renderAvatar(av, nm)}</div>`)}<div class="rp-card ${opened ? 'rp-opened' : ''} rp-msg-${i}" ${!isUser && !opened ? `onclick="_multiSelect?onMsgTap(event,${i}):openRedPacket('${char.id}',${i})"` : ''}>
+      return `${divider}<div class="msg ${isUser ? 'right' : 'left'}${multiCls(i)}" data-idx="${i}" oncontextmenu="event.preventDefault();onMsgRightClick(event,${i})" onclick="onMsgTap(event,${i})">${msgCheck(isUser, i)}${avCol(`<div class="avatar">${renderAvatar(av, nm)}</div>`)}<div class="rp-card ${opened ? 'rp-opened' : ''} rp-msg-${i}" ${!isUser && !opened ? `onclick="_multiSelect?onMsgTap(event,${i}):openRedPacket('${char.id}',${i})"` : ''}>
         <span class="rp-card-icon">🧧</span>
         <span class="rp-card-label">${isUser ? '你' : escapeHTML(nm)}</span>
         ${opened ? `<div class="rp-card-amount">¥ ${amtText}</div>` : `<div class="rp-card-btn">開</div>`}
@@ -493,7 +623,7 @@ function renderChat() {
     if (msg.type === 'sticker') {
       const stickerSrc = msg.media && msg.media.src ? msg.media.src : '';
       const tick = isUser ? `<div class="read-tick">${msg.status === 'read' ? '已读' : '已发送'}</div>` : '';
-      return `${divider}<div class="msg ${isUser ? 'right' : 'left'}${multiCls(i)}" data-idx="${i}" onclick="onMsgTap(event,${i})" ontouchstart="onMsgDown(event,${i})" onmousedown="onMsgDown(event,${i})" oncontextmenu="event.preventDefault();onMsgRightClick(event,${i})">${msgCheck(isUser, i)}${avCol(`<div class="avatar">${renderAvatar(av, nm)}</div>`)}${stickerSrc ? `<img src="${escapeHTML(stickerSrc)}" class="chat-sticker-img" alt="表情包" referrerpolicy="no-referrer" data-fb="${escapeHTML(msg.media.src || stickerSrc)}" onerror="stickerImgFallback(this)">` : ''}${tick}</div>`;
+      return `${divider}<div class="msg ${isUser ? 'right' : 'left'}${multiCls(i)}" data-idx="${i}" oncontextmenu="event.preventDefault();onMsgRightClick(event,${i})" onclick="onMsgTap(event,${i})">${msgCheck(isUser, i)}${avCol(`<div class="avatar">${renderAvatar(av, nm)}</div>`)}${stickerSrc ? `<img src="${escapeHTML(stickerSrc)}" class="chat-sticker-img" alt="表情包" referrerpolicy="no-referrer" data-fb="${escapeHTML(msg.media.src || stickerSrc)}" onerror="stickerImgFallback(this)">` : ''}${tick}</div>`;
     }
     let mediaHtml = '';
     if (msg.media && msg.media.type === 'image') {
@@ -521,7 +651,7 @@ function renderChat() {
     const tick = isUser ? `<div class="read-tick">${msg.status === 'read' ? '已读' : '已发送'}</div>` : '';
     const voiceBtnHtml = '';
     const avHtml = !isUser ? `<div class="avatar voice-avatar" onclick="event.stopPropagation();showInnerVoice('${char.id}')">${renderAvatar(av, nm)}</div>` : `<div class="avatar">${renderAvatar(av, nm)}</div>`;
-    return `${divider}<div class="msg ${isUser ? 'right' : 'left'}${multiCls(i)}" data-idx="${i}" oncontextmenu="event.preventDefault();onMsgRightClick(event,${i})" ontouchstart="onMsgDown(event,${i})" onmousedown="onMsgDown(event,${i})" onclick="onMsgTap(event,${i})">${msgCheck(isUser, i)}${avCol(avHtml)}<div class="bubble ${isUser ? 'right' : 'left'}">${quoteHtml}${textHtml}${mediaHtml}${transHtml}${voiceBtnHtml}</div>${tick}</div>`;
+    return `${divider}<div class="msg ${isUser ? 'right' : 'left'}${multiCls(i)}" data-idx="${i}" oncontextmenu="event.preventDefault();onMsgRightClick(event,${i})" onclick="onMsgTap(event,${i})">${msgCheck(isUser, i)}${avCol(avHtml)}<div class="bubble ${isUser ? 'right' : 'left'}">${quoteHtml}${textHtml}${mediaHtml}${transHtml}${voiceBtnHtml}</div>${tick}</div>`;
   }).join('') + typing;
   if (!_multiSelect) $('chatBody').scrollTop = $('chatBody').scrollHeight;
   applyBubbleStyle();
@@ -585,90 +715,6 @@ function quoteBlock(quote) {
   const text = quote.content || '';
   return `<div class="quote-block"><div class="quote-body"><div class="quote-name">${escapeHTML(name)}</div><div class="quote-text">${escapeHTML(text)}</div></div></div>`;
 }
-
-let _quotePressTimer = null;
-let _quotePressIndex = -1;
-let _quoteStartX = 0;
-let _quoteStartY = 0;
-let _pressEl = null;
-function quotePress(ev, el, index) {
-  if (ev.target && ev.target.closest && ev.target.closest('.voice-avatar')) return;
-  _quotePressIndex = index;
-  _quoteStartX = ev.clientX || 0;
-  _quoteStartY = ev.clientY || 0;
-  clearTimeout(_quotePressTimer);
-  _quotePressTimer = setTimeout(function() { showQuoteMenu(index); }, 450);
-}
-function onMsgRightClick(ev, index) {
-  if (ev && ev.preventDefault) ev.preventDefault();
-  clearQuotePress();
-  showQuoteMenu(index);
-}
-function clearQuotePress() {
-  clearTimeout(_quotePressTimer);
-  _quotePressTimer = null;
-  if (_pressEl) { _pressEl.classList.remove('pressing'); _pressEl = null; }
-}
-function showQuoteMenu(index) {
-  clearQuotePress();
-  _quoteMenuShowTime = Date.now();
-  if (navigator.vibrate) { try { navigator.vibrate(18); } catch (e) {} }
-  const char = activeCharacter();
-  const msg = char.chat[index];
-  if (!msg) return;
-  const prof = activeProfile();
-  const el = $('quoteMenu');
-  if (!el) return;
-  const isUser = msg.role === 'user';
-  const isSystem = msg.role === 'system';
-  const name = isSystem ? '系统' : (isUser ? prof.name : char.name);
-  const text = (msg.content || (msg.media ? '[图片]' : '')).slice(0, 60);
-  el.querySelector('.q-cut-txt').textContent = name + '：' + text;
-  var replyOpt = el.querySelector('.q-reply');
-  var voiceOpt = el.querySelector('.q-voice');
-  if (replyOpt) replyOpt.style.display = isSystem ? 'none' : '';
-  if (voiceOpt) voiceOpt.style.display = isSystem ? 'none' : '';
-  if (replyOpt) replyOpt.onclick = function() { hideQuoteMenu(); quoteMessage(index); };
-  var qMulti = el.querySelector('.q-multi');
-  if (qMulti) qMulti.onclick = function() { hideQuoteMenu(); enterMultiSelect(index); };
-  if (voiceOpt) voiceOpt.onclick = function() { hideQuoteMenu(); if (typeof speakText === 'function') speakText((msg.content || (msg.media ? '[图片]' : '')), null, document.querySelector('.msg[data-idx="' + index + '"]')); };
-  el.querySelector('.q-del').onclick = function() { hideQuoteMenu(); deleteMessage(char.id, index); };
-  el.style.display = 'flex';
-  var mask = $('quoteMenuMask'); if (mask) mask.classList.add('show');
-  setTimeout(function() { el.classList.add('show'); }, 10);
-  if (document.body.classList.contains('wx-mode')) {
-    var msgEl = document.querySelector('.msg[data-idx="' + index + '"]');
-    var cw = $('chatWindow');
-    if (msgEl && cw) {
-      var cwRect = cw.getBoundingClientRect();
-      var msgRect = msgEl.getBoundingClientRect();
-      var menuW = el.offsetWidth || 260;
-      var menuH = el.offsetHeight || 44;
-      var top = msgRect.top - cwRect.top - menuH - 8;
-      if (top < 0) top = msgRect.bottom - cwRect.top + 8;
-      var left = msgRect.left - cwRect.left + (msgRect.width - menuW) / 2;
-      left = Math.max(8, Math.min(left, cwRect.width - menuW - 8));
-      el.style.position = 'absolute';
-      el.style.left = left + 'px';
-      el.style.top = top + 'px';
-      el.style.transform = 'none';
-    }
-  }
-}
-function hideQuoteMenu() {
-  const el = $('quoteMenu');
-  const mask = $('quoteMenuMask');
-  if (el) { el.classList.remove('show'); el.style.display = 'none'; el.style.left = ''; el.style.top = ''; el.style.transform = ''; }
-  if (mask) mask.classList.remove('show');
-  clearQuotePress();
-}
-let _quoteMenuShowTime = 0;
-document.addEventListener('click', function(e) {
-  const el = $('quoteMenu');
-  if (!el || el.style.display === 'none') return;
-  if (Date.now() - _quoteMenuShowTime < 500) return;
-  if (!el.contains(e.target)) hideQuoteMenu();
-});
 
 function setChatTyping(value) {
   chatTyping = value;
@@ -2877,12 +2923,12 @@ function renderMemoriesGrouped(memories, itemHtml, emptyHtml) {
 
 // ===== 聊天设置 =====
 function openSettings() {
-  $('chatSettings').classList.add('open');
-  $('pinSwitch').classList.toggle('on', state.settings.pinned);
+  var scs = $('chatSettings'); if (scs) scs.classList.add('open');
+  var pinSw = $('pinSwitch'); if (pinSw) pinSw.classList.toggle('on', !!(state.settings && state.settings.pinned));
   var char = activeCharacter();
   if (char) {
-    $('charLang').value = char.lang || '中文';
-    $('translateSwitch').classList.toggle('on', char.translate === true);
+    var cl = $('charLang'); if (cl) cl.value = char.lang || '中文';
+    var trSw = $('translateSwitch'); if (trSw) trSw.classList.toggle('on', char.translate === true);
     var ss = $('streamSwitch');
     if (ss) ss.classList.toggle('on', !!(state.settings && state.settings.streamReply));
     var rsSel = $('replySplitSelect');
@@ -2918,7 +2964,7 @@ function openSettings() {
   if (typeof syncCharTts === 'function') syncCharTts();
   renderSettingsMemories();
 }
-function closeSettings() { $('chatSettings').classList.remove('open'); }
+function closeSettings() { var cs = $('chatSettings'); if (cs) cs.classList.remove('open'); }
 function renderSettingsMemories() {
   var char = activeCharacter();
   var box = $('settingsMemories');

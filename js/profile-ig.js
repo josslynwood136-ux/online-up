@@ -99,13 +99,20 @@ function switchProfileTab(tab) {
   if (activeNav) activeNav.classList.add('active');
   document.querySelectorAll('.ig-panels .profile-panel').forEach(p => p.classList.remove('active'));
   if (tab === 'home') {
-    $('igPanelHome').classList.add('active');
+    var panel = $('igPanelHome');
+    if (panel) panel.classList.add('active');
     renderFeed();
+  } else if (tab === 'search') {
+    var panel = $('igPanelSearch');
+    if (panel) panel.classList.add('active');
+    renderCharLibrary();
   } else if (tab === 'dm') {
-    $('igPanelDm').classList.add('active');
+    var panel = $('igPanelDm');
+    if (panel) panel.classList.add('active');
     renderDmList();
   } else if (tab === 'profile') {
-    $('igPanelProfile').classList.add('active');
+    var panel = $('igPanelProfile');
+    if (panel) panel.classList.add('active');
     renderMyProfileContent();
   }
 }
@@ -340,8 +347,8 @@ function renderIGCharEditor() {
     </div>`;
   // Highlight selected avatar
   document.querySelectorAll('.ig-avatar-opt').forEach(el => {
-    el.style.borderColor = el.dataset.em === igCharAvatar ? '#262626' : 'transparent';
-    el.style.background = el.dataset.em === igCharAvatar ? '#f5f5f5' : 'transparent';
+    el.style.borderColor = el.dataset.em === igCharAvatarData ? '#262626' : 'transparent';
+    el.style.background = el.dataset.em === igCharAvatarData ? '#f5f5f5' : 'transparent';
   });
 }
 
@@ -425,7 +432,7 @@ function saveIGCharEditor() {
   }
   saveState();
   renderIGProfile();
-  setTimeout(() => { switchProfileTab('search'); renderCharLibrary(); }, 50);
+  setTimeout(() => { if ($('igPanelSearch')) { switchProfileTab('search'); renderCharLibrary(); } }, 50);
   showIGToast(isNew ? '角色 ' + name + ' 已创建 ✨' : '角色已更新 ✅');
 }
 

@@ -11,6 +11,9 @@ var _lastPollPending = '';   // 去重：记录上次已处理的待收内容指
 function pushEnabled() { try { return localStorage.getItem('pushEnabled') === '1'; } catch (e) { return false; } }
 function setPushEnabled(v) { try { localStorage.setItem('pushEnabled', v ? '1' : '0'); } catch (e) {} }
 
+// 推送需要服务器端（push/config 等相对接口）；本地 file:// 打开时无法 fetch，直接禁用
+function pushServerOk() { return (typeof location === 'undefined' || location.protocol === 'http:' || location.protocol === 'https:'); }
+
 // 显示一条系统通知（页面级 Notification，不依赖 Web Push）
 function showNotification(title, body, charId) {
   try {
@@ -24,6 +27,7 @@ function showNotification(title, body, charId) {
 
 // 后台轮询：app 在后台活着时，定时拉取服务器生成的待收消息
 async function pollPendingOnce() {
+  if (!pushServerOk()) return;
   var deviceId = (typeof getDeviceId === 'function') ? getDeviceId() : '';
   if (!deviceId) return;
   try {
@@ -48,6 +52,7 @@ async function pollPendingOnce() {
 }
 function startPushPolling() {
   if (_pollTimer) return;
+  if (!pushServerOk()) return;
   _pollTimer = setInterval(pollPendingOnce, 45000);
   setTimeout(pollPendingOnce, 4000);
 }
@@ -55,6 +60,7 @@ function stopPushPolling() { if (_pollTimer) { clearInterval(_pollTimer); _pollT
 
 // 切换开关：开启 = 后台消息模式（轮询 + 通知）；关闭 = 停止
 async function togglePush() {
+  if (!pushServerOk()) { if (typeof quickNotice === 'function') quickNotice('本地文件模式无法使用后台通知，请把页面部署到服务器后再开'); return; }
   if (pushEnabled()) {
     setPushEnabled(false);
     stopPushPolling();
@@ -95,7 +101,8 @@ function refreshPushUI() {
     b.style.display = on ? '' : 'none';
   });
   document.querySelectorAll('.push-hint').forEach(function (hint) {
-    if (!pushSupported) hint.textContent = '当前浏览器不支持系统通知';
+    if (!pushServerOk()) hint.textContent = '需部署到服务器（http/https）后才能用后台通知';
+    else if (!pushSupported) hint.textContent = '当前浏览器不支持系统通知';
     else if (on) hint.textContent = '已开启：网页在后台时，角色消息会以系统通知弹出';
     else hint.textContent = '开启后，网页在后台也能收到角色消息通知';
   });
@@ -103,18 +110,18 @@ function refreshPushUI() {
 
 // 初始化
 async function initPush() {
-  if (!pushSupported) { refreshPushUI(); return; }
+  refreshPushUI();
+  if (!pushSupported || !pushServerOk()) return;
   if (pushEnabled()) {
     uploadPushConfig();
     startPushPolling();
   }
   fetchPendingMessages();
-  refreshPushUI();
 }
 
 // 上报配置：把 AI 凭证 + 角色人设 + 计划发给服务器，用于后台生成消息
 async function uploadPushConfig() {
-  if (!pushEnabled()) return;
+  if (!pushEnabled() || !pushServerOk()) return;
   var deviceId = (typeof getDeviceId === 'function') ? getDeviceId() : '';
   if (!deviceId) return;
   var s = (typeof state !== 'undefined' && state.settings) || {};
@@ -149,6 +156,7 @@ async function uploadPushConfig() {
 
 // 拉取后台生成的待收消息，写入对应角色聊天（app 打开时调用）
 async function fetchPendingMessages() {
+  if (!pushServerOk()) return;
   var deviceId = (typeof getDeviceId === 'function') ? getDeviceId() : '';
   if (!deviceId) return;
   try {

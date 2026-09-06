@@ -871,6 +871,7 @@ button { border: 0; cursor: pointer; }
 #chatWindow.comic-skin .select-here-line::after { background: #1c1c1c; }
 #chatWindow.comic-skin .select-here-btn { background: #1c1c1c; border: 2px solid #1c1c1c; box-shadow: 2.5px 2.5px 0 rgba(28,28,28,.25); }
 
+
 .chat-footer {
   flex: 0 0 auto;
   min-height: fit-content;
@@ -932,6 +933,7 @@ button { border: 0; cursor: pointer; }
 .quote-menu .q-cancel-sheet { background: #faf9f6; border: 1px solid #ece9e3; border-radius: 20px; overflow: hidden; box-shadow: 0 8px 30px rgba(60,52,44,.10); }
 .quote-menu .q-cancel { text-align: center; padding: 15px 16px; font-size: 15.5px; font-weight: 600; color: #5a554d; cursor: pointer; letter-spacing: .5px; }
 .quote-menu .q-cancel:active { background: #f3efe8; }
+
 .chat-input-wrapper { flex: 1; background: #efefef; border-radius: 20px; display: flex; align-items: center; padding: 0 12px; }
 .chat-input { flex: 1; border: 0; padding: 8px 4px; outline: none; font-size: 14px; background: transparent; user-select: text; font-family: "LXGW WenKai", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; font-weight: 600; }
 .send-btn { background:#53a6f5;border:none;color:#fff;width:38px;height:38px;border-radius:50%;cursor:pointer;transition:background .12s;display:grid;place-items:center;flex-shrink:0; }
@@ -3779,10 +3781,7 @@ button { border: 0; cursor: pointer; }
 }
 #chatWindow.imessage-skin .chat-header > div:last-child .icon-btn:nth-child(2),
 #chatWindow.imessage-skin .chat-header > div:last-child .icon-btn:nth-child(3) { display: none; }
-#chatWindow.imessage-skin .multi-bar {
-  background: #f9f9f9;
-  border-bottom: .33px solid var(--im-line);
-}
+
 #chatWindow.imessage-skin .chat-body {
   background: #fff;
   gap: 2px;
@@ -3884,6 +3883,10 @@ button { border: 0; cursor: pointer; }
 #chatWindow.imessage-skin .reply-bar::before { display: none; }
 #chatWindow.imessage-skin .reply-bar-name { color: var(--im-blue); font-weight: 600; }
 #chatWindow.imessage-skin .reply-bar-text { color: var(--im-muted); }
+#chatWindow.imessage-skin .multi-bar {
+  background: #f9f9f9;
+  border-bottom: .33px solid var(--im-line);
+}
 #chatWindow.imessage-skin .quote-menu .q-sheet,
 #chatWindow.imessage-skin .quote-menu .q-cancel-sheet {
   background: rgba(242,242,247,.92);
@@ -3893,6 +3896,7 @@ button { border: 0; cursor: pointer; }
 #chatWindow.imessage-skin .quote-menu .q-opt { background: transparent; color: var(--im-ink); }
 #chatWindow.imessage-skin .quote-menu .q-opt:active { background: rgba(0,0,0,.05); }
 #chatWindow.imessage-skin .quote-menu .q-cancel { color: var(--im-blue); }
+
 
 #chatWindow.bubble-style-imessage .bubble {
   border: none;
@@ -4090,6 +4094,55 @@ button { border: 0; cursor: pointer; }
 #chatWindow.wechat-skin .reply-bar::before { display: none; }
 #chatWindow.wechat-skin .reply-bar-name { color: var(--wx-green); font-weight: 500; }
 #chatWindow.wechat-skin .reply-bar-text { color: var(--wx-muted); }
+/* 微信长按菜单 */
+body.wx-mode .quote-menu-mask { background: rgba(0,0,0,.15); backdrop-filter: none; -webkit-backdrop-filter: none; }
+body.wx-mode .quote-menu {
+  position: absolute;
+  z-index: 6000;
+  pointer-events: none;
+  width: auto;
+  opacity: 0;
+  transition: opacity .12s ease;
+}
+body.wx-mode .quote-menu.show { opacity: 1; pointer-events: auto; }
+body.wx-mode .quote-menu .q-sheet {
+  background: #4C4C4C;
+  border: none;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0,0,0,.3);
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+  padding: 0;
+}
+body.wx-mode .quote-menu .q-cut { display: none !important; }
+body.wx-mode .quote-menu .q-opt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: row;
+  gap: 0;
+  padding: 8px 8px;
+  font-size: 12px;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 400;
+  background: transparent;
+  letter-spacing: 0;
+  white-space: nowrap;
+  flex: 1;
+}
+body.wx-mode .quote-menu .q-opt + .q-opt { border-left: .5px solid rgba(255,255,255,.15); }
+body.wx-mode .quote-menu .q-opt:active { background: rgba(255,255,255,.1); }
+body.wx-mode .quote-menu .q-opt-ico { display: none !important; }
+body.wx-mode .quote-menu .q-opt svg { display: none !important; }
+body.wx-mode .quote-menu .q-opt-label { flex: none; font-size: 15px; color: #fff; }
+body.wx-mode .quote-menu .q-del .q-opt-label { color: #fff; }
+body.wx-mode .quote-menu .q-cancel-sheet {
+  display: none !important;
+}
+body.wx-mode .quote-menu .q-cancel { display: none !important; }
 
 /* 微信气泡 */
 #chatWindow.bubble-style-wechat .bubble {
@@ -4173,56 +4226,6 @@ button { border: 0; cursor: pointer; }
 #chatWindow.bubble-style-wechat .bubble.right .quote-block { background: rgba(255,255,255,.3); }
 #chatWindow.bubble-style-wechat .bubble.left .quote-block { background: rgba(0,0,0,.04); }
 #chatWindow.bubble-style-wechat .chat-sticker-img { box-shadow: none; background: transparent; max-width: 120px; max-height: 120px; }
-
-/* 微信长按菜单 */
-body.wx-mode .quote-menu-mask { background: rgba(0,0,0,.15); backdrop-filter: none; -webkit-backdrop-filter: none; }
-body.wx-mode .quote-menu {
-  position: absolute;
-  z-index: 6000;
-  pointer-events: none;
-  width: auto;
-  opacity: 0;
-  transition: opacity .12s ease;
-}
-body.wx-mode .quote-menu.show { opacity: 1; pointer-events: auto; }
-body.wx-mode .quote-menu .q-sheet {
-  background: #4C4C4C;
-  border: none;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 4px 16px rgba(0,0,0,.3);
-  display: flex;
-  flex-direction: row;
-  gap: 0;
-  padding: 0;
-}
-body.wx-mode .quote-menu .q-cut { display: none !important; }
-body.wx-mode .quote-menu .q-opt {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: row;
-  gap: 0;
-  padding: 8px 8px;
-  font-size: 12px;
-  color: #fff;
-  cursor: pointer;
-  font-weight: 400;
-  background: transparent;
-  letter-spacing: 0;
-  white-space: nowrap;
-  flex: 1;
-}
-body.wx-mode .quote-menu .q-opt + .q-opt { border-left: .5px solid rgba(255,255,255,.15); }
-body.wx-mode .quote-menu .q-opt:active { background: rgba(255,255,255,.1); }
-body.wx-mode .quote-menu .q-opt-ico { display: none !important; }
-body.wx-mode .quote-menu .q-opt svg { display: none !important; }
-body.wx-mode .quote-menu .q-opt-label { flex: none; font-size: 15px; color: #fff; }
-body.wx-mode .quote-menu .q-del .q-opt-label { color: #fff; }
-body.wx-mode .quote-menu .q-cancel-sheet {
-  display: none !important;
-}
-body.wx-mode .quote-menu .q-cancel { display: none !important; }
 
 /* ===== 许愿柳 · One Wish Willow (假装老玩具包装盒) ===== */
 .wl-wrap { display:flex; flex-direction:column; align-items:center; padding-top:14px; gap:14px; text-align:center; }
