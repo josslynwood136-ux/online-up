@@ -9,7 +9,7 @@ const defaultState = {
   profile: { name: '我', avatar: '', wallet: 99999, persona: '', likes: '', boundaries: '', speaking: '' },
   profiles: [{ id: 'prof-default', name: '我', avatar: '', persona: '', likes: '', boundaries: '', speaking: '' }],
   activeProfileId: 'prof-default',
-  api: { key: '', url: 'https://api.openai.com/v1', model: 'gpt-4.1-mini', preset: '', temp: 0.85, topP: 0.9, maxTokens: 800, presencePenalty: 0.6, frequencyPenalty: 0.4 },
+  api: { key: '', url: 'https://api.openai.com/v1', model: 'gpt-4.1-mini', preset: '', temp: 1.0, topP: 0.95, maxTokens: 800, presencePenalty: 1.0, frequencyPenalty: 0.8 },
   apiProfiles: [],
   activeApiProfile: '',
   secondaryApiProfile: '',
@@ -430,8 +430,8 @@ function migrateApiPenalties(st) {
   if (Array.isArray(st.apiProfiles)) list = list.concat(st.apiProfiles);
   list.forEach(function(a) {
     if (!a) return;
-    if (a.presencePenalty === 0) a.presencePenalty = 0.6;
-    if (a.frequencyPenalty === 0) a.frequencyPenalty = 0.4;
+    if (a.presencePenalty === 0) a.presencePenalty = 1.0;
+    if (a.frequencyPenalty === 0) a.frequencyPenalty = 0.8;
   });
 }
 
@@ -696,3 +696,29 @@ function willowBlocksReplyFor(roleId, roleName) {
 }
 
 let state = loadState();
+
+// ===== 心跳保活 =====
+// Render 等免费托管实例空闲 15 分钟后会休眠，冷启动期间 /relay 会短暂 401/502。
+// 只要页面开着，就定期 ping 一下 /relay-probe，让实例保持活跃、避免休眠造成的抓图失败。
+// 纯静态托管（无 /relay）时静默跳过。
+let _keepAliveTimer = null;
+function relayKeepAlive() {
+  try {
+    if (relayAvailable()) {
+      var probe = relayBase() ? (relayBase() + '/relay-probe') : '/relay-probe';
+      fetch(probe, { method: 'HEAD', cache: 'no-store' }).catch(function () {});
+    }
+  } catch (e) {}
+}
+function startRelayKeepAlive() {
+  if (_keepAliveTimer) return;
+  // 先等 relayAvailable() 的首次探测完成，避免与它的缓存冲突
+  relayAvailable().then(function (ok) {
+    if (!ok) return;
+    relayKeepAlive();
+    _keepAliveTimer = setInterval(relayKeepAlive, 300000); // 每 5 分钟 ping 一次
+  }).catch(function () {});
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('load', function () { startRelayKeepAlive(); });
+}

@@ -5876,7 +5876,7 @@ async function doImportStickers() {
     return;
   }
   if (failCount > 0 && window.uiToast) {
-    uiToast(failCount + ' 张抓取失败（图床可能屏蔽了服务器 IP），已用原链接兜底');
+    uiToast(failCount + ' 张抓取失败（服务可能还在冷启动），已用原链接兜底，可点「刷新图片」再试');
   }
   saveState();
   if (window.uiToast) {
@@ -5890,23 +5890,40 @@ async function doImportStickers() {
 
 // 经 /relay 代理抓取图片并转成 data URL（规避图床防盗链与跨域）
 // 成功返回 { data: 'data:...' }；失败返回 { error: '原因' }
+// 自动重试：免费托管（Render 等）实例休眠后冷启动会短暂 401/502/连接关闭，重试几次加递增等待，几乎都能等到服务苏醒
 async function fetchImageAsDataUrl(url) {
   if (url.indexOf('data:') === 0) return { data: url };
-  try {
-    var res = await aiRequest(url, { method: 'GET' });
-    if (!res.ok) return { error: 'relay 返回 ' + res.status + '（图床可能屏蔽了服务器 IP）' };
-    var blob = await res.blob();
-    if (!blob || !blob.size) return { error: 'relay 返回了空内容' };
-    var data = await new Promise(function (resolve, reject) {
-      var reader = new FileReader();
-      reader.onload = function () { resolve(reader.result); };
-      reader.onerror = function () { reject(new Error('读取图片失败')); };
-      reader.readAsDataURL(blob);
-    });
-    return { data: data };
-  } catch (e) {
-    return { error: '抓取失败：' + (e && e.message ? e.message : String(e)) };
+  var delay = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+  var tries = 3;
+  for (var i = 0; i < tries; i++) {
+    if (i > 0) await delay((i === 1 ? 2500 : 2500) + i * 1500);
+    try {
+      var res = await aiRequest(url, { method: 'GET' });
+      if (!res.ok) {
+        // 冷启动暂态错误（401/502/503/429）→ 重试；其余报错直接返回
+        if (res.status === 401 || res.status === 502 || res.status === 503 || res.status === 429 || res.status === 404) {
+          if (i < tries - 1) continue;
+        }
+        return { error: 'relay 返回 ' + res.status + '（图床可能屏蔽了服务器 IP）' };
+      }
+      var blob = await res.blob();
+      if (!blob || !blob.size) {
+        if (i < tries - 1) continue;
+        return { error: 'relay 返回了空内容' };
+      }
+      var data = await new Promise(function (resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function () { resolve(reader.result); };
+        reader.onerror = function () { reject(new Error('读取图片失败')); };
+        reader.readAsDataURL(blob);
+      });
+      return { data: data };
+    } catch (e) {
+      if (i < tries - 1) continue;
+      return { error: '抓取失败：' + (e && e.message ? e.message : String(e)) };
+    }
   }
+  return { error: '抓取失败（重试后仍然失败）' };
 }
 
 // 用修好的 /relay（已禁用缓存）重新抓取所有贴图图片，修复之前被缓存成同一张的错误
