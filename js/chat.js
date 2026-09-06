@@ -95,14 +95,20 @@ function isQuotePressArea(el) {
   });
 
   cb.addEventListener('pointerup', function() {
+    if (_pressTimer) { clearTimeout(_pressTimer); _pressTimer = null; }
+    _pressIndex = -1;
     document.querySelectorAll('.msg.pressing').forEach(function(e) { e.classList.remove('pressing'); });
   });
 
   cb.addEventListener('pointercancel', function() {
+    if (_pressTimer) { clearTimeout(_pressTimer); _pressTimer = null; }
+    _pressIndex = -1;
     document.querySelectorAll('.msg.pressing').forEach(function(e) { e.classList.remove('pressing'); });
   });
 
   cb.addEventListener('pointerleave', function() {
+    if (_pressTimer) { clearTimeout(_pressTimer); _pressTimer = null; }
+    _pressIndex = -1;
     document.querySelectorAll('.msg.pressing').forEach(function(e) { e.classList.remove('pressing'); });
   });
 })();
