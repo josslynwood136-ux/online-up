@@ -550,6 +550,8 @@ function openChat(characterId, skin) {
   $('sendBtn').style.display = '';
   var ob = $('aiBtn');
   if (ob) ob.remove();
+  var fv = document.querySelector('#chatWindow .chat-footer');
+  if (fv) fv.style.visibility = ''; // 复位可能的残留隐藏（录音/语音预览中途被打断会卡住 footer，刷新才有）
   $('chatWindow').classList.add('open');
   var cs = $('chatSettings'); if (cs) cs.classList.remove('open'); // 进入聊天时确保设置面板已收起
   renderChat();
@@ -565,6 +567,8 @@ function closeChat() {
   exitMultiSelect();
   if (typeof stopSpeak === 'function') stopSpeak();
   $('sendBtn').style.display = '';
+  var ov = document.querySelector('#chatWindow .chat-footer');
+  if (ov) ov.style.visibility = '';
   var ob = $('aiBtn');
   if (ob) ob.remove();
   $('chatWindow').classList.remove('open');
