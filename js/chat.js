@@ -639,7 +639,7 @@ function renderChat() {
     if (msg.type === 'sticker') {
       const stickerSrc = msg.media && msg.media.src ? msg.media.src : '';
       const tick = isUser ? `<div class="read-tick">${msg.status === 'read' ? '已读' : '已发送'}</div>` : '';
-      return `${divider}<div class="msg ${isUser ? 'right' : 'left'}${multiCls(i)}" data-idx="${i}" oncontextmenu="event.preventDefault();onMsgRightClick(event,${i})" onclick="onMsgTap(event,${i})">${msgCheck(isUser, i)}${avCol(`<div class="avatar">${renderAvatar(av, nm)}</div>`)}${stickerSrc ? `<img src="${escapeHTML(stickerSrc)}" class="chat-sticker-img" alt="表情包" referrerpolicy="no-referrer" data-fb="${escapeHTML(msg.media.src || stickerSrc)}" onerror="stickerImgFallback(this)">` : ''}${tick}</div>`;
+      return `${divider}<div class="msg ${isUser ? 'right' : 'left'}${multiCls(i)}" data-idx="${i}" oncontextmenu="event.preventDefault();onMsgRightClick(event,${i})" onclick="onMsgTap(event,${i})">${msgCheck(isUser, i)}${avCol(`<div class="avatar">${renderAvatar(av, nm)}</div>`)}${stickerSrc ? `<img src="${escapeHTML(stickerSrc)}" class="chat-sticker-img" alt="表情包" referrerpolicy="no-referrer">` : ''}${tick}</div>`;
     }
     let mediaHtml = '';
     if (msg.media && msg.media.type === 'image') {

@@ -5466,16 +5466,6 @@ function _ensureStickerFields() {
   return changed;
 }
 
-function relayImgUrl(url) {
-  if (!url || url.indexOf('data:') === 0) return url;
-  var base = (typeof relayBase === 'function') ? relayBase() : '';
-  return (base || '') + '/relay?url=' + encodeURIComponent(url);
-}
-function stickerImgFallback(el) {
-  var u = el.getAttribute('data-fb');
-  if (u && el.src !== relayImgUrl(u)) { el.onerror = null; el.src = relayImgUrl(u); }
-}
-
 function renderEmojiPanel() {
   var panel = $('emojiPanel');
   if (!panel) return;
@@ -5488,7 +5478,7 @@ function renderEmojiPanel() {
     var gridHtml = stickers.length ? stickers.map(function (s) {
       var sel = stickerSelected.indexOf(s.id) > -1;
       return '<div class="sp-card' + (sel ? ' selected' : '') + '" onclick="toggleStickerSelect(\'' + s.id + '\')">' +
-        '<div class="sp-card-img"><img src="' + escapeHTML(s.image) + '" alt="' + escapeHTML(s.name) + '" referrerpolicy="no-referrer" data-fb="' + escapeHTML(s.src || s.image) + '" onerror="stickerImgFallback(this)"></div>' +
+        '<div class="sp-card-img"><img src="' + escapeHTML(s.image) + '" alt="' + escapeHTML(s.name) + '" referrerpolicy="no-referrer"></div>' +
         '<div class="sp-card-name">' + escapeHTML(s.name) + '</div>' +
         (sel ? '<div class="sp-sel-badge">✓</div>' : '') +
       '</div>';
@@ -5511,14 +5501,14 @@ function renderEmojiPanel() {
   for (var j = 0; j < stickers.length; j++) {
     var s = stickers[j];
     stHtml += '<div class="sp-card" data-cat="' + escapeHTML(s.category || '默认') + '" data-name="' + escapeHTML((s.name || '').toLowerCase()) + '" onclick="sendSticker(\'' + s.id + '\')">' +
-      '<div class="sp-card-img"><img src="' + escapeHTML(s.image) + '" alt="' + escapeHTML(s.name) + '" referrerpolicy="no-referrer" data-fb="' + escapeHTML(s.src || s.image) + '" onerror="stickerImgFallback(this)"></div>' +
+      '<div class="sp-card-img"><img src="' + escapeHTML(s.image) + '" alt="' + escapeHTML(s.name) + '" referrerpolicy="no-referrer"></div>' +
       '<div class="sp-card-name">' + escapeHTML(s.name) + '</div></div>';
   }
 
   panel.innerHTML =
     '<div class="sp-header">' +
       '<div class="sp-search"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#aaa" stroke-width="2.5"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/></svg><input id="stickerSearchInput" placeholder="搜寻贴图" oninput="filterStickerPanel()"></div>' +
-      '<button class="sp-action" onclick="showStickerImportDialog()">导入</button>' +
+      '<button class="sp-action" onclick="showStickerImportDialog(\'panel\')">导入</button>' +
       '<button class="sp-action" onclick="toggleStickerManage()">管理</button>' +
     '</div>' +
     '<div class="sticker-categories" id="stickerCategories">' + cats.map(function (c) {
@@ -5526,11 +5516,11 @@ function renderEmojiPanel() {
     }).join('') + '<button class="sticker-cat sp-add-folder" onclick="addStickerFolder()" title="新建表情包文件夹">＋</button>' +
     '</div>' +
     '<div class="sticker-panel-grid" id="stickerPanelGrid">' +
-      '<div class="sp-card sp-card-upload" onclick="showStickerImportDialog()">' +
-        '<div class="sp-card-img sp-upload-icon">+</div>' +
-        '<div class="sp-card-name">上传</div>' +
+      '<div class="sp-card sp-card-upload" onclick="showStickerImportDialog(\'panel\')">' +
+        '<div class="sp-card-img sp-upload-icon">＋</div>' +
+        '<div class="sp-card-name">导入</div>' +
       '</div>' +
-      (stHtml || '<div style="grid-column:1/-1;text-align:center;color:#ccc;font-size:12px;padding:20px 0">还没有贴图<br>点 + 上传或导入</div>') +
+      (stHtml || '<div style="grid-column:1/-1;text-align:center;color:#ccc;font-size:12px;padding:20px 0">还没有贴图<br>点上方 ＋ 导入</div>') +
     '</div>';
   applyStickerCatFilter();
 }
@@ -5764,183 +5754,14 @@ function filterStickerPanel() {
   var search = ($('stickerSearchInput') || {}).value || '';
   var searchLower = search.toLowerCase();
   var cat = currentStickerCat || '默认';
-  var cards = document.querySelectorAll('#stickerPanelGrid .sp-card:not(.sp-card-upload)');
+  var cards = document.querySelectorAll('#stickerPanelGrid .sp-card');
   for (var i = 0; i < cards.length; i++) {
     var card = cards[i];
+    if (card.classList.contains('sp-card-upload')) continue;
     var matchCat = (card.getAttribute('data-cat') === cat);
     var matchSearch = !searchLower || (card.getAttribute('data-name') || '').indexOf(searchLower) > -1;
     card.style.display = (matchCat && matchSearch) ? '' : 'none';
   }
-}
-
-function showStickerImportDialog() {
-  var overlay = document.createElement('div');
-  overlay.className = 'sticker-import-overlay active';
-  overlay.id = 'stickerImportOverlay';
-  overlay.onclick = function (e) { if (e.target === overlay) overlay.remove(); };
-  overlay.innerHTML =
-    '<div class="sticker-import-sheet" onclick="event.stopPropagation()">' +
-      '<h3>导入贴图</h3>' +
-      '<p style="font-size:12px;color:#999;margin:0 0 12px">每行：名字：图片链接（名字可留空）。会放进当前所在的文件夹。</p>' +
-      '<textarea id="stickerImportUrls" rows="8" placeholder="小猫：https://example.com/s1.png&#10;小狗：https://example.com/s2.png&#10;https://example.com/s3.png"></textarea>' +
-      '<div class="sticker-import-actions">' +
-        '<button class="btn-cancel" onclick="document.getElementById(\'stickerImportOverlay\').remove()">取消</button>' +
-        '<button class="btn-cancel" onclick="refreshAllStickerImages()">刷新图片</button>' +
-        '<button class="btn-primary" onclick="doImportStickers()">导入</button>' +
-      '</div>' +
-    '</div>';
-  document.body.appendChild(overlay);
-}
-
-async function doImportStickers() {
-  var ta = $('stickerImportUrls');
-  if (!ta) return;
-  var folderInput = $('stickerImportFolder');
-  var folder = (folderInput ? folderInput.value : '').trim();
-  // 留空 → 放进当前所在文件夹；在「默认」里留空就进「默认」文件夹
-  if (!folder) folder = (currentStickerCat && currentStickerCat !== '默认') ? currentStickerCat : '默认';
-  var lines = ta.value.split('\n').map(function (l) { return l.trim(); }).filter(function (l) { return l.length > 0; });
-  if (!lines.length) { alert('请输入内容'); return; }
-  if (!state.customStickers) state.customStickers = [];
-  if (!state.stickerFolders) state.stickerFolders = [];
-  if (folder !== '默认' && state.stickerFolders.indexOf(folder) === -1) state.stickerFolders.push(folder);
-  // 重复识别：按链接(src/image)或名字判断，避免重复添加
-  function normUrl(u) {
-    if (!u) return '';
-    u = String(u).trim();
-    if (u.indexOf('data:') === 0) return u;
-    return u.replace(/\?.*$/, '').replace(/\/$/, '').toLowerCase();
-  }
-  function normName(n) { return (n || '').trim().toLowerCase(); }
-  var seenImg = {}, seenName = {};
-  var exist = state.customStickers || [];
-  for (var k = 0; k < exist.length; k++) {
-    var ex = exist[k];
-    if (ex.image) seenImg[normUrl(ex.image)] = true;
-    if (ex.src) seenImg[normUrl(ex.src)] = true;
-    if (ex.name) seenName[normName(ex.name)] = true;
-  }
-  var count = 0, skipped = 0, failCount = 0, firstErr = '';
-  // 整批放进同一个文件夹；每行「名字：图片链接」的名字只是该贴图的标签，不会变成文件夹
-  for (var i = 0; i < lines.length; i++) {
-    var line = lines[i];
-    var m = /^(.+?)[：:]\s*(https?:\/\/\S+|data:image\/\S+)\s*$/.exec(line);
-    var name, url;
-    if (m) {
-      name = m[1].trim();
-      url = m[2].trim();
-    } else if (/^https?:\/\//i.test(line) || line.indexOf('data:') === 0) {
-      name = '';
-      url = line;
-    } else {
-      continue;
-    }
-    var u = normUrl(url), n = normName(name);
-    if ((u && seenImg[u]) || (n && seenName[n])) { skipped++; continue; }
-    // 尽量把图片抓下来内嵌成 base64，避免图床防盗链导致不显示；失败则保留原链接
-    var imgRes = await fetchImageAsDataUrl(url);
-    var finalImg;
-    if (imgRes.data) {
-      finalImg = imgRes.data;
-    } else {
-      failCount++;
-      if (!firstErr) firstErr = imgRes.error;
-      finalImg = url;
-    }
-    var fu = normUrl(finalImg);
-    // 抓下来后再次比对：已抓取成 base64 的旧图，重新粘贴同一链接也能识别为重复
-    if ((fu && seenImg[fu]) || (u && seenImg[u]) || (n && seenName[n])) { skipped++; continue; }
-    state.customStickers.push({
-      id: 'stk-' + Date.now() + '-' + count,
-      image: finalImg,
-      src: url,
-      name: name,
-      meaning: '',
-      category: folder,
-      pack: folder,
-      date: new Date().toLocaleString()
-    });
-    count++;
-    if (u) seenImg[u] = true;
-    if (fu) seenImg[fu] = true;
-    if (n) seenName[n] = true;
-  }
-  if (count === 0) {
-    if (failCount > 0) {
-      alert('图片一张都没抓下来（' + failCount + ' 张失败）。\n' + (firstErr || '') + '\n\n本地能显示、Render 不显示，通常是图床屏蔽了 Render 服务器的 IP。\n解决办法：去设置里填一个「外置转发代理地址」（把 sever/ 部署到你自己的服务器或能访问图床的地方），所有抓取就走那个代理。');
-    } else if (skipped > 0) {
-      alert('识别到 ' + skipped + ' 张重复，实际导入 0 张');
-    } else {
-      alert('没看出有效的「名字：图片链接」哦\n每行格式：名字：图片链接\n例如：小猫：https://example.com/s1.png');
-    }
-    return;
-  }
-  if (failCount > 0 && window.uiToast) {
-    uiToast(failCount + ' 张抓取失败（服务可能还在冷启动），已用原链接兜底，可点「刷新图片」再试');
-  }
-  saveState();
-  if (window.uiToast) {
-    if (skipped > 0) uiToast('识别到 ' + skipped + ' 张重复，实际导入 ' + count + ' 张');
-    else uiToast('成功导入 ' + count + ' 张');
-  }
-  var overlay = $('stickerImportOverlay');
-  if (overlay) overlay.remove();
-  renderEmojiPanel();
-}
-
-// 经 /relay 代理抓取图片并转成 data URL（规避图床防盗链与跨域）
-// 成功返回 { data: 'data:...' }；失败返回 { error: '原因' }
-// 自动重试：免费托管（Render 等）实例休眠后冷启动会短暂 401/502/连接关闭，重试几次加递增等待，几乎都能等到服务苏醒
-async function fetchImageAsDataUrl(url) {
-  if (url.indexOf('data:') === 0) return { data: url };
-  var delay = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
-  var tries = 3;
-  for (var i = 0; i < tries; i++) {
-    if (i > 0) await delay((i === 1 ? 2500 : 2500) + i * 1500);
-    try {
-      var res = await aiRequest(url, { method: 'GET' });
-      if (!res.ok) {
-        // 冷启动暂态错误（401/502/503/429）→ 重试；其余报错直接返回
-        if (res.status === 401 || res.status === 502 || res.status === 503 || res.status === 429 || res.status === 404) {
-          if (i < tries - 1) continue;
-        }
-        return { error: 'relay 返回 ' + res.status + '（图床可能屏蔽了服务器 IP）' };
-      }
-      var blob = await res.blob();
-      if (!blob || !blob.size) {
-        if (i < tries - 1) continue;
-        return { error: 'relay 返回了空内容' };
-      }
-      var data = await new Promise(function (resolve, reject) {
-        var reader = new FileReader();
-        reader.onload = function () { resolve(reader.result); };
-        reader.onerror = function () { reject(new Error('读取图片失败')); };
-        reader.readAsDataURL(blob);
-      });
-      return { data: data };
-    } catch (e) {
-      if (i < tries - 1) continue;
-      return { error: '抓取失败：' + (e && e.message ? e.message : String(e)) };
-    }
-  }
-  return { error: '抓取失败（重试后仍然失败）' };
-}
-
-// 用修好的 /relay（已禁用缓存）重新抓取所有贴图图片，修复之前被缓存成同一张的错误
-async function refreshAllStickerImages() {
-  var arr = state.customStickers || [];
-  if (!arr.length) { if (window.uiToast) uiToast('还没有表情包'); return; }
-  var done = 0;
-  for (var i = 0; i < arr.length; i++) {
-    var s = arr[i];
-    var url = s.src || (typeof s.image === 'string' && /^https?:\/\//i.test(s.image) ? s.image : '');
-    if (!url) continue;
-    var imgRes = await fetchImageAsDataUrl(url);
-    if (imgRes.data) { s.image = imgRes.data; done++; }
-  }
-  saveState();
-  if (window.uiToast) uiToast('已刷新 ' + done + ' 张图片');
-  renderEmojiPanel();
 }
 
 function sendSticker(id) {
@@ -5952,26 +5773,348 @@ function sendSticker(id) {
 
 function renderStickerManager() {
   setTitle('表情包');
+  _ensureStickerFields();
   const stickers = state.customStickers || [];
-  c().innerHTML = `
-    <div class="sticker-mgr-page">
-      <div class="header">
-        <h2>📦 表情包</h2>
-        <button class="add-btn" onclick="openStickerForm()">＋ 添加</button>
-      </div>
-      ${stickers.length ? stickers.map(s => `
-        <div class="card">
-          <div class="preview"><img src="${escapeHTML(s.image)}"></div>
-          <div class="info">
-            <div class="name">${escapeHTML(s.name)}</div>
-            <div class="meaning">${escapeHTML(s.meaning || '无含义')}</div>
-          </div>
-          <div class="actions">
-            <button class="edit" onclick="openStickerForm('${s.id}')">编辑</button>
-            <button class="del" onclick="deleteSticker('${s.id}')">删除</button>
-          </div>
-        </div>`).join('') : '<div style="text-align:center;color:#ccc;padding:40px 0;font-size:14px">还没有表情包<br><span style="font-size:12px">点右上角 ＋ 添加</span></div>'}
-    </div>`;
+  const folders = (state.stickerFolders || []).filter(function (f) { return f !== '默认'; });
+  const cats = ['默认'].concat(folders);
+  const cur = currentStickerCat || '默认';
+  const list = stickers.filter(function (s) { return (s.category || '默认') === cur; });
+  const card = function (s) {
+    return '<div class="sm-card" onclick="openStickerForm(\'' + s.id + '\')">' +
+      '<div class="sm-card-img"><img src="' + escapeHTML(s.image) + '" alt="' + escapeHTML(s.name) + '" referrerpolicy="no-referrer" loading="lazy"></div>' +
+      '<div class="sm-card-name">' + escapeHTML(s.name) + '</div>' +
+    '</div>';
+  };
+  const catBtn = function (c) {
+    return '<button class="sticker-cat' + (c === cur ? ' active' : '') + '" onclick="switchStickerCat(\'' + escapeHTML(c) + '\')">' + escapeHTML(c) + '</button>';
+  };
+  c().innerHTML =
+    '<div class="sticker-mgr-page">' +
+      '<div class="header">' +
+        '<h2>📦 表情包</h2>' +
+        '<div class="header-actions">' +
+          '<button class="add-btn" onclick="showStickerImportDialog()">导入</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="sticker-categories" id="stickerMgrCategories">' + cats.map(catBtn).join('') + '</div>' +
+      '<div class="sm-grid" id="stickerMgrGrid">' +
+        (list.length ? list.map(card).join('') :
+          '<div style="grid-column:1/-1;text-align:center;color:#ccc;padding:40px 0;font-size:14px">这个文件夹还没有表情包<br><span style="font-size:12px">点右上角 ＋ 导入</span></div>') +
+      '</div>' +
+    '</div>';
+}
+
+// ===== 统一导入弹层（管理页 / 表情面板共用）：本地上传 + URL 导入 =====
+var stickerImportSrc = 'mgr';
+function showStickerImportDialog(from) {
+  stickerImportSrc = (from === 'panel') ? 'panel' : 'mgr';
+  var overlay = document.createElement('div');
+  overlay.className = 'sticker-import-overlay active';
+  overlay.id = 'stickerImportOverlay';
+  overlay.onclick = function (e) { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML =
+    '<div class="sticker-import-sheet" onclick="event.stopPropagation()">' +
+      '<h3>导入表情包</h3>' +
+      '<div>' +
+        '<button type="button" class="btn-local" onclick="closeStickerImport();batchUploadStickerFiles(\'' + stickerImportSrc + '\')">📁 从本机选择图片</button>' +
+        '<div style="font-size:11px;color:#999;margin-top:4px">支持多选，自动压缩后存到当前文件夹</div>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:8px;margin:14px 0;">' +
+        '<span style="flex:1;height:1px;background:#eee"></span>' +
+        '<span style="font-size:12px;color:#bbb">或</span>' +
+        '<span style="flex:1;height:1px;background:#eee"></span>' +
+      '</div>' +
+      '<p style="font-size:12px;color:#999;margin:0 0 10px">URL 导入：每行一个：名字：图片链接（名字可留空）。抓取后存成 base64 内嵌。<br>本地 file:// 打开没部署后端时，会自动走公共 CORS 代理抓图（需联网）。</p>' +
+      '<textarea id="stickerImportUrls" rows="5" placeholder="小猫：https://example.com/s1.png&#10;小狗：https://example.com/s2.png&#10;https://example.com/s3.png"></textarea>' +
+      '<div id="stickerImportStatus" style="font-size:12px;color:#c0b0a0;margin-top:10px;min-height:16px;word-break:break-all"></div>' +
+      '<div class="sticker-import-actions">' +
+        '<button class="btn-cancel" onclick="closeStickerImport()">取消</button>' +
+        '<button class="btn-primary" id="stickerImportBtn" onclick="doImportStickers()">导入</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+}
+
+function closeStickerImport() {
+  var o = document.getElementById('stickerImportOverlay');
+  if (o) o.remove();
+}
+
+async function doImportStickers() {
+  var ta = $('stickerImportUrls');
+  if (!ta) return;
+  var btn = $('stickerImportBtn');
+  var statusEl = $('stickerImportStatus');
+  function setStatus(msg) { if (statusEl) statusEl.textContent = msg; }
+  function toast(msg) { if (window.uiToast) uiToast(msg); else alert(msg); }
+  if (btn) { btn.disabled = true; btn.textContent = '导入中…'; }
+  setStatus('');
+  var folder = (currentStickerCat || '默认');
+  if (!state.stickerFolders) state.stickerFolders = [];
+  if (folder !== '默认' && state.stickerFolders.indexOf(folder) === -1) state.stickerFolders.push(folder);
+  var lines = ta.value.split('\n').map(function (l) { return l.trim(); }).filter(function (l) { return l.length > 0; });
+  if (!lines.length) { if (btn) { btn.disabled = false; btn.textContent = '导入'; } toast('请输入至少一行 URL'); return; }
+  if (!state.customStickers) state.customStickers = [];
+  var seen = {};
+  (state.customStickers).forEach(function (s) {
+    if (s.image) seen[s.image] = true;
+    if (s.src) seen[s.src] = true;
+  });
+  var count = 0, linked = 0, fail = 0, skip = 0, firstErr = '', doneCnt = 0;
+  var inflight = {}, nextIdx = 0, total = lines.length;
+  async function worker() {
+    while (nextIdx < total) {
+      var i = nextIdx++;
+      var line = lines[i];
+      setStatus('抓取 ' + (doneCnt + 1) + '/' + total + '：' + line);
+      var m = /^(.+?)[：:]\s*(https?:\/\/\S+)\s*$/.exec(line);
+      var name = '', url = '';
+      if (m) { name = m[1].trim(); url = m[2].trim(); }
+      else if (/^https?:\/\//i.test(line)) { url = line.trim(); }
+      else { fail++; if (!firstErr) firstErr = '无法识别的行：' + line; doneCnt++; continue; }
+      if (seen[url] || inflight[url]) { skip++; doneCnt++; continue; }
+      inflight[url] = true;
+      var res;
+      try { res = await relayFetchImage(url); }
+      catch (e) { res = { error: (e && e.message ? e.message : String(e)) }; }
+      var finalImg = res.data;
+      if (!finalImg) {
+        // 拿不到 base64：只有确认外链真能显示才存为外链，否则按失败处理，不留裂图
+        var viewable = await testImageDecode(url);
+        if (!viewable) { fail++; if (!firstErr) firstErr = res.error || '无法抓取图片'; doneCnt++; continue; }
+        finalImg = url;
+      } else if (seen[finalImg]) { skip++; doneCnt++; continue; }
+      state.customStickers.push({
+        id: 'stk-' + Date.now() + '-' + i + '-' + (Math.random() * 1e6 | 0),
+        image: finalImg,
+        src: url,
+        name: name || ('表情 ' + (i + 1)),
+        meaning: '',
+        category: folder,
+        pack: folder,
+        date: new Date().toLocaleString()
+      });
+      if (res.data) { count++; seen[res.data] = true; }
+      else { linked++; if (!firstErr) firstErr = res.error || '抓取失败'; }
+      seen[url] = true;
+      doneCnt++;
+    }
+  }
+  if (total > 0) await Promise.all([worker(), worker()]);
+  if (btn) { btn.disabled = false; btn.textContent = '导入'; }
+  saveState();
+  setStatus('');
+  var overlay = $('stickerImportOverlay');
+  if (overlay) overlay.remove();
+  renderStickerManager();
+  renderEmojiPanel();
+  var msgs = [];
+  if (count > 0) msgs.push('成功导入 ' + count + ' 张');
+  if (linked > 0) msgs.push(linked + ' 张无法抓成本地图（已存为外链，在线且允许外链时才能显示）');
+  if (fail > 0) msgs.push('失败 ' + fail + ' 张（' + (firstErr || '无法识别') + '）');
+  if (skip > 0) msgs.push('跳过重复 ' + skip + ' 张');
+  if (msgs.length) toast(msgs.join('；'));
+  else toast('没有可导入的内容');
+}
+
+// 带超时的抓取：防止某个代理卡住无限等（AbortController 中止后必须取消定时器）
+function fetchWithTimeout(url, opts, ms) {
+  var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+  var timer = ctrl ? setTimeout(function () { try { ctrl.abort(); } catch (e) {} }, ms) : null;
+  var p;
+  try { p = Promise.resolve(aiRequest(url, Object.assign({}, opts, ctrl ? { signal: ctrl.signal } : {}))); }
+  catch (e) { p = Promise.reject(e); }
+  return p.then(function (r) { if (timer) clearTimeout(timer); return r; },
+                 function (e) { if (timer) clearTimeout(timer); throw e; });
+}
+function fetchErrMsg(e) {
+  if (e && e.name === 'AbortError') return '抓取超时';
+  return (e && e.message ? e.message : String(e));
+}
+
+// 经 /relay 转发抓图；无 /relay 时仅同源值得直连；跨域被拦（file:// / 静态托管）直接回退公共 CORS 代理。
+// 成功返回 {data: 压缩后 base64}，失败返回 {error}
+async function relayFetchImage(url, tries) {
+  var lastErr = '';
+  var sameOrigin = false;
+  try { sameOrigin = new URL(url).origin === location.origin; } catch (e) {}
+  var relayOn = false;
+  try { relayOn = await relayAvailable(); } catch (e) {}
+  var canDirect = relayOn || sameOrigin;
+  if (!canDirect) {
+    lastErr = (location.protocol === 'file:')
+      ? '本地 file:// 直连跨域图会被浏览器拦截，已改走公共 CORS 代理'
+      : '跨域图被浏览器拦截，已改走公共 CORS 代理';
+  } else {
+    var maxTries = tries || (relayOn ? 3 : 1);
+    for (var i = 0; i < maxTries; i++) {
+      if (i > 0) await new Promise(function (r) { setTimeout(r, 900 + i * 600); });
+      try {
+        var res = await fetchWithTimeout(url, { method: 'GET' }, 20000);
+        if (res.ok) {
+          var data = await blobToStickerDataUrl(await res.blob());
+          if (data) return { data: data };
+          lastErr = '图片为空';
+        } else {
+          var st = res.status;
+          if (st === 0) { lastErr = '跨域被浏览器拦截'; break; }
+          if (st === 401 || st === 502 || st === 503 || st === 429) { lastErr = '中转暂时不可用(status ' + st + ')'; continue; }
+          lastErr = '抓取返回 status ' + st; break;
+        }
+      } catch (e) {
+        lastErr = fetchErrMsg(e);
+        if (!relayOn) break; // 同源直连失败没有重试意义
+      }
+    }
+  }
+  // 兜底：公共 CORS 代理逐个试（这些代理带 Access-Control-Allow-Origin: *，浏览器能读回字节）
+  if (/^https?:\/\//i.test(url)) {
+    var proxies = ['https://api.allorigins.win/raw?url=', 'https://images.weserv.nl/?url=', 'https://corsproxy.io/?url='];
+    for (var j = 0; j < proxies.length; j++) {
+      try {
+        var proxyUrl = proxies[j] + encodeURIComponent(url);
+        res = await fetchWithTimeout(proxyUrl, { method: 'GET' }, 15000);
+        if (!res.ok) { lastErr = '代理返回 status ' + res.status; continue; }
+        var d2 = await blobToStickerDataUrl(await res.blob());
+        if (d2) return { data: d2 };
+      } catch (e) {
+        lastErr = fetchErrMsg(e);
+      }
+    }
+  }
+  return { error: lastErr || '无法抓取图片' };
+}
+
+// relay/代理抓回的 blob → 可直接显示的 dataURL：
+// 小图（≤300KB）原样保存原始字节（保留 GIF 动画/原格式，不再经 canvas 重编码）；
+// 大图才压到 512px，避免撑爆 localStorage。无法解码的图视为无效。
+function blobToStickerDataUrl(blob) {
+  return new Promise(function (resolve) {
+    if (!blob || !blob.size) { resolve(''); return; }
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+      var data = ev.target.result;
+      if (!/^data:image\//i.test(data)) {
+        data = data.replace(/^data:[^;]*/, 'data:image/png'); // 代理没给对 content-type：按图片前缀重打，靠浏览器魔数嗅探解码
+      }
+      testImageDecode(data).then(function (ok) {
+        if (!ok) { resolve(''); return; }
+        var bytes = Math.floor((data.length - 22) * 0.75); // base64 → 字节数近似
+        if (bytes <= 300000) { resolve(data); return; }
+        try {
+          var bb = new Blob([blob], { type: mimeOfDataUrl(data) });
+          localFileToDataUrl(bb, 512, 0.78).then(function (small) { resolve(small || data); });
+        } catch (e) { resolve(data); }
+      });
+    };
+    reader.onerror = function () { resolve(''); };
+    reader.readAsDataURL(blob);
+  });
+}
+
+// 从 dataURL 里取 MIME（缺省 image/png）
+function mimeOfDataUrl(data) {
+  var m = /^data:([^;,]+)/.exec(data);
+  return m ? m[1] : 'image/png';
+}
+
+// 校验一段 dataURL 或外链 URL 真能被浏览器显示（图片加载成功且非空白），返回 Promise<boolean>
+function testImageDecode(dataOrUrl) {
+  return new Promise(function (resolve) {
+    var img = new Image();
+    img.onload = function () { resolve(img.naturalWidth > 0 && img.naturalHeight > 0); };
+    img.onerror = function () { resolve(false); };
+    try { img.referrerPolicy = 'no-referrer'; } catch (e) {}
+    img.src = dataOrUrl;
+  });
+}
+
+function switchStickerCat(cat) {
+  currentStickerCat = cat;
+  renderStickerManager();
+}
+
+// 点批量上传 → 触发本地多选文件选择。from: 'mgr'=管理页 / 'panel'=表情面板
+// 上传完成后只刷新对应界面，避免从面板上传却被切到管理页
+function batchUploadStickerFiles(from) {
+  var input = document.getElementById('stickerBatchFileInput');
+  if (!input) {
+    input = document.createElement('input');
+    input.type = 'file';
+    input.id = 'stickerBatchFileInput';
+    input.accept = 'image/*';
+    input.multiple = true;
+    input.style.display = 'none';
+    input.addEventListener('change', handleStickerBatchFiles);
+    document.body.appendChild(input);
+  }
+  input._from = (from === 'panel') ? 'panel' : 'mgr';
+  input.value = '';
+  input.click();
+}
+
+// 批量处理选中的本地图片：压缩 → 文件名命名 → 加入当前文件夹
+async function handleStickerBatchFiles(e) {
+  var files = Array.prototype.slice.call(e.target.files || []);
+  if (!files.length) return;
+  var from = e.target._from || 'mgr';
+  var folder = (currentStickerCat || '默认');
+  var ok = 0, fail = 0;
+  if (window.uiToast) uiToast('正在处理 ' + files.length + ' 张…');
+  for (var i = 0; i < files.length; i++) {
+    var f = files[i];
+    var dataUrl = await localFileToDataUrl(f, 512, 0.75);
+    if (!dataUrl) { fail++; continue; }
+    var base = (f.name || '').replace(/\.[^.]+$/, '').trim() || ('表情 ' + (Date.now() + i));
+    if (!state.customStickers) state.customStickers = [];
+    state.customStickers.push({
+      id: 'stk-' + Date.now() + '-' + i + '-' + (Math.random() * 1e6 | 0),
+      image: dataUrl,
+      src: '',
+      name: base,
+      meaning: '',
+      category: folder,
+      pack: folder,
+      date: new Date().toLocaleString()
+    });
+    ok++;
+  }
+  saveState();
+  if (window.uiToast) uiToast(ok ? ('已添加 ' + ok + ' 张' + (fail ? '，' + fail + ' 张失败' : '')) : '添加失败');
+  if (from === 'panel') {
+    renderEmojiPanel();
+  } else {
+    renderStickerManager();
+  }
+}
+
+// 本地图片文件 → 压缩后的 data URL（不依赖任何网络/服务器）
+function localFileToDataUrl(file, maxSize, quality) {
+  return new Promise(function (resolve) {
+    if (!file || !/^image\//i.test(file.type)) { resolve(null); return; }
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+      var img = new Image();
+      img.onload = function () {
+        var w = img.width, h = img.height;
+        if (w > maxSize || h > maxSize) {
+          if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
+          else { w = Math.round(w * maxSize / h); h = maxSize; }
+        }
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        var type = (file.type === 'image/png' || file.type === 'image/gif') ? file.type : 'image/jpeg';
+        var out;
+        try { out = canvas.toDataURL(type, quality); } catch (err) { out = ''; }
+        resolve(out || null);
+      };
+      img.onerror = function () { resolve(null); };
+      img.src = ev.target.result;
+    };
+    reader.onerror = function () { resolve(null); };
+    reader.readAsDataURL(file);
+  });
 }
 
 function openStickerForm(id) {
@@ -5981,23 +6124,39 @@ function openStickerForm(id) {
   overlay.className = 'sticker-form-overlay active';
   overlay.id = 'stickerFormOverlay';
   overlay.onclick = e => { if (e.target === overlay) closeStickerForm(); };
+  const folders = (state.stickerFolders || []).filter(function (f) { return f !== '默认'; });
+  const cats = ['默认'].concat(folders);
+  const selCat = (s && s.category) || currentStickerCat || '默认';
   overlay.innerHTML = `
     <div class="sticker-form-sheet" onclick="event.stopPropagation()">
       <h3>${s ? '编辑表情包' : '添加表情包'}</h3>
       <label>图片</label>
-      <div class="upload-area" id="stickerUploadArea" onclick="document.getElementById('stickerFileInput').click()">${s ? `<img src="${escapeHTML(s.image)}">` : '＋'}</div>
+      <div class="sticker-upload-big" id="stickerUploadArea" onclick="document.getElementById('stickerFileInput').click()">${s ? `<img src="${escapeHTML(s.image)}">` : '＋'}</div>
       <input type="file" id="stickerFileInput" accept="image/*" style="display:none" onchange="stickerPickImage(event)">
       <input type="hidden" id="stickerImageVal" value="${s ? escapeHTML(s.image) : ''}">
       <label>名称</label>
       <input id="stickerName" placeholder="给表情包取个名字" value="${s ? escapeHTML(s.name) : ''}">
       <label>含义说明（可选）</label>
       <textarea id="stickerMeaning" placeholder="这个表情表达什么含义？">${s ? escapeHTML(s.meaning || '') : ''}</textarea>
+      <label>文件夹</label>
+      <div class="sticker-form-cats">${cats.map(function (c) {
+        return '<button type="button" class="sticker-cat' + (c === selCat ? ' active' : '') + '" onclick="pickEditStickerCat(this, \'' + escapeHTML(c) + '\')">' + escapeHTML(c) + '</button>';
+      }).join('')}</div>
+      <input type="hidden" id="stickerCatVal" value="${escapeHTML(selCat)}">
       <div class="actions">
+        ${s ? '<button class="del" onclick="deleteSticker(\'' + s.id + '\')">删除</button>' : ''}
         <button class="cancel" onclick="closeStickerForm()">取消</button>
         <button class="save" onclick="saveStickerForm()">保存</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);
+}
+
+// 编辑弹层里选择文件夹
+function pickEditStickerCat(btn, cat) {
+  document.getElementById('stickerCatVal').value = cat;
+  var all = document.querySelectorAll('#stickerFormOverlay .sticker-form-cats .sticker-cat');
+  for (var i = 0; i < all.length; i++) all[i].classList.toggle('active', all[i] === btn);
 }
 
 function closeStickerForm() {
@@ -6009,26 +6168,11 @@ function closeStickerForm() {
 function stickerPickImage(event) {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const max = 150;
-      let w = img.width, h = img.height;
-      if (w > max || h > max) {
-        if (w > h) { h = Math.round(h * max / w); w = max; }
-        else { w = Math.round(w * max / h); h = max; }
-      }
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
-      document.getElementById('stickerImageVal').value = dataUrl;
-      document.getElementById('stickerUploadArea').innerHTML = '<img src="' + dataUrl + '">';
-    };
-    img.src = e.target.result;
-  };
-  reader.readAsDataURL(file);
+  localFileToDataUrl(file, 512, 0.75).then(dataUrl => {
+    if (!dataUrl) { if (window.uiToast) uiToast('图片处理失败'); return; }
+    document.getElementById('stickerImageVal').value = dataUrl;
+    document.getElementById('stickerUploadArea').innerHTML = '<img src="' + dataUrl + '">';
+  });
   event.target.value = '';
 }
 
@@ -6036,14 +6180,18 @@ function saveStickerForm() {
   const image = document.getElementById('stickerImageVal').value.trim();
   const name = document.getElementById('stickerName').value.trim();
   const meaning = document.getElementById('stickerMeaning').value.trim();
+  const cat = document.getElementById('stickerCatVal').value.trim() || currentStickerCat || '默认';
   if (!image) { alert('请选择图片'); return; }
   if (!name) { alert('请输入名称'); return; }
   if (stickerFormMode) {
     const s = state.customStickers.find(x => x.id === stickerFormMode);
-    if (s) { s.image = image; s.name = name; s.meaning = meaning; }
+    if (s) { s.image = image; s.name = name; s.meaning = meaning; s.category = cat; s.pack = cat; }
   } else {
-    state.customStickers.push({ id: 'stk-' + Date.now(), image, name, meaning, date: new Date().toLocaleString() });
+    if (!state.customStickers) state.customStickers = [];
+    state.customStickers.push({ id: 'stk-' + Date.now(), image, name, meaning, category: cat, pack: cat, date: new Date().toLocaleString() });
   }
+  if (cat !== '默认' && (state.stickerFolders || []).indexOf(cat) === -1) state.stickerFolders.push(cat);
+  currentStickerCat = cat;
   closeStickerForm();
   saveState();
   renderStickerManager();
@@ -6053,6 +6201,7 @@ function saveStickerForm() {
 async function deleteSticker(id) {
   if (!await uiConfirm('删除这个表情包？')) return;
   state.customStickers = state.customStickers.filter(s => s.id !== id);
+  closeStickerForm();
   saveState();
   renderStickerManager();
   renderEmojiPanel();
