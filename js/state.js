@@ -536,16 +536,17 @@ function relayBase() {
 function relayAvailable() {
   if (__relayProbe !== null) return Promise.resolve(__relayProbe);
   if ((typeof location === 'undefined') || location.protocol === 'file:') {
-    if (!relayBase()) {
-      __relayProbe = false;
-      return Promise.resolve(false);
-    }
+    __relayProbe = false;
+    return Promise.resolve(false);
   }
   var base = relayBase();
-  var probeUrl = base ? (base + '/relay-probe') : '/relay-probe';
-  __relayProbe = fetch(probeUrl, { method: 'HEAD' })
-    .then(function (r) { return r.ok || r.status === 204; })
-    .catch(function () { return false; });
+  if (!base) { __relayProbe = false; return Promise.resolve(false); }
+  var probeUrl = base + '/relay-probe&_t=' + Date.now();
+  var ctrl = new AbortController();
+  var timer = setTimeout(function () { try { ctrl.abort(); } catch (e) {} }, 5000);
+  __relayProbe = fetch(probeUrl, { method: 'HEAD', mode: 'no-cors', signal: ctrl.signal, cache: 'no-store' })
+    .then(function (r) { clearTimeout(timer); return r.ok || r.status === 204; })
+    .catch(function () { clearTimeout(timer); return false; });
   return __relayProbe;
 }
 function secondaryApiConfig() {

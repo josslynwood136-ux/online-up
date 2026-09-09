@@ -3427,7 +3427,7 @@ async function clearHistory() {
 
 // ===== 面板控制 =====
 function toggleMore() { togglePanel('morePanel'); }
-function toggleEmoji() { togglePanel('emojiPanel'); }
+function toggleEmoji() { renderEmojiPanel(); togglePanel('emojiPanel'); }
 
 // ===== 快捷操作 =====
 function sendRed() {

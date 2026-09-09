@@ -35,7 +35,9 @@ const app = express()
 app.use(function (req, res, next) {
   res.set('Access-Control-Allow-Origin', '*')
   res.set('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
-  res.set('Access-Control-Allow-Headers', 'Content-Type,Origin,Cookie')
+  // x-relay-target / x-relay-method 是前端走 /relay（URL 抓图、AI 转发）时的自定义头，
+  // 必须允许，否则配置跨域「外置转发地址」时浏览器 preflight 会拦截
+  res.set('Access-Control-Allow-Headers', 'Content-Type,Origin,Cookie,x-relay-target,x-relay-method')
   if (req.method === 'OPTIONS') return res.status(204).end()
   next()
 })
@@ -291,10 +293,14 @@ app.use('/relay', function (req, res) {
     res.writeHead(pr.statusCode, outHeaders)
     pr.pipe(res)
   })
+  // 上游 30s 无响应就断开，避免卡死连接（前端一般 20s 内已中止）
+  proxy.setTimeout(30000, function () { proxy.destroy(new Error('upstream timeout')) })
   proxy.on('error', function () {
     if (!res.headersSent) res.status(502).json({ code: 502, msg: '目标服务暂时不可用' })
     else res.end()
   })
+  // 客户端提前取消（如前端抓图超时）时同步销毁上游连接
+  req.on('close', function () { proxy.destroy() })
   req.pipe(proxy)
 })
 

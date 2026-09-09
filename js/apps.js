@@ -5458,11 +5458,11 @@ function _ensureStickerFields() {
     if (!arr[i].category) { arr[i].category = '默认'; changed = true; }
     if (!arr[i].pack) { arr[i].pack = arr[i].category; changed = true; }
   }
-  // 「默认」是固定默认文件夹，不应出现在文件夹列表里（否则会重复）
   if (state.stickerFolders && state.stickerFolders.indexOf('默认') > -1) {
     state.stickerFolders = state.stickerFolders.filter(function (f) { return f !== '默认'; });
     changed = true;
   }
+  if (changed) saveState();
   return changed;
 }
 
@@ -5773,6 +5773,8 @@ function sendSticker(id) {
 
 function renderStickerManager() {
   setTitle('表情包');
+  stickerManageMode = false;
+  stickerSelected = [];
   _ensureStickerFields();
   const stickers = state.customStickers || [];
   const folders = (state.stickerFolders || []).filter(function (f) { return f !== '默认'; });
@@ -5807,6 +5809,12 @@ function renderStickerManager() {
 // ===== 统一导入弹层（管理页 / 表情面板共用）：本地上传 + URL 导入 =====
 var stickerImportSrc = 'mgr';
 function showStickerImportDialog(from) {
+  var o;
+  if (o = document.getElementById('stickerImportOverlay')) o.remove();
+  if (o = document.getElementById('stickerFormOverlay')) o.remove();
+  if (o = document.getElementById('stickerFolderPicker')) o.remove();
+  if (o = document.getElementById('stickerFolderDeletePicker')) o.remove();
+  if (o = document.getElementById('folderActionMenu')) o.remove();
   stickerImportSrc = (from === 'panel') ? 'panel' : 'mgr';
   var overlay = document.createElement('div');
   overlay.className = 'sticker-import-overlay active';
@@ -5872,19 +5880,15 @@ async function doImportStickers() {
       if (m) { name = m[1].trim(); url = m[2].trim(); }
       else if (/^https?:\/\//i.test(line)) { url = line.trim(); }
       else { fail++; if (!firstErr) firstErr = '无法识别的行：' + line; doneCnt++; continue; }
-      if (seen[url] || inflight[url]) { skip++; doneCnt++; continue; }
-      inflight[url] = true;
-      var res;
-      try { res = await relayFetchImage(url); }
-      catch (e) { res = { error: (e && e.message ? e.message : String(e)) }; }
-      var finalImg = res.data;
-      if (!finalImg) {
-        // 拿不到 base64：只有确认外链真能显示才存为外链，否则按失败处理，不留裂图
-        var viewable = await testImageDecode(url);
-        if (!viewable) { fail++; if (!firstErr) firstErr = res.error || '无法抓取图片'; doneCnt++; continue; }
-        finalImg = url;
-      } else if (seen[finalImg]) { skip++; doneCnt++; continue; }
-      state.customStickers.push({
+       if (seen[url] || inflight[url]) { skip++; doneCnt++; continue; }
+       inflight[url] = true;
+       var res;
+       try { res = await relayFetchImage(url); }
+       catch (e) { res = { error: (e && e.message ? e.message : String(e)) }; }
+       inflight[url] = false;
+       var finalImg = res.data || url;
+       if (seen[finalImg]) { skip++; doneCnt++; continue; }
+       state.customStickers.push({
         id: 'stk-' + Date.now() + '-' + i + '-' + (Math.random() * 1e6 | 0),
         image: finalImg,
         src: url,
@@ -5969,13 +5973,13 @@ async function relayFetchImage(url, tries) {
   }
   // 兜底：公共 CORS 代理逐个试（这些代理带 Access-Control-Allow-Origin: *，浏览器能读回字节）
   if (/^https?:\/\//i.test(url)) {
-    var proxies = ['https://api.allorigins.win/raw?url=', 'https://images.weserv.nl/?url=', 'https://corsproxy.io/?url='];
+    var proxies = ['https://api.allorigins.win/raw?url=', 'https://api.codetabs.com/v1/proxy?quest=', 'https://api.cors.lol/?url='];
     for (var j = 0; j < proxies.length; j++) {
       try {
         var proxyUrl = proxies[j] + encodeURIComponent(url);
-        res = await fetchWithTimeout(proxyUrl, { method: 'GET' }, 15000);
-        if (!res.ok) { lastErr = '代理返回 status ' + res.status; continue; }
-        var d2 = await blobToStickerDataUrl(await res.blob());
+        var proxyRes = await fetchWithTimeout(proxyUrl, { method: 'GET' }, 8000);
+        if (!proxyRes.ok) { lastErr = '代理返回 status ' + proxyRes.status; continue; }
+        var d2 = await blobToStickerDataUrl(await proxyRes.blob());
         if (d2) return { data: d2 };
       } catch (e) {
         lastErr = fetchErrMsg(e);
@@ -6019,11 +6023,13 @@ function mimeOfDataUrl(data) {
 }
 
 // 校验一段 dataURL 或外链 URL 真能被浏览器显示（图片加载成功且非空白），返回 Promise<boolean>
-function testImageDecode(dataOrUrl) {
+function testImageDecode(dataOrUrl, timeout) {
+  timeout = timeout || 8000;
   return new Promise(function (resolve) {
     var img = new Image();
-    img.onload = function () { resolve(img.naturalWidth > 0 && img.naturalHeight > 0); };
-    img.onerror = function () { resolve(false); };
+    var timer = setTimeout(function () { resolve(false); }, timeout);
+    img.onload = function () { clearTimeout(timer); resolve(img.naturalWidth > 0 && img.naturalHeight > 0); };
+    img.onerror = function () { clearTimeout(timer); resolve(false); };
     try { img.referrerPolicy = 'no-referrer'; } catch (e) {}
     img.src = dataOrUrl;
   });
@@ -6081,6 +6087,7 @@ async function handleStickerBatchFiles(e) {
   }
   saveState();
   if (window.uiToast) uiToast(ok ? ('已添加 ' + ok + ' 张' + (fail ? '，' + fail + ' 张失败' : '')) : '添加失败');
+  e.target.value = '';
   if (from === 'panel') {
     renderEmojiPanel();
   } else {
@@ -6119,6 +6126,12 @@ function localFileToDataUrl(file, maxSize, quality) {
 
 function openStickerForm(id) {
   stickerFormMode = id || null;
+  var o;
+  if (o = document.getElementById('stickerFormOverlay')) o.remove();
+  if (o = document.getElementById('stickerImportOverlay')) o.remove();
+  if (o = document.getElementById('stickerFolderPicker')) o.remove();
+  if (o = document.getElementById('stickerFolderDeletePicker')) o.remove();
+  if (o = document.getElementById('folderActionMenu')) o.remove();
   const s = id ? (state.customStickers || []).find(x => x.id === id) : null;
   const overlay = document.createElement('div');
   overlay.className = 'sticker-form-overlay active';
