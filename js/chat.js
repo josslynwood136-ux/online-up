@@ -479,19 +479,19 @@ function showQuoteMenu(index) {
   el.style.display = 'flex';
   var mask = $('quoteMenuMask'); if (mask) mask.classList.add('show');
   setTimeout(function() { el.classList.add('show'); }, 10);
-  if (document.body.classList.contains('wx-mode')) {
-    var msgEl = document.querySelector('.msg[data-idx="' + index + '"]');
-    var cw = $('chatWindow');
-    if (msgEl && cw) {
-      var cwRect = cw.getBoundingClientRect();
-      var msgRect = msgEl.getBoundingClientRect();
-      var menuW = el.offsetWidth || 260;
-      var menuH = el.offsetHeight || 44;
-      var top = msgRect.top - cwRect.top - menuH - 8;
-      if (top < 0) top = msgRect.bottom - cwRect.top + 8;
-      var left = msgRect.left - cwRect.left + (msgRect.width - menuW) / 2;
-      left = Math.max(8, Math.min(left, cwRect.width - menuW - 8));
-      el.style.position = 'absolute';
+if (document.body.classList.contains('wx-mode')) {
+     var msgEl = document.querySelector('.msg[data-idx="' + index + '"]');
+     var cw = $('chatWindow');
+     if (msgEl && cw) {
+       var cwRect = cw.getBoundingClientRect();
+       var msgRect = msgEl.getBoundingClientRect();
+       var menuW = el.offsetWidth || 260;
+       var menuH = el.offsetHeight || 44;
+       var top = msgRect.top - cwRect.top - menuH - 8;
+       if (top < 0) top = msgRect.bottom - cwRect.top + 8;
+       var left = msgRect.left - cwRect.left + (msgRect.width - menuW) / 2;
+       left = Math.max(8, Math.min(left, cwRect.width - menuW - 8));
+       el.style.position = 'absolute';
       el.style.left = left + 'px';
       el.style.top = top + 'px';
       el.style.transform = 'none';
@@ -669,12 +669,13 @@ function renderChat() {
     const avHtml = !isUser ? `<div class="avatar voice-avatar" onclick="event.stopPropagation();showInnerVoice('${char.id}')">${renderAvatar(av, nm)}</div>` : `<div class="avatar">${renderAvatar(av, nm)}</div>`;
     return `${divider}<div class="msg ${isUser ? 'right' : 'left'}${multiCls(i)}" data-idx="${i}" oncontextmenu="event.preventDefault();onMsgRightClick(event,${i})" onclick="onMsgTap(event,${i})">${msgCheck(isUser, i)}${avCol(avHtml)}<div class="bubble ${isUser ? 'right' : 'left'}">${quoteHtml}${textHtml}${mediaHtml}${transHtml}${voiceBtnHtml}</div>${tick}</div>`;
   }).join('') + typing;
-  if (!_multiSelect) $('chatBody').scrollTop = $('chatBody').scrollHeight;
+  if (!_multiSelect) { var _cb = $('chatBody'); var _nearBottom = _cb.scrollHeight - _cb.scrollTop - _cb.clientHeight < 80; if (_nearBottom) _cb.scrollTop = _cb.scrollHeight; }
   applyBubbleStyle();
   if (_multiSelect) {
     updatePreview();
     renderPreviewVisual();
   }
+  clearChatSearchHighlight();
 }
 
 async function deleteMessage(charId, index, noConfirm) {
@@ -1438,11 +1439,17 @@ async function streamDeliver(text, opts) {
     notify: true
   };
   var isReasoner = /reasoner|r1|o1|o3|-think|thinking/i.test(cfg.model || '');
-  if (!isReasoner) {
-    var tk = await callAIThink(char, userContent, systemPrompt, built.history, cfg);
-    lastRetract = (tk.retract !== null) ? tk.retract : null;
-    lastThinkText = (typeof formatInnerVoiceThink === 'function') ? (formatInnerVoiceThink(tk) || tk.note || '') : (tk.note || '');
-  }
+if (!isReasoner) {
+     var tk = await callAIThink(char, userContent, systemPrompt, built.history, cfg);
+     lastRetract = (tk.retract !== null) ? tk.retract : null;
+     lastThinkText = tk.thinkProcess || tk.note || '';
+var streamIV = tk.feeling || tk.note || '';
+      // 把心声判断出的真实情绪带进正式回复的生成依据里，避免两次调用各算各的
+      if (streamIV) {
+        userContent += '\n\n（你刚才心里真实想的是：' + streamIV + '——回复要暗合这份真实情绪，但绝不能把这段话原样说出来或写成"其实我心里想…"这种自我剖白。）';
+        window.__genPayload.messages = [{ role: 'system', content: systemPrompt }, ...built.history, { role: 'user', content: userContent }];
+      }
+   }
   // 撤回：仅按角色性格判断
   var doRetract = (lastRetract === true);
   lastRetract = null;
@@ -1768,10 +1775,7 @@ function showInnerVoice(charId) {
     '</div>' +
     '<div class="iv-wait">' + escapeHTML(waitTxt) + '</div>' +
     '<div class="inner-voice-body">' +
-      '<div class="inner-voice-row">' +
-        '<span class="inner-voice-tag"><i></i>没说出口</span>' +
-        '<span class="inner-voice-text">' + escapeHTML(unsaid) + '</span>' +
-      '</div>' +
+      (unsaid ? '<div class="inner-voice-row"><span class="inner-voice-tag"><i></i>没说出口</span><span class="inner-voice-text">' + escapeHTML(unsaid) + '</span></div>' : '') +
       '<div class="inner-voice-row">' +
         '<span class="inner-voice-tag"><i></i>真正情绪</span>' +
         '<span class="inner-voice-text">' + escapeHTML(feeling) + '</span>' +
@@ -2035,7 +2039,7 @@ function pushMemory(char, pm) {
 }
 
 function buildAIMessages(char, text, proactive, retryReason) {
-  const history = (char.chat || []).slice(-(char.contextLen || 12)).filter(m => m.role !== 'system').map(function(m) {
+  const history = (char.chat || []).slice(-(char.contextLen || 20)).filter(m => m.role !== 'system').map(function(m) {
     let content = m.content || (m.media ? (m.type === 'sticker' ? ('[用户发来一张表情包]' + (m.media.stickerName ? '（名称：' + m.media.stickerName + (m.media.stickerMeaning ? '，含义：' + m.media.stickerMeaning : '') + '）' : '') + '——请把它当成一个表情包/贴图来回应，不要把它当成普通照片去描述画面') : '[' + m.media.type + ']') : '');
     if (m.quote && m.quote.content) {
       content = '（你正在回复上面这条 —— 用户引用了「' + m.quote.name + '」说的：「' + m.quote.content + '」，你这次要针对这段引用内容回应）\n' + content;
@@ -2060,7 +2064,7 @@ function buildAIMessages(char, text, proactive, retryReason) {
   if (retryReason === 'repeat') {
     anti = '【上一条被拦截】你刚才生成的回复和过去的消息几乎一模一样，已被系统拦截、没有发给对方。现在必须重新生成一条与以往任何一条回复都不相同、带着全新开场和内容的话。' + (anti ? '\n' + anti : '');
   } else if (retryReason === 'dodge') {
-    anti = '【上一条被拦截】你刚才的回复没有接住对方的问题、答非所问，已被系统拦截。错误示范：对方问"要不要哄"，你却回"看到奶茶店，啧"——这完全无视了问题。正确做法：必须先直接、明确地答应或拒绝对方刚说的那句话（对方问"要不要哄"→先答"要啊 / 不用啦 / 看情况"），然后再自然展开。绝不许无视提问去说别的事、绝不许反问把球踢回去。' + (anti ? '\n' + anti : '');
+    anti = '【上一条被拦截】你刚才的回复没有接住用户消息的主题或情绪，答非所问，已被系统拦截。正确做法：必须先直接、具体地回应用户刚说的那句话（接住它讲的内容和情绪），然后再自然展开。绝不许无视用户去说别的事、绝不许反问把球踢回去、绝不许跑偏到无关话题。' + (anti ? '\n' + anti : '');
   }
   if (anti) userContent += '\n\n' + anti;
   return { history: history, userContent: userContent };
@@ -2068,12 +2072,23 @@ function buildAIMessages(char, text, proactive, retryReason) {
 
 function isDodgingReply(userText, reply) {
   if (!reply || reply === '⚠️ 回复失败') return false;
+  // 原有逻辑：是非问句没接住
   var proposed = /(要不要|想不想|给(你|我)|送你|我的[^，。！？]{1,12}给你|请你|来不(了|来)|能不能|好不好|行不行|愿不愿意|喜不喜欢|该不该|去不去|是不是|是吗|对吗|吗[？?])/.test(userText);
-  if (!proposed) return false;
-  var caught = /(要(不|想)?|好(呀|啊|的|哦|吧|滴)?|想(要|收|听|去|喝|看)?|答应|收(下|到)?|喜欢|爱(你)?|行(的|呀|吧)?|可以|当然|乐意|嗯(嗯)?(要|好)?|不用|不要|不(想|用|去|喝|看)?|拒绝|算了|不必|没(必要|关系)|随(你|便)|你定|你决定|听你的|挺好|不错|很好|很配|好看|衬你|对啊|确实|是呢|没问题|必须的|肯定|安排|就这)/i.test(reply);
-  if (caught) return false;
-  // 用户提了直接问题，回复里却没有任何答复词：要么把问题反问回去，要么自顾自跑题——都算答非所问
-  return true;
+  if (proposed) {
+    var caught = /(要(不|想)?|好(呀|啊|的|哦|吧|滴)?|想(要|收|听|去|喝|看)?|答应|收(下|到)?|喜欢|爱(你)?|行(的|呀|吧)?|可以|当然|乐意|嗯(嗯)?(要|好)?|不用|不要|不(想|用|去|喝|看)?|拒绝|算了|不必|没(必要|关系)|随(你|便)|你定|你决定|听你的|挺好|不错|很好|很配|好看|衬你|对啊|确实|是呢|没问题|必须的|肯定|安排|就这)/i.test(reply);
+    if (caught) return false;
+    return true;
+  }
+  // 通用逻辑：提取用户消息中的实质性关键词（2字以上），检查回复是否引用了其中任何一个
+  var stopWords = new Set(['的','了','是','在','我','有','和','就','不','人','都','一','个','那','这','它','来','到','去','要','会','可以','应该','因为','所以','如果','而且','或者','但是','然后','就是','还是','已经','知道','觉得','起来','下来','里面','上面','下面','现在','为什么','怎么','什么','哪个','谁','多少','这样','那样','这个','那个','自己','不是','没有','还是','一次','一把','一直','一边','一些','一点','一下','一起','一会','一部分','已经','正在','出来','进去','过来','回去','关于','对于','由于','通过','随着','为了','关于']);
+  var userWords = userText.match(/[\u4e00-\u9fa5]{2,4}/g) || [];
+  var keyWords = userWords.filter(function(w) { return !stopWords.has(w); });
+  // 回复中引用了至少一个用户消息的实质性关键词 → 视为相关
+  var hasRef = keyWords.some(function(w) { return reply.includes(w); });
+  if (hasRef) return false;
+  // 用户消息有3个以上实质性关键词、回复完全没引用任何一个 → 大概率答非所问
+  // （阈值从2调到3，减少"同义改写接住了但关键词对不上"被误判成跑题的情况）
+  return keyWords.length >= 3;
 }
 
 async function callAI(text, shortTest = false, proactive = false, forChar = null) {
@@ -2090,11 +2105,13 @@ async function callAI(text, shortTest = false, proactive = false, forChar = null
   const isReasoner = /reasoner|r1|o1|o3|-think|thinking/i.test(cfg.model || '');
   var reason = '';
   var thinkNote = '';
+  var innerVoiceText = '';
   if (!shortTest && !isReasoner) {
     const probe = buildAIMessages(char, text, proactive, '');
     const tk = await callAIThink(char, probe.userContent, systemPrompt, shortTest ? [] : probe.history, cfg);
-    thinkNote = (typeof formatInnerVoiceThink === 'function') ? (formatInnerVoiceThink(tk) || tk.note || '') : (tk.note || '');
+    thinkNote = tk.thinkProcess || tk.note || '';
     lastRetract = (tk.retract !== null) ? tk.retract : null;
+    innerVoiceText = tk.feeling || tk.note || '';
   }
   if (!shortTest) {
     var _cap = buildAIMessages(char, text, proactive, '');
@@ -2111,8 +2128,9 @@ async function callAI(text, shortTest = false, proactive = false, forChar = null
     const built = buildAIMessages(char, text, proactive, reason);
     const history = shortTest ? [] : built.history;
     let userContent = built.userContent;
-    if (thinkNote) {
-      userContent += '\n\n（先想清楚再说，正式回复里不要把思考过程写出来。）';
+    if (innerVoiceText) {
+      // 把上一步心声判断出的真实情绪/未说出口的想法带进正式回复的生成依据里
+      userContent += '\n\n（你刚才心里真实想的是：' + innerVoiceText + '——回复要暗合这份真实情绪，但绝不能把这段话原样说出来或写成"其实我心里想…"这种自我剖白。）';
     }
     if (!shortTest && document.visibilityState !== 'visible') {
       try { var _s3 = await callAIServer(window.__genPayload.char, window.__genPayload.messages, window.__genPayload.modelBody, pushEnabled()); window.__genActive = false; if (_s3) return _s3; } catch (_e2) {}
@@ -2135,10 +2153,10 @@ async function callAI(text, shortTest = false, proactive = false, forChar = null
           model: cfg.model,
           messages: [{ role: 'system', content: systemPrompt }, ...history, { role: 'user', content: userContent }],
           max_tokens: shortTest ? 20 : (cfg.maxTokens || 500),
-          temperature: attempt > 0 ? Math.min(1.2, (cfg.temp ?? 0.75) + 0.2) : (cfg.temp ?? 0.75),
+          temperature: attempt > 0 ? Math.min(1.0, (cfg.temp ?? 0.75) + 0.1) : (cfg.temp ?? 0.75),
           top_p: cfg.topP ?? 0.9,
-          presence_penalty: (cfg.presencePenalty ?? 0) + (attempt > 0 ? 0.8 : 0),
-          frequency_penalty: (cfg.frequencyPenalty ?? 0) + (attempt > 0 ? 0.8 : 0)
+          presence_penalty: (cfg.presencePenalty ?? 0) + (attempt > 0 ? 0.3 : 0),
+          frequency_penalty: (cfg.frequencyPenalty ?? 0) + (attempt > 0 ? 0.3 : 0)
         })
       });
       const data = await response.json().catch(() => ({}));
@@ -2156,7 +2174,7 @@ async function callAI(text, shortTest = false, proactive = false, forChar = null
         lastThinkText = isReasoner ? (rc || '') : (thinkNote || '');
       }
       if (!shortTest && attempt === 0 && content !== '⚠️ 回复失败') {
-        if (prevAsst && diceSim(content, prevAsst) > 0.55) {
+        if (prevAsst && diceSim(content, prevAsst) > 0.62) {
           reason = 'repeat';
           continue;
         }
@@ -2175,7 +2193,7 @@ async function callAI(text, shortTest = false, proactive = false, forChar = null
   return '⚠️ 回复失败';
 }
 
-// 隐藏的「内部盘算」步骤：给心声气泡和撤回判断用，不把草稿原文喂回正式回复。
+// 隐藏的「内部盘算」步骤：先推理，再从推理中提取心声。
 // 推理模型（reasoner）自带思维链，跳过这一步。
 async function callAIThink(char, userContent, systemPrompt, history, cfg) {
   try {
@@ -2188,9 +2206,9 @@ async function callAIThink(char, userContent, systemPrompt, history, cfg) {
       body: JSON.stringify({
         model: cfg.model,
         messages: [
-          { role: 'system', content: systemPrompt + '\n\n' + (typeof innerVoiceThinkInstruction === 'function' ? innerVoiceThinkInstruction(char) : ('现在写一条只给用户查看的【心声】：用' + char.name + '第一人称。写完后另起一行，只输出【撤回：是】或【撤回：否】。')) },
+          { role: 'system', content: systemPrompt + '\n\n' + (typeof thinkProcessInstruction === 'function' ? thinkProcessInstruction(char) : '') },
           ...history,
-          { role: 'user', content: userContent + '\n\n（写 TA 此刻没说出口的心声三行：未说出口 / 真正情绪 / 撤回原因，不要写正式发出去的话。）' }
+          { role: 'user', content: userContent + '\n\n请按下面两步回答：\n【第一步·推理】用2-3句话分析对方刚才的话，推理TA的真实意图、心情和可能的反应。写出你的思考过程，不要直接给结论。\n【第二步·心声】基于上面的推理，用角色第一人称写心声：三行——未说出口、真正情绪、撤回原因。然后另起一行只输出【撤回：是】或【撤回：否】。' }
         ],
         max_tokens: cfg.maxTokens ? Math.min(220, cfg.maxTokens) : 220,
         temperature: Math.min(1, (cfg.temp ?? 0.75) + 0.1),
@@ -2200,10 +2218,26 @@ async function callAIThink(char, userContent, systemPrompt, history, cfg) {
     clearTimeout(timer);
     const data = await response.json().catch(() => ({}));
     let note = (data.choices?.[0]?.message?.content || '').trim();
-    var parsed = (typeof parseInnerVoiceNote === 'function') ? parseInnerVoiceNote(note) : null;
+    // 分离推理过程和心声
+    var thinkPart = '';
+    var ivPart = '';
+    var stepMatch = note.match(/【第一步·推理】\s*([\s\S]*?)【第二步·心声】/);
+    if (stepMatch) {
+      thinkPart = stepMatch[1].trim();
+      ivPart = note.slice(stepMatch[0].length + stepMatch[1].length + '【第二步·心声】'.length).trim();
+    } else {
+      // 兼容旧格式：没有分步标记，整段当作心声
+      ivPart = note;
+    }
+    var parsed = (typeof parseInnerVoiceNote === 'function') ? parseInnerVoiceNote(ivPart) : null;
     if (parsed) {
       if (typeof saveInnerVoice === 'function') saveInnerVoice(char, parsed);
-      return { note: parsed.unsaid || parsed.note || '', retract: parsed.retract, unsaid: parsed.unsaid, feeling: parsed.feeling, retractWhy: parsed.retractWhy };
+      // 推理过程更充实：模型推理 + 角色关系背景
+      var thinkText = thinkPart || parsed.note || '';
+      if (!thinkText && ivPart) {
+        thinkText = '正在思考……' + ivPart.slice(0, 30);
+      }
+      return { note: thinkText, thinkProcess: thinkText, retract: parsed.retract, unsaid: parsed.unsaid, feeling: parsed.feeling, retractWhy: parsed.retractWhy };
     }
     const m = note.match(/【撤回[:：]\s*(是|否)\s*】/);
     const retract = m ? (m[1] === '是') : null;
@@ -2318,7 +2352,7 @@ async function aiTranslate(text, srcLang) {
       body: JSON.stringify({
         model: cfg.model,
         messages: [
-          { role: 'system', content: '你是专业的中文本地化翻译。把用户给的外语句子翻译成自然、口语化、符合中文表达习惯的中文。要求：保留原句的语气、情绪和角色口吻（可带一点俏皮、撒娇或随意，视原文而定）；不要逐字硬译，不要机翻味，不要书面腔；不要添加任何解释、前缀或引号，只输出译文本身。' },
+          { role: 'system', content: '你是专业的中文本地化翻译。把用户给的外语句子翻译成自然、口语化、符合中文表达习惯的中文。要求：保留原句的语气、情绪和角色口吻；不要逐字硬译，不要机翻味，不要书面腔；不要添加任何解释、前缀或引号，只输出译文本身。' },
           { role: 'user', content: text }
         ],
         max_tokens: 400,
@@ -2647,6 +2681,12 @@ function buildRoleSystemPrompt(char, userText) {
   var parts = [
     '你是 ' + char.name + '。你必须完全代入这个角色，用角色的语气和性格说话。你不是 AI，不是语言模型。',
     '',
+    '【最高优先级铁律——任何时候都不能被下面的信息覆盖或稀释】',
+    '1. 先接话：第一句必须先接住对方刚说的那句话、那个具体点，正面回应它讲的内容和情绪，再往下聊。绝不绕开问题、不跑题、不答非所问、不把问题反问回去。',
+    '2. 少空话：“我理解你”“你说得对”“嗯嗯”这类开场越少越好。要具体、有细节、有画面，别写成客服话术或书面总结。',
+    '3. 不复读：每轮都要有新内容，不许把上一条换个说法再说一遍；可以有情绪、有脾气、敢说出来，别永远温柔永远正确。',
+    '4. 像真人发消息：短句、口语、碎一点，不是写文章，不追求"工整"和"完整段落"。',
+    '',
     '【角色设定】',
     '名字：' + char.name,
     '别名：' + (char.aliases || '无'),
@@ -2656,10 +2696,10 @@ function buildRoleSystemPrompt(char, userText) {
     '背景：' + (char.background && char.background.trim() ? char.background : '和对方关系亲近，日常会聊天、会拌嘴、也会惦记对方'),
     '额外规则：' + (char.prompt || '无'),
     '',
-    '【此刻状态】',
+    '【此刻状态（仅为背景氛围，参考用，不强制体现）】',
     '你现在的心情：' + (char._moodText || '比较平静'),
     '你正在做的事：' + ((char.life && char.life.detail) || char._lifeText || '过自己的日子'),
-    '注意：这两行只是你此刻的背景氛围，绝不能用它替代对对方问题的回答——必须先接住对方刚说的话。除非和当前话题强相关，否则不要在回复里主动提起"正在做的事"，更不要答非所问地自言自语。',
+    '注意：这两行绝不能替代对对方问题的回答——必须先接住对方刚说的话。除非和当前话题强相关，否则不要在回复里主动提起"正在做的事"，更不要答非所问地自言自语。',
     '',
     (typeof relateSystemPrompt === 'function' ? relateSystemPrompt(char) : ''),
     '',
@@ -2670,16 +2710,8 @@ function buildRoleSystemPrompt(char, userText) {
     '雷点：' + (profile.boundaries || '未填写'),
     '说话方式：' + (profile.speaking || '未填写'),
     '',
-    '【相关记忆】',
-    memCtx,
-    '',
-    '【回复要求】',
-    replySplitInstruction(char.name, char),
-    '【说话方式（最重要）】像真人发消息，不是写文章：短句、口语、碎一点，直接了当。别像客服、别像汇报、别满口漂亮话。',
-    '【必须做到】',
-    '1. 第一句就先接住对方刚说的那句话、那个具体点，先答掉再往下聊，绝不绕开问题、不跑题、不答非所问、不把问题反问回去。',
-    '2. 少空话套话：“我理解你”“你说得对”“嗯嗯”这类开场越少越好。要具体、有细节、有画面。',
-    '3. 每轮都有新东西，别把上一条换个说法再说一遍；有情绪、有脾气、敢说出来，别永远温柔永远正确。'
+    '【相关记忆（参考用，不要机械复述原文，也不要为了用记忆而生硬插入无关内容）】',
+    memCtx
   ];
   if (char.examples && char.examples.trim()) {
     parts.push('', '【示例对话】', '以下是你与对方的真实对话片段。重点学习你的说话方式、语气、用词和反应习惯；遇到相似情境要沿用这种风格来回应，但不要照抄内容：', char.examples.trim());
@@ -2729,6 +2761,13 @@ function buildRoleSystemPrompt(char, userText) {
     var ct = state.call.type === 'video' ? '视频' : '语音';
     parts.push('【当前情境：正在实时' + ct + '通话中】你们此刻正在打' + ct + '电话，是实时对话，不是发文字消息。请用像真的在打电话的口语：句子短、自然、可以打断对方、会有"嗯""啊""等等"之类自然的语气词和小停顿；可以偶尔用（）轻轻描写你这边的小动作或表情（比如（笑）（整理头发）（喝了口水）），但别每句都写。聊得差不多了想结束时，可以自然地说再见、说先挂了，并在最后加上"（挂断）"标记表示你要挂电话——系统会真的帮你挂断。不要每句都加（挂断），只在你确实想结束通话时才加。');
   }
+  parts.push(
+    '',
+    '【输出格式要求】',
+    replySplitInstruction(char.name, char),
+    '',
+    '【生成前最后自检——回到最重要的事】不管上面读到了多少设定，你要说的下一句话必须先正面回应对方刚才那句话；不要开头就是空话套话；不要和你上一条说过的话雷同。'
+  );
   return parts.join('\n');
 }
 
@@ -2938,6 +2977,107 @@ function renderMemoriesGrouped(memories, itemHtml, emptyHtml) {
       g.items.map(itemHtml).join('') + '</div>';
   }).join('');
 }
+
+// ===== 聊天搜索 =====
+var _chatSearchTimer = null;
+function openChatSearch() {
+  var ov = $('chatSearchOverlay');
+  if (!ov) return;
+  ov.style.display = '';
+  var inp = $('chatSearchInput');
+  if (inp) { inp.value = ''; setTimeout(function() { inp.focus(); }, 100); }
+  $('chatSearchResults').innerHTML = '';
+  $('chatSearchCount').textContent = '';
+  document.addEventListener('keydown', _chatSearchKeyHandler);
+}
+var _chatSearchKeyHandler = function(e) {
+  if (e.key === 'Escape') closeChatSearch();
+};
+function closeChatSearch() {
+  document.removeEventListener('keydown', _chatSearchKeyHandler);
+  var ov = $('chatSearchOverlay');
+  if (ov) ov.style.display = 'none';
+  clearChatSearchHighlight();
+}
+document.addEventListener('DOMContentLoaded', function() {
+  document.addEventListener('click', function(e) {
+    var ov = $('chatSearchOverlay');
+    if (!ov || ov.style.display === 'none') return;
+    var box = ov.querySelector('.chat-search-box');
+    if (box && !box.contains(e.target)) closeChatSearch();
+  });
+});
+function doChatSearch() {
+  var q = ($('chatSearchInput').value || '').trim();
+  clearTimeout(_chatSearchTimer);
+  _chatSearchTimer = setTimeout(function() {
+    if (!q) { $('chatSearchResults').innerHTML = ''; $('chatSearchCount').textContent = ''; return; }
+    var char = activeCharacter();
+    if (!char || !char.chat || !char.chat.length) {
+      $('chatSearchResults').innerHTML = '<div class="chat-search-empty">暂无消息记录</div>';
+      $('chatSearchCount').textContent = '0 条';
+      return;
+    }
+    var ql = q.toLowerCase();
+    var results = [];
+    char.chat.forEach(function(m, idx) {
+      if (!m || !m.content) return;
+      var pos = m.content.toLowerCase().indexOf(ql);
+      if (pos >= 0) {
+        var start = Math.max(0, pos - 30);
+        var end = Math.min(m.content.length, pos + ql.length + 30);
+        var snippet = m.content.slice(start, end);
+        if (start > 0) snippet = '…' + snippet;
+        if (end < m.content.length) snippet = snippet + '…';
+        results.push({ idx: idx, text: snippet, role: m.role, time: m.time, content: m.content });
+      }
+    });
+    var cnt = $('chatSearchCount');
+    cnt.textContent = results.length + ' 条';
+    var box = $('chatSearchResults');
+    if (!results.length) {
+      box.innerHTML = '<div class="chat-search-empty">没有找到「' + escapeHTML(q) + '」</div>';
+      return;
+    }
+    box.innerHTML = results.map(function(r) {
+      var name = r.role === 'user' ? '我' : (char.name || 'TA');
+      var time = r.time ? r.time.slice(0, 16) : '';
+      return '<div class="chat-search-item" data-idx="' + r.idx + '" onclick="jumpToChatMsg(' + r.idx + ')">' +
+        '<div class="chat-search-role">' + escapeHTML(name) + ' <span class="chat-search-time">' + escapeHTML(time) + '</span></div>' +
+        '<div class="chat-search-snippet">' + escapeHTML(r.text) + '</div>' +
+        '</div>';
+    }).join('');
+  }, 150);
+}
+function jumpToChatMsg(idx) {
+  var char = activeCharacter();
+  if (!char || !char.chat[idx]) return;
+  renderChat();
+  setTimeout(function() {
+    var el = document.querySelector('#chatBody .msg[data-idx="' + idx + '"]');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('search-highlight');
+      setTimeout(function() { el.classList.remove('search-highlight'); }, 2000);
+    }
+    var all = document.querySelectorAll('#chatBody .msg[data-idx]');
+    all.forEach(function(e) { e.classList.remove('search-dim'); });
+    all.forEach(function(e) {
+      var i = parseInt(e.getAttribute('data-idx'));
+      if (i !== idx) e.classList.add('search-dim');
+    });
+    setTimeout(function() { all.forEach(function(e) { e.classList.remove('search-dim'); }); }, 3000);
+  }, 50);
+}
+function clearChatSearchHighlight() {
+  document.querySelectorAll('#chatBody .msg.search-dim, #chatBody .msg.search-highlight').forEach(function(e) {
+    e.classList.remove('search-dim', 'search-highlight');
+  });
+}
+window.openChatSearch = openChatSearch;
+window.closeChatSearch = closeChatSearch;
+window.doChatSearch = doChatSearch;
+window.jumpToChatMsg = jumpToChatMsg;
 
 // ===== 聊天设置 =====
 function openSettings() {

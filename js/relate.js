@@ -88,6 +88,76 @@ function relateCharMinutes(char) {
   }
 }
 
+// 缓存的作息表：按角色ID+周缓存，每周刷新一次
+var _scheduleCache = {};
+
+// 用角色特征生成一个独特的作息表（确定性伪随机，不走API）
+function generateLifeSchedule(char) {
+  if (!char) return null;
+  var now = new Date();
+  var jan1 = new Date(now.getFullYear(), 0, 1);
+  var weekNum = Math.floor(((now - jan1) / 604800000 + jan1.getDay() + 1) / 7);
+  var cacheKey = (char.id || 'default') + '-' + now.getFullYear() + '-W' + weekNum;
+  if (_scheduleCache[cacheKey]) return _scheduleCache[cacheKey];
+
+  var seed = ((char.id || 'default') + '-' + char.name + '-' + weekNum + '-' + (char.persona || '') + '-' + (char.style || '')).split('').reduce(function (h, c) { h = ((h << 5) - h + c.charCodeAt(0)) | 0; return h; }, 0);
+  function srand() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
+  function randRange(a, b) { return a + srand() * (b - a); }
+  function randInt(a, b) { return Math.floor(randRange(a, b)); }
+
+  var blocks = [];
+  var isStudent = /学|生|校|大学/.test(char.persona || '');
+  var isNightOwl = /夜|猫|晚|晚睡/.test(char.style || char.persona || '');
+  var isEarlyBird = /早|晨|鸟|早起/.test(char.style || char.persona || '');
+  var sleepStart = isNightOwl ? randInt(120, 240) : isEarlyBird ? randInt(0, 120) : randInt(0, 180);
+  var sleepEnd = sleepStart + randInt(360, 540);
+  var wakeEnd = sleepEnd + randInt(30, 60);
+  var workStart = wakeEnd + randInt(0, 60);
+  var workEnd = workStart + randInt(240, 480);
+  var homeStart = workEnd + randInt(0, 120);
+  var homeEnd = homeStart + randInt(120, 240);
+  var nightStart = homeEnd + randInt(0, 60);
+  var nightEnd = 1440;
+
+  blocks.push({ start: 0, end: sleepStart, id: 'night', label: '快睡了', busy: false, canReply: 'normal',
+    details: ['躺着刷手机，灯关了一半', '夜深了，人有点软', '本该睡了，还是想再看看你'] });
+  blocks.push({ start: sleepStart, end: sleepEnd, id: 'sleep', label: '在睡觉', busy: true, canReply: 'silent',
+    details: ['睡得很沉，呼吸很匀', '翻了个身，还没醒', '在做梦，手机扣在枕头边'] });
+  if (wakeEnd > sleepEnd + 20) blocks.push({ start: sleepEnd, end: wakeEnd, id: 'wake', label: '刚醒', busy: false, canReply: 'short',
+    details: ['刚醒，还赖在被窝里', '在洗漱，嘴里还含着泡沫', '头发乱着，刚摸到手机'] });
+  if (isStudent && workEnd > workStart + 60) blocks.push({ start: workStart, end: workEnd, id: 'class', label: '在上课', busy: true, canReply: 'short',
+    details: ['在上课，手机藏在桌肚', '老师在讲，只能偷摸回一句', '教室里很安静，不太方便打字'] });
+  if (homeEnd > workEnd + 20) blocks.push({ start: workEnd, end: homeStart, id: 'commute', label: '在路上', busy: false, canReply: 'normal',
+    details: ['刚结束，走在回家的路上', '挤在车上，信号一顿一顿', '晚风挺舒服，突然想跟你说一句'] });
+  blocks.push({ start: homeStart, end: homeEnd, id: 'home', label: '在家', busy: false, canReply: 'eager',
+    details: ['在家待着，终于能好好看手机', '在做饭，油烟有点呛', '窝在沙发上，空了一块位置'] });
+  if (homeEnd < 1380) blocks.push({ start: homeEnd, end: Math.min(homeEnd + randInt(30, 60), 1440), id: 'shower', label: '在洗漱', busy: true, canReply: 'short',
+    details: ['在洗澡，头发还湿着', '刚洗完，蒸汽还没散', '对着镜子发呆，想起你了'] });
+  if (nightStart < homeEnd) nightStart = homeEnd;
+  if (nightStart < 1320) blocks.push({ start: nightStart, end: 1440, id: 'night', label: '快睡了', busy: false, canReply: 'normal',
+    details: ['躺着刷手机，灯关了一半', '夜深了，人有点软', '本该睡了，还是想再看看你'] });
+
+  // 确保覆盖0-1440
+  blocks.sort(function (a, b) { return a.start - b.start; });
+  var merged = [];
+  blocks.forEach(function (b) {
+    if (merged.length && merged[merged.length - 1].end < b.start) {
+      merged.push({ start: merged[merged.length - 1].end, end: b.start, id: 'sleep', label: '在睡觉', busy: true, canReply: 'silent', details: ['睡得很沉，呼吸很匀'] });
+    }
+    merged.push(b);
+  });
+
+  var schedule = { blocks: merged, updatedAt: Date.now() };
+  _scheduleCache[cacheKey] = schedule;
+  if (char.lifeSchedule !== schedule) { char.lifeSchedule = schedule; }
+  return schedule;
+}
+
+function getLifeBlocks(char) {
+  if (char && char.lifeSchedule && char.lifeSchedule.blocks && char.lifeSchedule.blocks.length > 0) return char.lifeSchedule.blocks;
+  return LIFE_BLOCKS;
+}
+
 // 一天的作息：忙/闲/睡决定回复长度、延迟、会不会主动找你
 var LIFE_BLOCKS = [
   { start: 0, end: 420, id: 'sleep', label: '在睡觉', busy: true, canReply: 'silent',
@@ -101,13 +171,13 @@ var LIFE_BLOCKS = [
   { start: 810, end: 1080, id: 'work', label: '在忙', busy: true, canReply: 'short',
     details: ['下午的课/班正紧着', '在赶东西，脑子有点转不动', '手头有事，回得会慢一点'] },
   { start: 1080, end: 1140, id: 'commute', label: '在路上', busy: false, canReply: 'normal',
-    details: ['刚结束，走在回家的路上', '挤在车里，信号一顿一顿', '晚风挺舒服，突然想跟你说一句'] },
+    details: ['刚结束，走在回家的路上', '挤在车上，信号一顿一顿', '晚风挺舒服，突然想跟你说一句'] },
   { start: 1140, end: 1260, id: 'home', label: '在家', busy: false, canReply: 'eager',
     details: ['在家待着，终于能好好看手机', '在做饭，油烟有点呛', '窝在沙发上，空了一块位置'] },
   { start: 1260, end: 1350, id: 'shower', label: '在洗漱', busy: true, canReply: 'short',
     details: ['在洗澡，头发还湿着', '刚洗完，蒸汽还没散', '对着镜子发呆，想起你了'] },
   { start: 1350, end: 1440, id: 'night', label: '快睡了', busy: false, canReply: 'normal',
-    details: ['躺着刷手机，灯关了一半', '夜深了，人有点软', '本该睡了，还是想再看看你'] }
+    details: ['躺着刷手机，灯关了一半', '夜深了，人有点软', '本该睡了，还是想再看看你'] },
 ];
 
 function pickLifeBlock(mins) {
@@ -414,26 +484,29 @@ function relateProactiveHint(char) {
   } else if (char.life) {
     bits.push('你此刻在：' + (char.life.detail || char.life.label) + '。消息要带着这个现场感，一两句就够。');
   }
-  if (b.missing >= 60) bits.push('想念已经压不住了，但不要写成情书，像随手冒出来的。');
-  if (b.security < 38) bits.push('安全感不太够，可以试探一句“你还在吗/是不是忙”，别哭诉。');
-  if (b.jealousy >= 45) bits.push('心里有点酸，旁敲侧击即可。');
-  if (b.fatigue >= 60) bits.push('很累，极短。');
-  if (char.life && char.life.canReply === 'silent') bits.push('你其实该睡了，这条像失眠时发给对方的。');
+bits.push('语气自然、轻松，像随手发了一条。不要提"你为什么不回我""你在想什么"这类质问，不要制造焦虑，不要显得患得患失。');
   bits.push('不要问号轰炸，不要自我总结，不要提 AI。');
   return bits.join('');
+}
+
+function thinkProcessInstruction(char) {
+  var b = ensureBond(char);
+  var name = (char && char.name) || 'TA';
+  var relDesc = b.relation || '普通关系';
+  return '你正在思考。你需要先进行推理，再表达心声。\n'
+    + '【推理要求】用2-3句话做逻辑分析：对方这段话的客观事实是什么？有哪些上下文线索？最合理的下一步是什么？不要写感受，只写事实推断和策略思考。\n'
+    + '推理时要考虑：对方说了什么、没说什么、你们的关系背景（' + relDesc + '）、对方可能的反应模式。\n'
+    + '【注意】这是纯分析步骤，不是情感表达。用户不会看到这段内容。分析完成后，再写出心声。';
 }
 
 function innerVoiceThinkInstruction(char) {
   var b = ensureBond(char);
   var name = (char && char.name) || '你';
-  return '现在写只给用户点头像才能看见的【心声】，不是发出去的回复。用' + name + '第一人称。必须严格按下面三行输出（不要编号、不要引号、不要分析术语）：\n'
-    + '未说出口：……（嘴上不会发出去的那句，像卡在喉咙里，20字内）\n'
+  return '现在写只给用户点头像才能看见的【心声】，不是发出去的回复。用' + name + '第一人称，只写一行：\n'
     + '真正情绪：……（此刻真实心情，可以别扭、心软、酸、累，20字内）\n'
-    + '撤回原因：无\n'
-    + '若你发出去的话会让你后悔，把最后一行改成具体原因（例如“说得太软了 / 不该问那么直”），否则必须写「无」。\n'
-    + '再另起一行只输出【撤回：是】或【撤回：否】。欲言又止越高、安全感越低，越可能【撤回：是】。'
-    + '当前欲言又止' + relateLevelWord(b.unsaid) + '，安全感' + relateLevelWord(b.security) + '。'
-    + '不要写正式回复，不要出现“我应该/接住话题”这类痕迹。';
+    + '再另起一行只输出【撤回：是】或【撤回：否】。'
+    + '当前安全感' + relateLevelWord(b.security) + '。'
+    + '不要写正式回复，不要出现"我应该/接住话题"这类痕迹。';
 }
 
 function parseInnerVoiceNote(raw) {
@@ -448,27 +521,21 @@ function parseInnerVoiceNote(raw) {
     var x = note.match(re);
     return x ? x[1].replace(/^["「『]|["」』]$/g, '').trim() : '';
   }
-  var unsaid = grab('未说出口|没说出口|心声');
   var feeling = grab('真正情绪|真实情绪|情绪');
   var retractWhy = grab('撤回原因|想撤回');
-  if (!unsaid) {
-    var first = note.split(/\n/)[0] || '';
-    unsaid = first.replace(/^(未说出口|心声)[:：]\s*/, '').trim().slice(0, 48);
-  }
   if (retractWhy === '无' || retractWhy === '没有' || retractWhy === '否') retractWhy = '';
   return {
-    unsaid: unsaid,
+    unsaid: '',
     feeling: feeling,
     retractWhy: retractWhy,
     retract: retract,
-    note: unsaid
+    note: feeling
   };
 }
 
 function formatInnerVoiceThink(iv) {
   if (!iv) return '';
   var rows = [];
-  if (iv.unsaid) rows.push('没说出口：' + iv.unsaid);
   if (iv.feeling) rows.push('真正情绪：' + iv.feeling);
   if (iv.retractWhy) rows.push('想撤回：' + iv.retractWhy);
   return rows.join('\n') || (iv.note || '');

@@ -504,8 +504,18 @@ function filterMsgList() {
   const q = ($('msgSearch').value || '').toLowerCase();
   document.querySelectorAll('#msgListWrap .list-card').forEach((el, i) => {
     const char = state.roles[i];
-    const hit = char && (char.name.toLowerCase().includes(q) || lastChatPreview(char).toLowerCase().includes(q));
-    el.style.display = (!q || hit) ? '' : 'none';
+    const nameHit = char && char.name.toLowerCase().includes(q);
+    const previewHit = char && lastChatPreview(char).toLowerCase().includes(q);
+    const contentHit = char && char.chat && char.chat.some(function(m) { return m && m.content && m.content.toLowerCase().includes(q); });
+    const hit = (!q) || nameHit || previewHit || contentHit;
+    el.style.display = hit ? '' : 'none';
+    if (char && contentHit && q) {
+      var preview = el.querySelector('.msg-preview');
+      if (preview) {
+        var match = char.chat.find(function(m) { return m && m.content && m.content.toLowerCase().includes(q); });
+        if (match) preview.textContent = match.content.slice(0, 40) + (match.content.length > 40 ? '…' : '');
+      }
+    }
   });
 }
 

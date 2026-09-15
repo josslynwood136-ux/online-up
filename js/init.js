@@ -36,6 +36,12 @@ function init() {
   renderChat();
   initDragDesktop();
   bindHotspots();
+  // 更多面板：点击选项项后自动关闭
+  var _mp = $('morePanel');
+  if (_mp) _mp.addEventListener('click', function(e) {
+    var item = e.target.closest('.panel-item');
+    if (item) setTimeout(function() { var p = $('morePanel'); if (p && p.style.display === 'grid') p.style.display = 'none'; }, 80);
+  });
   if (typeof loadNcmState === 'function') loadNcmState();
   if (typeof loadQqState === 'function') loadQqState();
   if (typeof maybeProbeNcm === 'function') maybeProbeNcm();
@@ -185,7 +191,7 @@ _w.currentWillowWish = currentWillowWish; _w.currentWillowRule = currentWillowRu
 _w.startIdleProactive = startIdleProactive; _w.setIdleParams = setIdleParams;
 _w.showInnerVoice = showInnerVoice; _w.closeInnerVoice = closeInnerVoice;
 _w.toggleAutoVoice = toggleAutoVoice; _w.setTtsProvider = setTtsProvider; _w.setTtsUrl = setTtsUrl; _w.setTtsKey = setTtsKey; _w.setTtsModel = setTtsModel; _w.setCharTtsProvider = setCharTtsProvider; _w.setCharTtsVoice = setCharTtsVoice; _w.testTtsConnection = testTtsConnection; _w.toggleMsgVoice = toggleMsgVoice; _w.stopSpeak = stopSpeak; _w.speakText = speakText;
-_w.startCall = startCall; _w.endCall = endCall;
+_w.startCall = startCall; _w.endCall = endCall; _w.openChatSearch = openChatSearch; _w.closeChatSearch = closeChatSearch; _w.doChatSearch = doChatSearch; _w.jumpToChatMsg = jumpToChatMsg;
 
 // 离开时保存
 window.addEventListener('beforeunload', saveState);

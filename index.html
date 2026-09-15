@@ -80,6 +80,7 @@
           <span id="chatRel" class="subtle"></span>
         </div>
         <div style="display:flex;gap:4px;justify-self:end">
+          <button class="icon-btn" onclick="openChatSearch()" title="搜索聊天记录">🔍</button>
           <button class="icon-btn" onclick="openSettings()">⚙</button>
         </div>
       </div>
@@ -139,6 +140,18 @@
         <span class="sph-txt">选到这里</span>
         <span class="sph-cnt" id="selectHereCount"></span>
       </button>
+      <div id="chatSearchOverlay" class="chat-search-overlay" style="display:none">
+        <div class="chat-search-box">
+          <div class="chat-search-header">
+            <input type="text" class="chat-search-input" id="chatSearchInput" placeholder="搜索消息..." oninput="doChatSearch()" autofocus>
+            <div style="display:flex;gap:4px;align-items:center">
+              <span class="chat-search-count" id="chatSearchCount"></span>
+              <button class="chat-search-close" onclick="closeChatSearch()">✕</button>
+            </div>
+          </div>
+          <div class="chat-search-results" id="chatSearchResults"></div>
+        </div>
+      </div>
     </div>
 
     <div id="chatSettings">

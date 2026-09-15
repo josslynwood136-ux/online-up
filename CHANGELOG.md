@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-09-06
+
+### 修复：本地 file:// 打开时聊天页报错
+
+- **`index.html`**：补上缺失的 `#chatSettings` 外层容器。此前聊天设置面板内容直接散在 `.phone` 里，CSS（`#chatSettings.open` 滑入）与 `chat.js` 均依赖该容器，导致打开设置时取不到元素报错。现已在面板前后补 `<div id="chatSettings">…</div>`
+- **`js/chat.js`**：`openSettings()` 对 `pinSwitch` / `charLang` / `translateSwitch` 的取值与 class 切换加判空保护，避免个别元素缺失时整段崩溃
+- **`js/push.js`**：新增 `pushServerOk()`（仅 http/https 生效）。`pollPendingOnce` / `startPushPolling` / `uploadPushConfig` / `fetchPendingMessages` / `initPush` / `togglePush` 在 `file://` 下直接跳过，消除一堆「Cross origin requests are only supported for protocol schemes」CORS 报错；设置页提示「需部署到服务器后才能用后台通知」
+- **说明**：推送、Service Worker、manifest 本就需要服务器环境；本地调试请用 `python -m http.server` 之类起 HTTP
+- **本期文件版本**：`css/` 不变；`js/` 建议递增引用后缀（或 Ctrl+F5 强刷，避免旧缓存）
+
+---
+
 ## 2026-08-31
 
 ### 文档与命名
