@@ -282,6 +282,23 @@ function renderIGCharEditor() {
           <input class="ig-ce-input" id="igCeRelation" placeholder="朋友 / 恋人 / 搭档..." value="${escapeHTML(char.relation || '')}">
         </div>
         <div class="ig-ce-section">
+          <div class="ig-ce-label">职业</div>
+          <select class="ig-ce-input" id="igCeOccupation" style="background:#fafafa">
+            <option value="">不设职业</option>
+            <option value="学生" ${char.occupation === '学生' ? 'selected' : ''}>学生</option>
+            <option value="上班族" ${char.occupation === '上班族' ? 'selected' : ''}>上班族</option>
+            <option value="自由职业" ${char.occupation === '自由职业' ? 'selected' : ''}>自由职业</option>
+            <option value="护士/医生" ${char.occupation === '护士/医生' ? 'selected' : ''}>护士/医生</option>
+            <option value="程序员" ${char.occupation === '程序员' ? 'selected' : ''}>程序员</option>
+            <option value="厨师" ${char.occupation === '厨师' ? 'selected' : ''}>厨师</option>
+            <option value="艺术家" ${char.occupation === '艺术家' ? 'selected' : ''}>艺术家</option>
+            <option value="运动员" ${char.occupation === '运动员' ? 'selected' : ''}>运动员</option>
+            <option value="警察/消防员" ${char.occupation === '警察/消防员' ? 'selected' : ''}>警察/消防员</option>
+            <option value="军人" ${char.occupation === '军人' ? 'selected' : ''}>军人</option>
+            <option value="老师" ${char.occupation === '老师' ? 'selected' : ''}>老师</option>
+          </select>
+        </div>
+        <div class="ig-ce-section">
           <div class="ig-ce-label">性格标签</div>
           <textarea class="ig-ce-textarea" id="igCePersonality" placeholder="冷静、温柔、占有欲、毒舌...">${escapeHTML(char.personality || '')}</textarea>
         </div>
@@ -418,8 +435,9 @@ function saveIGCharEditor() {
   char.avatar = igCharAvatarData;
   char.name = name;
   char.aliases = $('igCeAliases').value.trim();
-  char.relation = $('igCeRelation').value.trim();
-  char.personality = $('igCePersonality').value.trim();
+char.relation = $('igCeRelation').value.trim();
+   char.occupation = $('igCeOccupation').value.trim();
+   char.personality = $('igCePersonality').value.trim();
   char.style = $('igCeStyle').value.trim();
   char.background = $('igCeBackground').value.trim();
   char.prompt = $('igCePrompt').value.trim();

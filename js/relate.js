@@ -100,44 +100,113 @@ function generateLifeSchedule(char) {
   var cacheKey = (char.id || 'default') + '-' + now.getFullYear() + '-W' + weekNum;
   if (_scheduleCache[cacheKey]) return _scheduleCache[cacheKey];
 
-  var seed = ((char.id || 'default') + '-' + char.name + '-' + weekNum + '-' + (char.persona || '') + '-' + (char.style || '')).split('').reduce(function (h, c) { h = ((h << 5) - h + c.charCodeAt(0)) | 0; return h; }, 0);
+  var seed = ((char.id || 'default') + '-' + char.name + '-' + weekNum + '-' + (char.persona || '') + '-' + (char.style || '') + '-' + (char.occupation || '')).split('').reduce(function (h, c) { h = ((h << 5) - h + c.charCodeAt(0)) | 0; return h; }, 0);
   function srand() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
   function randRange(a, b) { return a + srand() * (b - a); }
   function randInt(a, b) { return Math.floor(randRange(a, b)); }
 
-  var blocks = [];
-  var isStudent = /学|生|校|大学/.test(char.persona || '');
-  var isNightOwl = /夜|猫|晚|晚睡/.test(char.style || char.persona || '');
-  var isEarlyBird = /早|晨|鸟|早起/.test(char.style || char.persona || '');
-  var sleepStart = isNightOwl ? randInt(120, 240) : isEarlyBird ? randInt(0, 120) : randInt(0, 180);
-  var sleepEnd = sleepStart + randInt(360, 540);
-  var wakeEnd = sleepEnd + randInt(30, 60);
-  var workStart = wakeEnd + randInt(0, 60);
-  var workEnd = workStart + randInt(240, 480);
-  var homeStart = workEnd + randInt(0, 120);
+  var occupation = (char.occupation || '').trim();
+  var personality = (char.persona || '') + ' ' + (char.style || '');
+  var isNightOwl = /夜|猫|晚|晚睡|熬夜/.test(personality);
+  var isEarlyBird = /早|晨|鸟|早起/.test(personality);
+
+  // 根据职业确定基础作息
+  var baseSleepStart, baseWakeTime, workStart, workEnd, hasCommute, isStudent;
+  switch (occupation) {
+    case '学生':
+      baseSleepStart = isEarlyBird ? randInt(22, 23) : randInt(23, 24);
+      baseWakeTime = isEarlyBird ? randInt(6, 7) : randInt(7, 8);
+      workStart = isEarlyBird ? randInt(7, 8) : randInt(8, 9);
+      workEnd = randInt(16, 18);
+      hasCommute = true; isStudent = true; break;
+    case '上班族':
+      baseSleepStart = isNightOwl ? randInt(23, 2) : randInt(22, 24);
+      baseWakeTime = isNightOwl ? randInt(8, 10) : randInt(6, 8);
+      workStart = randInt(8, 9); workEnd = randInt(17, 19);
+      hasCommute = true; isStudent = false; break;
+    case '自由职业':
+      baseSleepStart = isNightOwl ? randInt(2, 4) : randInt(0, 2);
+      baseWakeTime = isNightOwl ? randInt(10, 12) : randInt(8, 10);
+      workStart = randInt(9, 14); workEnd = randInt(16, 22);
+      hasCommute = false; isStudent = false; break;
+    case '护士/医生':
+      baseSleepStart = randInt(0, 2);
+      baseWakeTime = randInt(6, 8);
+      workStart = randInt(0, 8); workEnd = randInt(14, 16);
+      hasCommute = true; isStudent = false; break;
+    case '程序员':
+      baseSleepStart = isNightOwl ? randInt(2, 4) : randInt(1, 3);
+      baseWakeTime = randInt(9, 11);
+      workStart = randInt(10, 12); workEnd = randInt(19, 22);
+      hasCommute = false; isStudent = false; break;
+    case '厨师':
+      baseSleepStart = randInt(0, 1);
+      baseWakeTime = randInt(4, 6);
+      workStart = randInt(5, 7); workEnd = randInt(12, 15);
+      hasCommute = true; isStudent = false; break;
+    case '艺术家':
+      baseSleepStart = isNightOwl ? randInt(2, 5) : randInt(1, 3);
+      baseWakeTime = isNightOwl ? randInt(11, 13) : randInt(8, 10);
+      workStart = randInt(10, 14); workEnd = randInt(18, 23);
+      hasCommute = false; isStudent = false; break;
+    case '运动员':
+      baseSleepStart = randInt(0, 1);
+      baseWakeTime = randInt(5, 7);
+      workStart = randInt(6, 8); workEnd = randInt(11, 14);
+      hasCommute = true; isStudent = false; break;
+    case '警察/消防员':
+      baseSleepStart = randInt(0, 2);
+      baseWakeTime = randInt(6, 9);
+      workStart = randInt(0, 12); workEnd = randInt(12, 24);
+      hasCommute = true; isStudent = false; break;
+    case '军人':
+      baseSleepStart = randInt(0, 1);
+      baseWakeTime = randInt(5, 6);
+      workStart = randInt(6, 7); workEnd = randInt(17, 22);
+      hasCommute = true; isStudent = false; break;
+    case '老师':
+      baseSleepStart = isEarlyBird ? randInt(22, 23) : randInt(23, 24);
+      baseWakeTime = isEarlyBird ? randInt(6, 7) : randInt(7, 8);
+      workStart = isEarlyBird ? randInt(7, 8) : randInt(8, 9); workEnd = randInt(16, 18);
+      hasCommute = true; isStudent = false; break;
+    default:
+      baseSleepStart = isNightOwl ? randInt(1, 3) : randInt(0, 2);
+      baseWakeTime = isEarlyBird ? randInt(6, 7) : randInt(7, 9);
+      workStart = randInt(9, 11); workEnd = randInt(17, 20);
+      hasCommute = true; isStudent = false;
+  }
+
+  var sleepEnd = baseWakeTime;
+  var wakeEnd = sleepEnd + randInt(20, 50);
+  var commuteStart = workStart;
+  var commuteEnd = workStart + (hasCommute ? randInt(30, 90) : 0);
+  var realWorkStart = commuteEnd || workStart;
+  var realWorkEnd = workEnd;
+  var homeStart = realWorkEnd + randInt(0, 60);
   var homeEnd = homeStart + randInt(120, 240);
   var nightStart = homeEnd + randInt(0, 60);
-  var nightEnd = 1440;
 
-  blocks.push({ start: 0, end: sleepStart, id: 'night', label: '快睡了', busy: false, canReply: 'normal',
+  var blocks = [];
+  blocks.push({ start: 0, end: baseSleepStart * 60, id: 'night', label: '快睡了', busy: false, canReply: 'normal',
     details: ['躺着刷手机，灯关了一半', '夜深了，人有点软', '本该睡了，还是想再看看你'] });
-  blocks.push({ start: sleepStart, end: sleepEnd, id: 'sleep', label: '在睡觉', busy: true, canReply: 'silent',
+  blocks.push({ start: baseSleepStart * 60, end: sleepEnd * 60, id: 'sleep', label: '在睡觉', busy: true, canReply: 'silent',
     details: ['睡得很沉，呼吸很匀', '翻了个身，还没醒', '在做梦，手机扣在枕头边'] });
-  if (wakeEnd > sleepEnd + 20) blocks.push({ start: sleepEnd, end: wakeEnd, id: 'wake', label: '刚醒', busy: false, canReply: 'short',
+  if (wakeEnd > sleepEnd + 20) blocks.push({ start: sleepEnd * 60, end: wakeEnd * 60, id: 'wake', label: '刚醒', busy: false, canReply: 'short',
     details: ['刚醒，还赖在被窝里', '在洗漱，嘴里还含着泡沫', '头发乱着，刚摸到手机'] });
-  if (isStudent && workEnd > workStart + 60) blocks.push({ start: workStart, end: workEnd, id: 'class', label: '在上课', busy: true, canReply: 'short',
+  if (isStudent && realWorkEnd > realWorkStart + 60) blocks.push({ start: realWorkStart * 60, end: realWorkEnd * 60, id: 'class', label: '在上课', busy: true, canReply: 'short',
     details: ['在上课，手机藏在桌肚', '老师在讲，只能偷摸回一句', '教室里很安静，不太方便打字'] });
-  if (homeEnd > workEnd + 20) blocks.push({ start: workEnd, end: homeStart, id: 'commute', label: '在路上', busy: false, canReply: 'normal',
+  if (hasCommute && commuteEnd > commuteStart + 20 && homeStart > commuteEnd) blocks.push({ start: commuteStart * 60, end: commuteEnd * 60, id: 'commute', label: '在路上', busy: false, canReply: 'normal',
     details: ['刚结束，走在回家的路上', '挤在车上，信号一顿一顿', '晚风挺舒服，突然想跟你说一句'] });
-  blocks.push({ start: homeStart, end: homeEnd, id: 'home', label: '在家', busy: false, canReply: 'eager',
+  if (realWorkStart < 1440 && realWorkEnd > realWorkStart + 60 && (!isStudent || realWorkStart < realWorkEnd)) blocks.push({ start: Math.max(realWorkStart * 60, wakeEnd * 60), end: realWorkEnd * 60, id: 'work', label: '在忙', busy: true, canReply: 'short',
+    details: ['下午的课/班正紧着', '在赶东西，脑子有点转不动', '手头有事，回得会慢一点'] });
+  blocks.push({ start: homeStart * 60, end: homeEnd * 60, id: 'home', label: '在家', busy: false, canReply: 'eager',
     details: ['在家待着，终于能好好看手机', '在做饭，油烟有点呛', '窝在沙发上，空了一块位置'] });
-  if (homeEnd < 1380) blocks.push({ start: homeEnd, end: Math.min(homeEnd + randInt(30, 60), 1440), id: 'shower', label: '在洗漱', busy: true, canReply: 'short',
+  if (homeEnd * 60 < 1380) blocks.push({ start: homeEnd * 60, end: Math.min(homeEnd * 60 + randInt(30, 60), 1440), id: 'shower', label: '在洗漱', busy: true, canReply: 'short',
     details: ['在洗澡，头发还湿着', '刚洗完，蒸汽还没散', '对着镜子发呆，想起你了'] });
-  if (nightStart < homeEnd) nightStart = homeEnd;
-  if (nightStart < 1320) blocks.push({ start: nightStart, end: 1440, id: 'night', label: '快睡了', busy: false, canReply: 'normal',
+  if (nightStart * 60 < homeEnd * 60) nightStart = homeEnd;
+  if (nightStart * 60 < 1320) blocks.push({ start: nightStart * 60, end: 1440, id: 'night', label: '快睡了', busy: false, canReply: 'normal',
     details: ['躺着刷手机，灯关了一半', '夜深了，人有点软', '本该睡了，还是想再看看你'] });
 
-  // 确保覆盖0-1440
   blocks.sort(function (a, b) { return a.start - b.start; });
   var merged = [];
   blocks.forEach(function (b) {
@@ -180,12 +249,13 @@ var LIFE_BLOCKS = [
     details: ['躺着刷手机，灯关了一半', '夜深了，人有点软', '本该睡了，还是想再看看你'] },
 ];
 
-function pickLifeBlock(mins) {
-  for (var i = 0; i < LIFE_BLOCKS.length; i++) {
-    var b = LIFE_BLOCKS[i];
+function pickLifeBlock(mins, char) {
+  var blocks = getLifeBlocks(char);
+  for (var i = 0; i < blocks.length; i++) {
+    var b = blocks[i];
     if (mins >= b.start && mins < b.end) return b;
   }
-  return LIFE_BLOCKS[0];
+  return blocks[0];
 }
 
 function lifeDetail(block, char) {
@@ -282,7 +352,8 @@ function tickCharacterLife(char, now) {
   now = now || Date.now();
   decayBondOverTime(char, now);
   var mins = relateCharMinutes(char);
-  var block = pickLifeBlock(mins);
+  char.lifeSchedule = generateLifeSchedule(char);
+  var block = pickLifeBlock(mins, char);
   var overlay = maybeLifeOverlay(char, block, now);
   if (overlay) {
     block = {

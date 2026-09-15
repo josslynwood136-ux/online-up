@@ -24,6 +24,7 @@ const defaultState = {
       persona: '',
       greeting: '我在。先把我的角色卡改成你想要的样子吧。',
       mood: '😊',
+      occupation: '',
       examples: '',
       memories: [],
       chat: [{ role: 'assistant', content: '我在。先把我的角色卡改成你想要的样子吧。' }],
@@ -61,23 +62,15 @@ const defaultState = {
     rooms: {
       living: {
         name: '客厅',
-        bg: 'https://img.facfox.com/imgs/2026/07/19/06d3c79d7f440afd.jpg',
-        person: 'https://img.facfox.com/imgs/2026/07/19/ea51598f7d0459ee.jpg',
+        bg: '',
+        person: '',
         personPos: { x: 50, y: 72 },
-        furniture: [
-          { id: 'fur-sofa', name: '沙发', img: '', x: 22, y: 56, w: 48, h: 22, actions: [{ label: '瘫一会儿', result: '小人瘫在沙发上，像一颗被吸干的电池。' }, { label: '抱紧抱枕', result: '小人抱紧抱枕，获得了短暂的安全感。' }, { cid: 'couple', label: '和 TA 一起瘫', result: '小人靠在 TA 肩头，两个人什么都不用说，却很安心。', kiss: true }] },
-          { id: 'fur-table', name: '茶几', img: '', x: 34, y: 70, w: 24, h: 10, actions: [{ label: '喝茶', result: '小人端起茶杯抿了一口，暖意从手心传到心里。' }] },
-          { id: 'fur-shelf', name: '书架', img: '', x: 80, y: 10, w: 16, h: 40, actions: [{ label: '翻书', result: '小人抽出一本书翻了几页，又放了回去。' }] },
-          { id: 'fur-lamp', name: '落地灯', img: '', x: 14, y: 56, w: 8, h: 22, actions: [{ label: '开灯', result: '小人拧了一下开关，暖黄的光洒了下来。' }] },
-          { id: 'fur-pot', name: '绿植', img: '', x: 82, y: 86, w: 8, h: 12, actions: [{ label: '浇点水', result: '小人给绿植浇了水，叶子抖了抖。' }] },
-          { id: 'fur-cabinet', name: '落地边柜', img: '', x: 18, y: 42, w: 55, h: 18, actions: [{ label: '整理一下', result: '小人把柜子里的东西摆整齐了。' }] },
-          { id: 'fur-coffee', name: '咖啡机', img: '', x: 24, y: 62, w: 10, h: 14, actions: [{ label: '来杯咖啡', result: '小人按下按钮，浓郁的咖啡香飘了出来。☕' }] }
-        ]
+        furniture: []
       },
       bathroom: {
         name: '浴室',
         bg: '',
-        person: 'https://img.facfox.com/imgs/2026/07/19/ea51598f7d0459ee.jpg',
+        person: '',
         personPos: { x: 30, y: 68 },
         effects: ['steam', 'bubble'],
         furniture: [
@@ -125,6 +118,72 @@ const defaultState = {
           { id: 'fur-scale', name: '⚖️ 体重秤', img: '', x: 44, y: 68, w: 10, h: 12, actions: [
             { label: '称体重', result: '小人站上体重秤，低头看了一眼数字，面无表情地走下来了。⚖️' },
             { label: '把它藏起来', result: '小人把体重秤塞到角落眼不见心不烦，舒服了。😌' }
+          ]}
+        ]
+      },
+      bedroom: {
+        name: '卧室',
+        bg: '',
+        person: '',
+        personPos: { x: 60, y: 82 },
+        furniture: [
+          { id: 'fur-bed', name: '🛏️ 大床', img: '', x: 10, y: 40, w: 80, h: 42, actions: [
+            { label: '躺下睡觉', result: '小人缩进被窝里，枕头软乎乎的，很快就闭上了眼睛。😴' },
+            { label: '起床', result: '小人伸了个懒腰，从床上坐了起来，新的一天开始了。' },
+            { label: '翻滚', result: '小人在床上滚了个身，床单发出沙沙的响声。' }
+          ]},
+          { id: 'fur-wardrobe', name: '👗 衣柜', img: '', x: 8, y: 6, w: 22, h: 32, actions: [
+            { label: '整理衣物', result: '小人把叠好的衣服整齐地放进衣柜，每件都放平了。' },
+            { label: '挑选衣服', result: '小人打开柜门，在几件衣服间犹豫了半天，最后选了那件最喜欢的。' }
+          ]},
+          { id: 'fur-dresser', name: '🪞 梳妆台', img: '', x: 78, y: 6, w: 18, h: 28, actions: [
+            { label: '化妆', result: '小人对着镜子画了画眉毛，涂了点口红，精神了许多。💄' },
+            { label: '整理头发', result: '小人用梳子把头发打理得整整齐齐，还喷了点香味。' }
+          ]},
+          { id: 'fur-nightlamp', name: '💡 台灯', img: '', x: 72, y: 86, w: 12, h: 10, actions: [
+            { label: '开灯', result: '小人拧开台灯，暖黄的光晕洒满了小角落。💡' },
+            { label: '关灯', result: '小人关了灯，房间陷入温柔的黑暗。只有窗外透进来一点月光。' }
+          ]},
+          { id: 'fur-carpet', name: '🧶 地毯', img: '', x: 2, y: 82, w: 16, h: 14, actions: [
+            { label: '坐着', result: '小人盘腿坐在地毯上，托着下巴发呆。' },
+            { label: '躺着', result: '小人舒舒服服地躺在地毯上，听起了音乐。🎵' }
+          ]},
+          { id: 'fur-pillow', name: '💤 枕头', img: '', x: 26, y: 78, w: 24, h: 14, actions: [
+            { label: '抱枕', result: '小人把枕头抱在怀里，感觉安心了不少。' },
+            { label: '拍一拍', result: '小人拍了拍枕头，抖了抖灰，准备躺下了。' }
+          ]}
+        ]
+      },
+      kitchen: {
+        name: '厨房',
+        bg: '',
+        person: '',
+        personPos: { x: 40, y: 80 },
+        furniture: [
+          { id: 'fur-fridge', name: '🧊 冰箱', img: '', x: 2, y: 10, w: 22, h: 50, actions: [
+            { label: '打开冰箱', result: '冰箱门打开，冷气扑面而来，里面有昨天剩的菜和一瓶牛奶。' },
+            { label: '拿出食材', result: '小人从冰箱里拿出新鲜蔬菜和鸡蛋，准备做饭。' }
+          ]},
+          { id: 'fur-stove', name: '🔥 灶台', img: '', x: 32, y: 38, w: 28, h: 38, actions: [
+            { label: '点火', result: '小人拧开灶台，"啪"地一声，火苗蹿了起来。' },
+            { label: '烧水', result: '小人往锅里倒水，放在灶台上，不一会儿水就烧开了。💧' },
+            { label: '炒菜', result: '小人颠了颠锅，香味飘满整个厨房。🍳' }
+          ]},
+          { id: 'fur-counter', name: '🪑 料理台', img: '', x: 66, y: 30, w: 26, h: 26, actions: [
+            { label: '切菜', result: '小人左手按住土豆，右手拿刀，"笃笃笃"地切了起来。' },
+            { label: '摆盘', result: '小人把菜仔仔细细地摆在盘子里，像在创作艺术品。🎨' }
+          ]},
+          { id: 'fur-kitchensink', name: '🚿 水槽', img: '', x: 66, y: 68, w: 16, h: 20, actions: [
+            { label: '洗碗', result: '小人把碗放在水槽里，里里外外刷了好几遍，冲干净了。' },
+            { label: '洗菜', result: '小人把青菜在水流下冲了冲，抖了抖，准备下锅。🥬' }
+          ]},
+          { id: 'fur-microwave', name: '📦 微波炉', img: '', x: 2, y: 70, w: 16, h: 18, actions: [
+            { label: '热饭', result: '小人把饭盒放进微波炉，"叮"一声，热好了。' },
+            { label: '解冻', result: '小人把冻肉放进去，设定了时间，等待解冻。' }
+          ]},
+          { id: 'fur-diningtable', name: '🍽️ 餐桌', img: '', x: 28, y: 78, w: 44, h: 20, actions: [
+            { label: '吃饭', result: '小人坐下来，端起筷子，吃了满满一碗。🍚' },
+            { label: '喝茶', result: '小人泡了一杯热茶，坐在桌前慢慢喝完。🍵' }
           ]}
         ]
       }
@@ -291,8 +350,8 @@ function ensureStateShape(next, saved) {
     var migrated = {};
     migrated.living = {
       name: '客厅',
-      bg: next.home.bg || def.living.bg,
-      person: next.home.person || def.living.person,
+      bg: def.living.bg,
+      person: def.living.person,
       personPos: next.home.personPos || { x: 50, y: 72 },
       furniture: (next.home.furniture || []).length ? next.home.furniture : JSON.parse(JSON.stringify(def.living.furniture))
     };

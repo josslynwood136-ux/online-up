@@ -54,6 +54,7 @@ function closeApp() {
   if (window._openAppName === '游戏' || window._openAppName === '游戏房' || window._openAppName === '游戏游戏') {
     if (gameMode !== 'list') { gameMode = 'list'; renderGame(); return; }
   }
+  destroyBedroom3D();
   _willowFogShown = false;
   if (spaceFxTimer) { clearInterval(spaceFxTimer); spaceFxTimer = null; }
   var hc = $('homeCouple'); if (hc) hc.style.display = 'none';
@@ -544,6 +545,21 @@ function renderCharacterEditor(id) {
         <input class="field" id="charAliases" value="${escapeHTML(char.aliases)}" placeholder="多个别名用逗号隔开">
         <label class="label">关系设定</label>
         <input class="field" id="charRelation" value="${escapeHTML(char.relation)}" placeholder="朋友 / 恋人 / 搭档 / 自定义">
+        <label class="label">职业</label>
+        <select class="field" id="charOccupation" style="border:none;background:#f7f5f2;border-radius:8px;padding:8px 10px;font-size:13px;outline:none;color:#5a4a3a">
+          <option value="">不设职业</option>
+          <option value="学生" ${char.occupation === '学生' ? 'selected' : ''}>学生</option>
+          <option value="上班族" ${char.occupation === '上班族' ? 'selected' : ''}>上班族</option>
+          <option value="自由职业" ${char.occupation === '自由职业' ? 'selected' : ''}>自由职业</option>
+          <option value="护士/医生" ${char.occupation === '护士/医生' ? 'selected' : ''}>护士/医生</option>
+          <option value="程序员" ${char.occupation === '程序员' ? 'selected' : ''}>程序员</option>
+          <option value="厨师" ${char.occupation === '厨师' ? 'selected' : ''}>厨师</option>
+          <option value="艺术家" ${char.occupation === '艺术家' ? 'selected' : ''}>艺术家</option>
+          <option value="运动员" ${char.occupation === '运动员' ? 'selected' : ''}>运动员</option>
+          <option value="警察/消防员" ${char.occupation === '警察/消防员' ? 'selected' : ''}>警察/消防员</option>
+          <option value="军人" ${char.occupation === '军人' ? 'selected' : ''}>军人</option>
+          <option value="老师" ${char.occupation === '老师' ? 'selected' : ''}>老师</option>
+        </select>
         <label class="label">性格标签</label>
         <textarea class="textarea" id="charPersonality" placeholder="冷静、温柔、占有欲、毒舌...">${escapeHTML(char.personality)}</textarea>
         <label class="label">说话风格</label>
@@ -609,8 +625,9 @@ function saveCharacter(id) {
   char.avatar = $('charAvatar').value.trim();
   char.name = $('charName').value.trim() || '未命名角色';
   char.aliases = $('charAliases').value.trim();
-  char.relation = $('charRelation').value.trim();
-  char.personality = $('charPersonality').value.trim();
+char.relation = $('charRelation').value.trim();
+   char.occupation = $('charOccupation').value.trim();
+   char.personality = $('charPersonality').value.trim();
   char.style = $('charStyle').value.trim();
   char.background = $('charBackground').value.trim();
   char.prompt = $('charPrompt').value.trim();
@@ -1156,7 +1173,7 @@ const YARD_CROPS = {
 const YARD_DEFAULT = {
   name: '庭院',
   bg: '',
-  person: 'https://img.facfox.com/imgs/2026/07/19/ea51598f7d0459ee.jpg',
+  person: '',
   personPos: { x: 50, y: 88 },
   furniture: [
     { id: 'fur-swing', name: '秋千', img: '', x: 2, y: 44, w: 22, h: 24, actions: [
@@ -1320,6 +1337,35 @@ function yardState() {
   }
   h.rooms.yard.bg = '';
   return h.rooms.yard;
+}
+
+function ensureHomeRooms() {
+  var h = state.home;
+  if (!h || !h.rooms) return;
+  var defaults = defaultState.home.rooms || {};
+  var changed = false;
+  Object.keys(defaults).forEach(function (rid) {
+    if (!h.rooms[rid]) {
+      h.rooms[rid] = JSON.parse(JSON.stringify(defaults[rid]));
+      changed = true;
+    } else {
+      var room = h.rooms[rid];
+      if (!room.furniture || room.furniture.length === 0) {
+        room.furniture = JSON.parse(JSON.stringify(defaults[rid].furniture || []));
+        changed = true;
+      }
+      // 清空外链图片
+      if (room.bg && typeof room.bg === 'string' && room.bg.startsWith('http')) {
+        room.bg = '';
+        changed = true;
+      }
+      if (room.person && typeof room.person === 'string' && room.person.startsWith('http')) {
+        room.person = '';
+        changed = true;
+      }
+    }
+  });
+  if (changed) saveState();
 }
 
 function yardProgress(p) {
@@ -1522,34 +1568,42 @@ function renderHome() {
   const DEFAULT_PERSON = 'https://img.facfox.com/imgs/2026/07/19/ea51598f7d0459ee.jpg';
   var h = state.home;
   if (!h || !h.rooms) { state.home = JSON.parse(JSON.stringify(defaultState.home)); h = state.home; saveState(); }
+  ensureHomeRooms();
   var activeId = h.activeRoom || 'living';
   var room = h.rooms[activeId];
   if (!room) { activeId = 'living'; room = h.rooms.living; h.activeRoom = 'living'; saveState(); }
   var yd = yardState();
   var plotHtml = (activeId === 'yard' && yd) ? renderYardPlots(yd) : '';
   var bathHtml = '';
-  var sceneHtml = (activeId === 'living' || activeId === 'bathroom') ? livingRoomArt() : '';
+  var sceneHtml = '';
+  if (activeId === 'living' || activeId === 'bathroom') sceneHtml = livingRoomArt();
+  if (activeId === 'kitchen') sceneHtml = kitchenArt();
   var isBath = (activeId === 'bathroom');
-  var furHtml = (room.furniture || []).map(function (f) {
-    var isYard = (activeId === 'yard');
-    var imgUrl = isYard ? (f.img || YARD_FUR_IMG[f.id] || '') : (f.img || '');
-    if (f.id === 'fur-plant') imgUrl = '';
-    var inner = '';
-    if (isYard) {
-      inner = imgUrl ? '<img class="yard-fur-img" src="' + escapeHTML(imgUrl) + '" alt="' + escapeHTML(f.id) + '">' : yardFurArt(f.id);
-    } else if (imgUrl) {
-      inner = '';
+var furHtml = '';
+    if (activeId === 'bedroom') {
+      furHtml = '<canvas id="bedroomCanvas" style="width:100%;height:100%;display:block;cursor:grab"></canvas>';
     } else {
-      inner = furArt(f.id);
+      furHtml = (room.furniture || []).map(function (f) {
+        var isYard = (activeId === 'yard');
+        var imgUrl = isYard ? (f.img || YARD_FUR_IMG[f.id] || '') : (f.img || '');
+        if (f.id === 'fur-plant') imgUrl = '';
+        var inner = '';
+        if (isYard) {
+          inner = imgUrl ? '<img class="yard-fur-img" src="' + escapeHTML(imgUrl) + '" alt="' + escapeHTML(f.id) + '">' : yardFurArt(f.id);
+        } else if (imgUrl) {
+          inner = '';
+        } else {
+          inner = furArt(f.id);
+        }
+        var hasArt = (!isYard && !imgUrl && inner) ? ' art' : '';
+        var depthStyle = '';
+        if (activeId === 'living' || isBath) {
+          var d = Math.max(0, Math.min(100, f.y)) / 100;
+          depthStyle = ';transform:scale(' + (0.6 + d * 0.8).toFixed(3) + ');transform-origin:50% 100%;z-index:' + Math.round(20 + f.y);
+        }
+        return '<div class="home-fur' + hasArt + '" data-fid="' + f.id + '" style="left:' + f.x + '%;top:' + f.y + '%;width:' + f.w + '%;height:' + f.h + '%;background-image:' + (imgUrl && !isYard ? ('url(\'' + escapeHTML(imgUrl) + '\')') : 'none') + depthStyle + '">' + (inner ? '<div class="' + (isYard ? 'yard-fur-art' : 'fur-art') + '">' + inner + '</div>' : '') + '<span class="home-fur-name">' + escapeHTML(f.name) + '</span></div>';
+      }).join('');
     }
-    var hasArt = (!isYard && !imgUrl && inner) ? ' art' : '';
-    var depthStyle = '';
-    if (activeId === 'living' || isBath) {
-      var d = Math.max(0, Math.min(100, f.y)) / 100;
-      depthStyle = ';transform:scale(' + (0.6 + d * 0.8).toFixed(3) + ');transform-origin:50% 100%;z-index:' + Math.round(20 + f.y);
-    }
-    return '<div class="home-fur' + hasArt + '" data-fid="' + f.id + '" style="left:' + f.x + '%;top:' + f.y + '%;width:' + f.w + '%;height:' + f.h + '%;background-image:' + (imgUrl && !isYard ? ('url(\'' + escapeHTML(imgUrl) + '\')') : 'none') + depthStyle + '">' + (inner ? '<div class="' + (isYard ? 'yard-fur-art' : 'fur-art') + '">' + inner + '</div>' : '') + '<span class="home-fur-name">' + escapeHTML(f.name) + '</span></div>';
-  }).join('');
   var roomTabs = Object.keys(h.rooms).map(function(rid) {
     var r = h.rooms[rid];
     return '<div class="home-tab' + (rid === activeId ? ' active' : '') + '" onclick="switchRoom(\'' + rid + '\')">' + escapeHTML(r.name) + '</div>';
@@ -1565,7 +1619,7 @@ function renderHome() {
   ensureHomeCoupleActions();
   c().innerHTML = `
     <div class="stack" style="height:100%;margin:0;padding:0;position:relative">
-      <div class="home-room${activeId === 'yard' ? ' yard' : ''}">
+      <div class="home-room${activeId === 'yard' ? ' yard' : ''}${activeId === 'bedroom' ? ' bedroom' : ''}${activeId === 'kitchen' ? ' kitchen' : ''}">
         <div class="home-bg"${room.bg ? ` style="background-image:url('${escapeHTML(room.bg)}')"` : ''}></div>
         ${sceneHtml}
         <div class="home-exit" onclick="closeApp()" title="退出">✕</div>
@@ -1615,9 +1669,860 @@ function renderHome() {
       }
     };
   }
+  if (activeId === 'bedroom') {
+    setTimeout(initBedroom3D, 100);
+  }
+}
+
+var bedroom3DScene = null;
+var bedroom3DRenderer = null;
+var bedroom3DCamera = null;
+var bedroom3DControls = null;
+var bedroom3DAnimId = null;
+
+function initBedroom3D() {
+  if (bedroom3DScene) return;
+  if (!window.THREE || !window.OrbitControls) { setTimeout(initBedroom3D, 50); return; }
+  var canvas = document.getElementById('bedroomCanvas');
+  if (!canvas) return;
+  var THREE = window.THREE;
+  var OrbitControls = window.OrbitControls;
+
+  bedroom3DScene = new THREE.Scene();
+  bedroom3DScene.background = new THREE.Color(0x1a1a2e);
+  bedroom3DScene.fog = new THREE.Fog(0xf5ead8, 12, 20);
+
+  bedroom3DCamera = new THREE.PerspectiveCamera(50, canvas.clientWidth / Math.max(1, canvas.clientHeight), 0.1, 100);
+  bedroom3DCamera.position.set(4, 3, 5);
+
+  bedroom3DRenderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+  bedroom3DRenderer.setSize(canvas.clientWidth, canvas.clientHeight);
+  bedroom3DRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  bedroom3DRenderer.shadowMap.enabled = true;
+  bedroom3DRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  bedroom3DControls = new OrbitControls(bedroom3DCamera, canvas);
+  bedroom3DControls.enableDamping = true;
+  bedroom3DControls.enablePan = true;
+  bedroom3DControls.panSpeed = 0.8;
+  bedroom3DControls.target.set(0, 0.8, 0);
+  bedroom3DControls.minDistance = 1.5;
+  bedroom3DControls.maxDistance = 10;
+  bedroom3DControls.maxPolarAngle = Math.PI / 2.1;
+  bedroom3DControls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+
+// Walls — wallpaper with visible pattern
+    var wallCanvas = document.createElement('canvas');
+    wallCanvas.width = 512;
+    wallCanvas.height = 512;
+    var wCtx = wallCanvas.getContext('2d');
+    // Base: warm cream
+    wCtx.fillStyle = '#f5ead8';
+    wCtx.fillRect(0, 0, 512, 512);
+    // Large cross-hatch grid
+    wCtx.strokeStyle = 'rgba(200, 175, 150, 0.35)';
+    wCtx.lineWidth = 1;
+    for (var i = 0; i < 512; i += 64) {
+      wCtx.beginPath(); wCtx.moveTo(i, 0); wCtx.lineTo(i, 512); wCtx.stroke();
+      wCtx.beginPath(); wCtx.moveTo(0, i); wCtx.lineTo(512, i); wCtx.stroke();
+    }
+    // Diagonal lines inside each cell
+    wCtx.strokeStyle = 'rgba(195, 170, 145, 0.18)';
+    wCtx.lineWidth = 0.8;
+    for (var i2 = 0; i2 < 512; i2 += 64) {
+      for (var j2 = 0; j2 < 512; j2 += 64) {
+        wCtx.beginPath(); wCtx.moveTo(i2, j2); wCtx.lineTo(i2 + 64, j2 + 64); wCtx.stroke();
+        wCtx.beginPath(); wCtx.moveTo(i2 + 64, j2); wCtx.lineTo(i2, j2 + 64); wCtx.stroke();
+      }
+    }
+    // Small flower in each cell center
+    for (var cx = 32; cx < 512; cx += 64) {
+      for (var cy = 32; cy < 512; cy += 64) {
+        for (var p = 0; p < 5; p++) {
+          var angle = (p / 5) * Math.PI * 2 - Math.PI / 2;
+          var px = cx + Math.cos(angle) * 12;
+          var py = cy + Math.sin(angle) * 12;
+          wCtx.fillStyle = 'rgba(200, 160, 160, 0.3)';
+          wCtx.beginPath();
+          wCtx.arc(px, py, 5, 0, Math.PI * 2);
+          wCtx.fill();
+        }
+        // Center dot
+        wCtx.fillStyle = 'rgba(220, 180, 140, 0.4)';
+        wCtx.beginPath();
+        wCtx.arc(cx, cy, 3, 0, Math.PI * 2);
+        wCtx.fill();
+      }
+    }
+    var wallTexture = new THREE.CanvasTexture(wallCanvas);
+    wallTexture.wrapS = THREE.RepeatWrapping;
+    wallTexture.wrapT = THREE.RepeatWrapping;
+    wallTexture.repeat.set(2, 2);
+    var wallMat = new THREE.MeshStandardMaterial({
+      map: wallTexture,
+      roughness: 0.65,
+      metalness: 0.02,
+      color: 0xffffff,
+      side: THREE.DoubleSide
+    });
+    function makeWall(w, h, x, z, rotY) {
+      var wall = new THREE.Mesh(new THREE.PlaneGeometry(w, h), wallMat);
+      wall.position.set(x, h / 2, z);
+      wall.rotation.y = rotY;
+      wall.receiveShadow = true;
+      bedroom3DScene.add(wall);
+    }
+    makeWall(8, 3, 0, -4, 0);
+    makeWall(8, 3, -4, 0, Math.PI / 2);
+
+    // Bay window (飘窗) — protrudes from left wall at x=-4
+    var bayMat = new THREE.MeshStandardMaterial({ color: 0xe8dcc8, roughness: 0.8 });
+    var glassMat = new THREE.MeshStandardMaterial({
+      color: 0xa8d8ea, transparent: true, opacity: 0.4,
+      roughness: 0.1, metalness: 0.05, side: THREE.DoubleSide
+    });
+    var frameMat2 = new THREE.MeshStandardMaterial({ color: 0xd4b896, roughness: 0.6 });
+    var baySeat = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.4, 1.6), bayMat);
+    baySeat.position.set(-4.1, 0.4, 0);
+    baySeat.castShadow = true;
+    baySeat.receiveShadow = true;
+    baySeat.userData.fid = 'fur-carpet';
+    bedroom3DScene.add(baySeat);
+    var bayCushionL = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.3, 0.6), new THREE.MeshStandardMaterial({ color: 0xf0d8e8, roughness: 0.9 }));
+    bayCushionL.position.set(-4.1, 0.65, -0.3);
+    bayCushionL.castShadow = true;
+    bayCushionL.userData.fid = 'fur-pillow';
+    bedroom3DScene.add(bayCushionL);
+    var bayCushionR = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.3, 0.6), new THREE.MeshStandardMaterial({ color: 0xd8c8e0, roughness: 0.9 }));
+    bayCushionR.position.set(-4.1, 0.65, 0.3);
+    bayCushionR.castShadow = true;
+    bayCushionR.userData.fid = 'fur-pillow';
+    bedroom3DScene.add(bayCushionR);
+    var bayFrame = new THREE.Mesh(new THREE.BoxGeometry(0.15, 1.4, 1.8), frameMat2);
+    bayFrame.position.set(-4.65, 0.9, 0);
+    bayFrame.castShadow = true;
+    bayFrame.userData.fid = 'fur-dresser';
+    bedroom3DScene.add(bayFrame);
+    var bayGlass1 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.2, 0.7), glassMat);
+    bayGlass1.position.set(-4.55, 0.9, -0.4);
+    bedroom3DScene.add(bayGlass1);
+    var bayGlass2 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.2, 0.7), glassMat);
+    bayGlass2.position.set(-4.55, 0.9, 0.4);
+    bedroom3DScene.add(bayGlass2);
+    var bayGlassTop = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 1.6), glassMat);
+    bayGlassTop.position.set(-4.55, 1.6, 0);
+    bedroom3DScene.add(bayGlassTop);
+    var baySill = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.06, 1.8), frameMat2);
+    baySill.position.set(-4.65, 0.03, 0);
+    baySill.receiveShadow = true;
+    baySill.userData.fid = 'fur-carpet';
+    bedroom3DScene.add(baySill);
+
+    // Lighting — warm cozy bedroom
+    var ambient = new THREE.AmbientLight(0xfff0e0, 0.25);
+    bedroom3DScene.add(ambient);
+
+    var dirLight = new THREE.DirectionalLight(0xffe8c8, 0.8);
+    dirLight.position.set(3, 8, 6);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.set(1024, 1024);
+    dirLight.shadow.camera.near = 0.5;
+    dirLight.shadow.camera.far = 20;
+    dirLight.shadow.camera.left = -6;
+    dirLight.shadow.camera.right = 6;
+    dirLight.shadow.camera.top = 6;
+    dirLight.shadow.camera.bottom = -6;
+    bedroom3DScene.add(dirLight);
+
+    var hemiLight = new THREE.HemisphereLight(0xffe8c8, 0x3a2a1a, 0.3);
+    bedroom3DScene.add(hemiLight);
+
+    // Night lamp warm glow
+    var lampLight = new THREE.PointLight(0xffe4a0, 1.5, 5, 2);
+    lampLight.position.set(-2, 0.6, 0.5);
+    bedroom3DScene.add(lampLight);
+
+    // Soft fill from bed area
+    var bedLight = new THREE.PointLight(0xfff0d0, 0.6, 4, 2);
+    bedLight.position.set(0, 1.5, 0);
+    bedroom3DScene.add(bedLight);
+
+    // Subtle rim light from back wall
+    var rimLight = new THREE.PointLight(0xc8b8a8, 0.4, 8, 2);
+    rimLight.position.set(0, 2, -4);
+    bedroom3DScene.add(rimLight);
+
+    // Floor
+    var floorMat = new THREE.MeshStandardMaterial({ color: 0xd4b896, roughness: 0.9, metalness: 0.05 });
+  var floor = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), floorMat);
+  floor.rotation.x = -Math.PI / 2;
+  floor.receiveShadow = true;
+  floor.userData.fid = 'fur-floor';
+  bedroom3DScene.add(floor);
+
+// Lighting — warm cozy bedroom
+    var ambient = new THREE.AmbientLight(0xfff0e0, 0.25);
+    bedroom3DScene.add(ambient);
+
+    var dirLight = new THREE.DirectionalLight(0xffe8c8, 0.8);
+    dirLight.position.set(3, 8, 6);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.set(1024, 1024);
+    dirLight.shadow.camera.near = 0.5;
+    dirLight.shadow.camera.far = 20;
+    dirLight.shadow.camera.left = -6;
+    dirLight.shadow.camera.right = 6;
+    dirLight.shadow.camera.top = 6;
+    dirLight.shadow.camera.bottom = -6;
+    bedroom3DScene.add(dirLight);
+
+    var hemiLight = new THREE.HemisphereLight(0xffe8c8, 0x3a2a1a, 0.3);
+    bedroom3DScene.add(hemiLight);
+
+    // Night lamp warm glow
+    var lampLight = new THREE.PointLight(0xffe4a0, 1.5, 5, 2);
+    lampLight.position.set(-2, 0.6, 0.5);
+    bedroom3DScene.add(lampLight);
+
+    // Soft fill from bed area
+    var bedLight = new THREE.PointLight(0xfff0d0, 0.6, 4, 2);
+    bedLight.position.set(0, 1.5, 0);
+    bedroom3DScene.add(bedLight);
+
+    // Subtle rim light from back wall
+    var rimLight = new THREE.PointLight(0xc8b8a8, 0.4, 8, 2);
+    rimLight.position.set(0, 2, -4);
+    bedroom3DScene.add(rimLight);
+
+    // Floor
+  var bedGroup = new THREE.Group();
+  var woodDark = new THREE.MeshStandardMaterial({ color: 0x6b4226, roughness: 0.55, metalness: 0.05 });
+  var woodMid = new THREE.MeshStandardMaterial({ color: 0x8b5e3c, roughness: 0.6, metalness: 0.03 });
+  var woodLight = new THREE.MeshStandardMaterial({ color: 0xa07848, roughness: 0.55 });
+
+  // Frame base
+  var bedBase = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.12, 1.5), woodMid);
+  bedBase.position.y = 0.16;
+  bedBase.castShadow = true;
+  bedBase.receiveShadow = true;
+  bedBase.userData.fid = 'fur-bed';
+  bedGroup.add(bedBase);
+
+  // Legs — tapered cylinders
+  var bedLegGeo = new THREE.CylinderGeometry(0.04, 0.06, 0.28, 8);
+  [[-1.05, -0.62], [1.05, -0.62], [-1.05, 0.62], [1.05, 0.62]].forEach(function(p) {
+    var leg = new THREE.Mesh(bedLegGeo, woodDark);
+    leg.position.set(p[0], 0.02, p[1]);
+    leg.castShadow = true;
+    leg.userData.fid = 'fur-bed';
+    bedGroup.add(leg);
+  });
+
+  // Side rails
+  var railGeo = new THREE.BoxGeometry(0.06, 0.14, 1.4);
+  [-1.12, 1.12].forEach(function(x) {
+    var rail = new THREE.Mesh(railGeo, woodMid);
+    rail.position.set(x, 0.28, 0);
+    rail.castShadow = true;
+    rail.userData.fid = 'fur-bed';
+    bedGroup.add(rail);
+  });
+  // Foot rail
+  var footRail = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.1, 0.06), woodMid);
+  footRail.position.set(0, 0.22, 0.72);
+  footRail.castShadow = true;
+  footRail.userData.fid = 'fur-bed';
+  bedGroup.add(footRail);
+
+  // Mattress
+  var mattMat = new THREE.MeshStandardMaterial({ color: 0xf8f4ee, roughness: 0.92 });
+  var matt = new THREE.Mesh(new THREE.BoxGeometry(2.15, 0.18, 1.35), mattMat);
+  matt.position.y = 0.38;
+  matt.castShadow = true;
+  matt.userData.fid = 'fur-bed';
+  bedGroup.add(matt);
+
+  // Mattress top quilting lines
+  var quiltMat = new THREE.MeshStandardMaterial({ color: 0xeee8dc, roughness: 0.9 });
+  for (var qi = -0.8; qi <= 0.8; qi += 0.4) {
+    var qLine = new THREE.Mesh(new THREE.BoxGeometry(2.15, 0.01, 0.03), quiltMat);
+    qLine.position.set(0, 0.48, qi);
+    qLine.userData.fid = 'fur-bed';
+    bedGroup.add(qLine);
+  }
+
+  // Duvet — soft wavy surface
+  var duvetMat = new THREE.MeshStandardMaterial({ color: 0xb0c4d8, roughness: 0.88, side: THREE.DoubleSide });
+  var duvetGeo = new THREE.PlaneGeometry(2.1, 1.0, 20, 12);
+  var duvetPos = duvetGeo.attributes.position;
+  for (var di = 0; di < duvetPos.count; di++) {
+    var dx = duvetPos.getX(di);
+    var dz = duvetPos.getY(di);
+    // Wave across the surface
+    var wave = Math.sin(dx * 3.5) * 0.025 + Math.cos(dz * 4.2) * 0.02;
+    // Slight droop at edges
+    var edgeDrop = (Math.abs(dx) > 0.8 ? (Math.abs(dx) - 0.8) * 0.08 : 0);
+    // Slight lift in center
+    var centerLift = (1.0 - Math.abs(dx) * 0.8) * 0.015;
+    duvetPos.setZ(di, wave - edgeDrop + centerLift);
+  }
+  duvetGeo.computeVertexNormals();
+  var duvet = new THREE.Mesh(duvetGeo, duvetMat);
+  duvet.rotation.x = -Math.PI / 2;
+  duvet.position.set(0, 0.52, 0.2);
+  duvet.castShadow = true;
+  duvet.receiveShadow = true;
+  duvet.userData.fid = 'fur-bed';
+  bedGroup.add(duvet);
+
+  // Duvet folded edge — soft curved roll
+  var foldGeo = new THREE.CylinderGeometry(0.05, 0.05, 2.1, 12, 1);
+  foldGeo.rotateZ(Math.PI / 2);
+  var foldMat = new THREE.MeshStandardMaterial({ color: 0xa0b4c8, roughness: 0.85 });
+  var duvetFold = new THREE.Mesh(foldGeo, foldMat);
+  duvetFold.position.set(0, 0.53, 0.12);
+  duvetFold.castShadow = true;
+  duvetFold.userData.fid = 'fur-bed';
+  bedGroup.add(duvetFold);
+
+  // Duvet decorative stripes
+  var stripeMat = new THREE.MeshStandardMaterial({ color: 0x90a8bc, roughness: 0.82 });
+  [-0.18, -0.03, 0.12].forEach(function(z) {
+    var stripe = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.008, 0.03), stripeMat);
+    stripe.position.set(0, 0.545, z);
+    stripe.userData.fid = 'fur-bed';
+    bedGroup.add(stripe);
+  });
+
+  // Pillows — flattened spheres for soft look
+  var pillowWhite = new THREE.MeshStandardMaterial({ color: 0xfcf8f4, roughness: 0.93 });
+  var pillowGeo = new THREE.SphereGeometry(0.2, 14, 10);
+  pillowGeo.scale(1.4, 0.35, 1);
+  [-0.48, 0.48].forEach(function(x) {
+    var p = new THREE.Mesh(pillowGeo, pillowWhite);
+    p.position.set(x, 0.56, -0.38);
+    p.castShadow = true;
+    p.userData.fid = 'fur-bed';
+    bedGroup.add(p);
+  });
+
+  // Small decorative pillow
+  var decoMat = new THREE.MeshStandardMaterial({ color: 0xe8c8d0, roughness: 0.9 });
+  var decoGeo = new THREE.SphereGeometry(0.12, 10, 8);
+  decoGeo.scale(1, 0.3, 0.8);
+  var decoPill = new THREE.Mesh(decoGeo, decoMat);
+  decoPill.position.set(0, 0.54, -0.38);
+  decoPill.castShadow = true;
+  decoPill.userData.fid = 'fur-bed';
+  bedGroup.add(decoPill);
+
+  // Headboard — carved panel style
+  var hbBoard = new THREE.Mesh(new THREE.BoxGeometry(2.35, 0.8, 0.1), woodMid);
+  hbBoard.position.set(0, 0.78, -0.72);
+  hbBoard.castShadow = true;
+  hbBoard.userData.fid = 'fur-bed';
+  bedGroup.add(hbBoard);
+
+  // Headboard top crown
+  var hbCrown = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.08, 0.14), woodDark);
+  hbCrown.position.set(0, 1.2, -0.72);
+  hbCrown.castShadow = true;
+  hbCrown.userData.fid = 'fur-bed';
+  bedGroup.add(hbCrown);
+
+  // Headboard carved panels
+  var panelMat = new THREE.MeshStandardMaterial({ color: 0x9b6e4e, roughness: 0.6 });
+  [-0.6, 0, 0.6].forEach(function(x) {
+    var panel = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.45, 0.03), panelMat);
+    panel.position.set(x, 0.78, -0.66);
+    panel.userData.fid = 'fur-bed';
+    bedGroup.add(panel);
+    // Panel border
+    var borderMat = new THREE.MeshStandardMaterial({ color: 0x7a5838, roughness: 0.55 });
+    var border = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.49, 0.01), borderMat);
+    border.position.set(x, 0.78, -0.655);
+    border.userData.fid = 'fur-bed';
+    bedGroup.add(border);
+  });
+
+  // Bed skirt
+  var skirtMat = new THREE.MeshStandardMaterial({ color: 0xe8ddd0, roughness: 0.92 });
+  var skirtF = new THREE.Mesh(new THREE.BoxGeometry(2.35, 0.1, 0.015), skirtMat);
+  skirtF.position.set(0, 0.06, 0.76);
+  skirtF.userData.fid = 'fur-bed';
+  bedGroup.add(skirtF);
+
+  bedGroup.position.set(0, 0, 0);
+  bedroom3DScene.add(bedGroup);
+
+  // Wardrobe — detailed with doors, crown, legs
+  var wardrobeGroup = new THREE.Group();
+  var wMat = new THREE.MeshStandardMaterial({ color: 0xc8a8d0, roughness: 0.7 });
+  var wMatDark = new THREE.MeshStandardMaterial({ color: 0xb898c4, roughness: 0.65 });
+  var wMatLight = new THREE.MeshStandardMaterial({ color: 0xd4b8dc, roughness: 0.68 });
+  // Body
+  var wBody = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.05, 0.55), wMat);
+  wBody.position.y = 1.0;
+  wBody.castShadow = true;
+  wBody.userData.fid = 'fur-wardrobe';
+  wardrobeGroup.add(wBody);
+  // Base
+  var wBase = new THREE.Mesh(new THREE.BoxGeometry(1.24, 0.08, 0.58), wMatDark);
+  wBase.position.y = 0.04;
+  wBase.castShadow = true;
+  wBase.userData.fid = 'fur-wardrobe';
+  wardrobeGroup.add(wBase);
+  // Legs
+  var wLegGeo = new THREE.CylinderGeometry(0.03, 0.035, 0.12, 8);
+  [[-0.55, -0.24], [0.55, -0.24], [-0.55, 0.24], [0.55, 0.24]].forEach(function(p) {
+    var leg = new THREE.Mesh(wLegGeo, wMatDark);
+    leg.position.set(p[0], -0.02, p[1]);
+    leg.castShadow = true;
+    leg.userData.fid = 'fur-wardrobe';
+    wardrobeGroup.add(leg);
+  });
+  // Crown molding
+  var wCrown = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.1, 0.62), wMatDark);
+  wCrown.position.y = 2.075;
+  wCrown.castShadow = true;
+  wCrown.userData.fid = 'fur-wardrobe';
+  wardrobeGroup.add(wCrown);
+  var wCrownTop = new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.05, 0.65), wMatLight);
+  wCrownTop.position.y = 2.15;
+  wCrownTop.castShadow = true;
+  wCrownTop.userData.fid = 'fur-wardrobe';
+  wardrobeGroup.add(wCrownTop);
+  // Door panels — left & right
+  var wDoorMat = new THREE.MeshStandardMaterial({ color: 0xd0b0d8, roughness: 0.72 });
+  var wDoorPanelMat = new THREE.MeshStandardMaterial({ color: 0xc4a4cc, roughness: 0.7 });
+  [-0.3, 0.3].forEach(function(x) {
+    // Door face
+    var door = new THREE.Mesh(new THREE.BoxGeometry(0.56, 1.85, 0.02), wDoorMat);
+    door.position.set(x, 1.0, 0.28);
+    door.userData.fid = 'fur-wardrobe';
+    wardrobeGroup.add(door);
+    // Raised panel
+    var panel = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.75, 0.025), wDoorPanelMat);
+    panel.position.set(x, 1.35, 0.3);
+    panel.userData.fid = 'fur-wardrobe';
+    wardrobeGroup.add(panel);
+    // Lower panel
+    var panelLow = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.5, 0.025), wDoorPanelMat);
+    panelLow.position.set(x, 0.55, 0.3);
+    panelLow.userData.fid = 'fur-wardrobe';
+    wardrobeGroup.add(panelLow);
+    // Handle
+    var handleMat = new THREE.MeshStandardMaterial({ color: 0xb898b0, roughness: 0.3, metalness: 0.4 });
+    var handle = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.2, 0.04), handleMat);
+    handle.position.set(x + (x > 0 ? -0.22 : 0.22), 1.0, 0.31);
+    handle.userData.fid = 'fur-wardrobe';
+    wardrobeGroup.add(handle);
+  });
+  // Center divider line
+  var wDivider = new THREE.Mesh(new THREE.BoxGeometry(0.02, 1.88, 0.04), wMatDark);
+  wDivider.position.set(0, 1.0, 0.285);
+  wDivider.userData.fid = 'fur-wardrobe';
+  wardrobeGroup.add(wDivider);
+  // Top decorative rail
+  var wRail = new THREE.Mesh(new THREE.BoxGeometry(1.22, 0.025, 0.02), wMatDark);
+  wRail.position.set(0, 1.98, 0.285);
+  wRail.userData.fid = 'fur-wardrobe';
+  wardrobeGroup.add(wRail);
+  wardrobeGroup.position.set(2.5, 0, -1.5);
+  bedroom3DScene.add(wardrobeGroup);
+
+  // Dresser + mirror
+  var dresserGroup = new THREE.Group();
+  var dMat = new THREE.MeshStandardMaterial({ color: 0xd0b8d8, roughness: 0.7 });
+  var dBody = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.85, 0.4), dMat);
+  dBody.position.y = 0.425;
+  dBody.castShadow = true;
+  dBody.userData.fid = 'fur-dresser';
+  dresserGroup.add(dBody);
+  var dTop = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.1, 0.45), dMat);
+  dTop.position.y = 0.9;
+  dTop.castShadow = true;
+  dTop.userData.fid = 'fur-dresser';
+  dresserGroup.add(dTop);
+  var dMirror = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.6, 0.35), new THREE.MeshStandardMaterial({ color: 0xaabbcc, roughness: 0.2, metalness: 0.5 }));
+  dMirror.position.set(0, 1.0, 0.23);
+  dMirror.userData.fid = 'fur-dresser';
+  dresserGroup.add(dMirror);
+  dresserGroup.position.set(-2.2, 0, -1);
+  bedroom3DScene.add(dresserGroup);
+
+  // Nightstand left
+    var nsMat = new THREE.MeshStandardMaterial({ color: 0x7a4f2e, roughness: 0.65 });
+    var nsMat2 = new THREE.MeshStandardMaterial({ color: 0x6b4226, roughness: 0.6 });
+    var nsL = new THREE.Group();
+    var nsBodyL = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.45), nsMat);
+    nsBodyL.position.y = 0.3;
+    nsBodyL.castShadow = true;
+    nsBodyL.userData.fid = 'fur-nightlamp';
+    nsL.add(nsBodyL);
+    var nsTopL = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.04, 0.49), nsMat2);
+    nsTopL.position.y = 0.56;
+    nsTopL.castShadow = true;
+    nsTopL.userData.fid = 'fur-nightlamp';
+    nsL.add(nsTopL);
+    var nsLegL = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.12, 6), nsMat2);
+    nsLegL.position.set(-0.2, 0.02, -0.18);
+    nsLegL.userData.fid = 'fur-nightlamp';
+    nsL.add(nsLegL);
+    var nsLegL2 = nsLegL.clone(); nsLegL2.position.x = 0.2; nsL.add(nsLegL2);
+    var nsLegL3 = nsLegL.clone(); nsLegL3.position.z = 0.18; nsL.add(nsLegL3);
+    var nsLegL4 = nsLegL.clone(); nsLegL4.position.set(0.2, 0.02, 0.18); nsL.add(nsLegL4);
+    // Drawer
+    var nsDrawerL = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.18, 0.02), nsMat2);
+    nsDrawerL.position.set(0, 0.35, 0.24);
+    nsDrawerL.userData.fid = 'fur-nightlamp';
+    nsL.add(nsDrawerL);
+    var nsHandleL = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.1, 6), new THREE.MeshStandardMaterial({ color: 0xb8a070, roughness: 0.4, metalness: 0.3 }));
+    nsHandleL.rotation.z = Math.PI / 2;
+    nsHandleL.position.set(0, 0.35, 0.26);
+    nsHandleL.userData.fid = 'fur-nightlamp';
+    nsL.add(nsHandleL);
+    nsL.position.set(-1.55, 0, -0.5);
+    bedroom3DScene.add(nsL);
+
+    // Nightstand right
+    var nsR = nsL.clone();
+    nsR.position.set(1.55, 0, -0.5);
+    bedroom3DScene.add(nsR);
+
+    // Night lamp — on left nightstand
+    var lampGroup = new THREE.Group();
+    var lMetalMat = new THREE.MeshStandardMaterial({ color: 0xc8a880, roughness: 0.4, metalness: 0.3 });
+    // Base disc
+    var lBase = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 0.04, 12), lMetalMat);
+    lBase.position.y = 0.02;
+    lBase.castShadow = true;
+    lBase.userData.fid = 'fur-nightlamp';
+    lampGroup.add(lBase);
+    // Stem
+    var lStem = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.35, 6), lMetalMat);
+    lStem.position.y = 0.2;
+    lStem.userData.fid = 'fur-nightlamp';
+    lampGroup.add(lStem);
+    // Arm (angled)
+    var lArm = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.2, 6), lMetalMat);
+    lArm.rotation.z = -0.5;
+    lArm.position.set(0.06, 0.38, 0);
+    lArm.userData.fid = 'fur-nightlamp';
+    lampGroup.add(lArm);
+    // Shade (cone/trapezoid shape)
+    var lShadeMat = new THREE.MeshStandardMaterial({ color: 0xf5e8d0, roughness: 0.85, side: THREE.DoubleSide });
+    var lShade = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.1, 0.12, 12, 1, true), lShadeMat);
+    lShade.position.set(0.12, 0.44, 0);
+    lShade.userData.fid = 'fur-nightlamp';
+    lampGroup.add(lShade);
+    // Bulb glow
+    var lBulb = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), new THREE.MeshStandardMaterial({ color: 0xffe8a0, emissive: 0xffe8a0, emissiveIntensity: 0.5 }));
+    lBulb.position.set(0.12, 0.39, 0);
+    lBulb.userData.fid = 'fur-nightlamp';
+    lampGroup.add(lBulb);
+    lampGroup.position.set(-1.55, 0.58, -0.5);
+    bedroom3DScene.add(lampGroup);
+
+    // Small plant on right nightstand
+    var plantPotMat = new THREE.MeshStandardMaterial({ color: 0xd4b896, roughness: 0.8 });
+    var plantPot = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.06, 0.12, 8), plantPotMat);
+    plantPot.position.set(1.55, 0.66, -0.5);
+    plantPot.castShadow = true;
+    plantPot.userData.fid = 'fur-nightlamp';
+    bedroom3DScene.add(plantPot);
+    var leafMat = new THREE.MeshStandardMaterial({ color: 0x6a9a5a, roughness: 0.8 });
+    for (var li = 0; li < 5; li++) {
+      var leaf = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 4), leafMat);
+      leaf.scale.set(0.8, 1.5, 0.8);
+      var la = (li / 5) * Math.PI * 2;
+      leaf.position.set(1.55 + Math.cos(la) * 0.06, 0.78 + Math.random() * 0.06, -0.5 + Math.sin(la) * 0.06);
+      leaf.userData.fid = 'fur-nightlamp';
+      bedroom3DScene.add(leaf);
+    }
+
+  // Carpet under bed (peeks out slightly) - thin woven fabric
+  var underCarpetCanvas = document.createElement('canvas');
+  underCarpetCanvas.width = 512;
+  underCarpetCanvas.height = 512;
+  var uctx = underCarpetCanvas.getContext('2d');
+  // Base warm gray-beige
+  uctx.fillStyle = '#c8bcc8';
+  uctx.fillRect(0, 0, 512, 512);
+  // Warp threads (vertical) - subtle
+  for (var x = 0; x < 512; x += 2) {
+    var alpha = 0.03 + Math.random() * 0.025;
+    uctx.fillStyle = 'rgba(140,130,150,' + alpha + ')';
+    uctx.fillRect(x, 0, 1, 512);
+    if (Math.random() < 0.3) {
+      uctx.fillStyle = 'rgba(160,150,170,' + (0.02 + Math.random() * 0.02) + ')';
+      uctx.fillRect(x + 1, 0, 1, 512);
+    }
+  }
+  // Weft threads (horizontal) - subtle
+  for (var y = 0; y < 512; y += 2) {
+    var alpha = 0.025 + Math.random() * 0.02;
+    uctx.fillStyle = 'rgba(130,120,145,' + alpha + ')';
+    uctx.fillRect(0, y, 512, 1);
+    if (Math.random() < 0.25) {
+      uctx.fillStyle = 'rgba(150,140,165,' + (0.015 + Math.random() * 0.015) + ')';
+      uctx.fillRect(0, y + 1, 512, 1);
+    }
+  }
+  // Tiny fiber speckles
+  for (var s = 0; s < 300; s++) {
+    uctx.fillStyle = 'rgba(120,110,135,' + (0.03 + Math.random() * 0.03) + ')';
+    var rx = Math.random() * 512;
+    var ry = Math.random() * 512;
+    var r = 0.5 + Math.random() * 1.5;
+    uctx.beginPath();
+    uctx.arc(rx, ry, r, 0, Math.PI * 2);
+    uctx.fill();
+  }
+  // Occasional thicker fibers
+  for (var f = 0; f < 40; f++) {
+    uctx.strokeStyle = 'rgba(100,90,120,' + (0.04 + Math.random() * 0.03) + ')';
+    uctx.lineWidth = 0.5 + Math.random() * 0.5;
+    uctx.beginPath();
+    var fx = Math.random() * 512;
+    var fy = Math.random() * 512;
+    uctx.moveTo(fx, fy);
+    uctx.lineTo(fx + (Math.random() - 0.5) * 6, fy + (Math.random() - 0.5) * 6);
+    uctx.stroke();
+  }
+  // Border pattern
+  uctx.strokeStyle = 'rgba(170,150,180,0.45)';
+  uctx.lineWidth = 6;
+  uctx.strokeRect(28, 28, 456, 456);
+  uctx.strokeStyle = 'rgba(190,170,200,0.35)';
+  uctx.lineWidth = 2;
+  uctx.strokeRect(40, 40, 432, 432);
+  uctx.strokeStyle = 'rgba(160,140,175,0.3)';
+  uctx.lineWidth = 1.5;
+  uctx.strokeRect(48, 48, 416, 416);
+  // Diamond medallion center
+  uctx.strokeStyle = 'rgba(165,145,180,0.5)';
+  uctx.lineWidth = 2.5;
+  uctx.beginPath();
+  uctx.moveTo(256, 180);
+  uctx.lineTo(320, 256);
+  uctx.lineTo(256, 332);
+  uctx.lineTo(192, 256);
+  uctx.closePath();
+  uctx.stroke();
+  uctx.strokeStyle = 'rgba(180,160,195,0.35)';
+  uctx.lineWidth = 1.5;
+  uctx.beginPath();
+  uctx.moveTo(256, 200);
+  uctx.lineTo(300, 256);
+  uctx.lineTo(256, 312);
+  uctx.lineTo(212, 256);
+  uctx.closePath();
+  uctx.stroke();
+  // Corner flourishes
+  [[64, 64], [448, 64], [64, 448], [448, 448]].forEach(function(c) {
+    uctx.strokeStyle = 'rgba(160,140,175,0.4)';
+    uctx.lineWidth = 1.5;
+    uctx.beginPath();
+    uctx.arc(c[0], c[1], 18, 0, Math.PI * 2);
+    uctx.stroke();
+    uctx.beginPath();
+    uctx.arc(c[0], c[1], 10, 0, Math.PI * 2);
+    uctx.stroke();
+  });
+  // Border inner diamond row
+  uctx.strokeStyle = 'rgba(170,155,185,0.3)';
+  uctx.lineWidth = 1;
+  for (var bx = 64; bx <= 448; bx += 32) {
+    [[bx, 36], [bx, 476]].forEach(function(p) {
+      uctx.beginPath();
+      uctx.moveTo(p[0] - 6, p[1]);
+      uctx.lineTo(p[0], p[1] - 6);
+      uctx.lineTo(p[0] + 6, p[1]);
+      uctx.lineTo(p[0], p[1] + 6);
+      uctx.closePath();
+      uctx.stroke();
+    });
+  }
+  for (var by = 64; by <= 448; by += 32) {
+    [[36, by], [476, by]].forEach(function(p) {
+      uctx.beginPath();
+      uctx.moveTo(p[0] - 6, p[1]);
+      uctx.lineTo(p[0], p[1] - 6);
+      uctx.lineTo(p[0] + 6, p[1]);
+      uctx.lineTo(p[0], p[1] + 6);
+      uctx.closePath();
+      uctx.stroke();
+    });
+  }
+  var underCarpetTex = new THREE.CanvasTexture(underCarpetCanvas);
+  underCarpetTex.wrapS = underCarpetTex.wrapT = THREE.RepeatWrapping;
+  underCarpetTex.repeat.set(1.5, 1.5);
+  underCarpetTex.anisotropy = 4;
+  var underCarpetMat = new THREE.MeshStandardMaterial({
+    map: underCarpetTex,
+    color: 0xd0c4d8,
+    roughness: 1.0,
+    metalness: 0.0
+  });
+  var underCarpet = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.8, 1, 1), underCarpetMat);
+  underCarpet.rotation.x = -Math.PI / 2;
+  underCarpet.position.set(0, 0.003, 0);
+  underCarpet.receiveShadow = true;
+  underCarpet.userData.fid = 'fur-carpet';
+  bedroom3DScene.add(underCarpet);
+
+  // 3D Character — load GLB model
+  var charModel = null;
+  var charMixer = null;
+  var walkClip = null, idleClip = null;
+  var walkAction = null, idleAction = null;
+
+  (function loadCharacter() {
+    if (!window.GLTFLoader) { setTimeout(loadCharacter, 100); return; }
+    var loader = new GLTFLoader();
+    loader.load('low_poly_girl.glb', function (gltf) {
+      charModel = gltf.scene;
+      charModel.scale.set(0.5, 0.5, 0.5);
+      charModel.position.set(0, 0, 0);
+      charModel.traverse(function (c) { if (c.isMesh) c.castShadow = true; });
+      bedroom3DScene.add(charModel);
+      if (gltf.animations && gltf.animations.length) {
+        charMixer = new THREE.AnimationMixer(charModel);
+        gltf.animations.forEach(function (clip) {
+          var n = clip.name.toLowerCase();
+          if (n.indexOf('walk') >= 0) walkClip = clip;
+          else if (n.indexOf('idle') >= 0) idleClip = clip;
+        });
+        if (!idleClip && gltf.animations[0]) idleClip = gltf.animations[0];
+      }
+    }, undefined, function (e) { console.warn('角色模型加载失败:', e); });
+  })();
+
+  // Walk state
+  var walkTarget = null;
+  var walkSpeed = 1.2;
+
+  // Hide 2D person overlay in bedroom
+  var hp = document.getElementById('homePerson');
+  var hpt = document.getElementById('homePartner');
+  if (hp) hp.style.display = 'none';
+  if (hpt) hpt.style.display = 'none';
+
+  // Animation loop
+  function animate() {
+    bedroom3DAnimId = requestAnimationFrame(animate);
+    bedroom3DControls.update();
+    // Walk toward target
+    if (walkTarget && charModel) {
+      var dx = walkTarget.x - charModel.position.x;
+      var dz = walkTarget.z - charModel.position.z;
+      var dist = Math.sqrt(dx * dx + dz * dz);
+      if (dist < 0.08) {
+        walkTarget = null;
+        if (charMixer && walkAction) { walkAction.stop(); walkAction = null; }
+      } else {
+        var step = Math.min(walkSpeed * 0.016, dist);
+        charModel.position.x += (dx / dist) * step;
+        charModel.position.z += (dz / dist) * step;
+        charModel.rotation.y = Math.atan2(dx, dz);
+        if (charMixer && walkClip && !walkAction) {
+          if (idleAction) { idleAction.stop(); idleAction = null; }
+          walkAction = charMixer.clipAction(walkClip);
+          walkAction.play();
+        }
+      }
+    }
+    if (charMixer) charMixer.update(0.016);
+    bedroom3DRenderer.render(bedroom3DScene, bedroom3DCamera);
+  }
+  animate();
+
+  // Resize
+  function onResize() {
+    if (!bedroom3DCamera || !bedroom3DRenderer) return;
+    var w = canvas.clientWidth;
+    var h = Math.max(1, canvas.clientHeight);
+    bedroom3DCamera.aspect = w / h;
+    bedroom3DCamera.updateProjectionMatrix();
+    bedroom3DRenderer.setSize(w, h);
+  }
+  window.addEventListener('resize', onResize);
+  canvas._onResize = onResize;
+
+  // Raycaster for clicks (only on tap, not drag)
+    var raycaster = new THREE.Raycaster();
+    var mouse = new THREE.Vector2();
+    var pointerDownPos = { x: 0, y: 0 };
+    var pointerMoved = false;
+
+    canvas.addEventListener('pointerdown', function(e) {
+      pointerDownPos.x = e.clientX;
+      pointerDownPos.y = e.clientY;
+      pointerMoved = false;
+    });
+    canvas.addEventListener('pointermove', function(e) {
+      var dx = e.clientX - pointerDownPos.x;
+      var dy = e.clientY - pointerDownPos.y;
+      if (Math.sqrt(dx * dx + dy * dy) > 8) pointerMoved = true;
+    });
+    canvas.addEventListener('pointerup', function(e) {
+      if (pointerMoved) return;
+      var rect = canvas.getBoundingClientRect();
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(mouse, bedroom3DCamera);
+      var intersects = raycaster.intersectObjects(bedroom3DScene.children, true);
+      if (intersects.length > 0) {
+        var hit = intersects[0];
+        var obj = hit.object;
+        var fid = null;
+        while (obj) {
+          if (obj.userData && obj.userData.fid) { fid = obj.userData.fid; break; }
+          obj = obj.parent;
+        }
+        if (fid === 'fur-floor' || fid === 'fur-carpet') {
+          // Click on floor — walk there
+          var pt = hit.point;
+          var cx = Math.max(-3, Math.min(3, pt.x));
+          var cz = Math.max(-3, Math.min(3, pt.z));
+          walkTarget = { x: cx, z: cz };
+        } else if (fid) {
+          openFurniture(fid);
+        }
+      }
+    });
+}
+
+function destroyBedroom3D() {
+  if (bedroom3DAnimId) { cancelAnimationFrame(bedroom3DAnimId); bedroom3DAnimId = null; }
+  if (bedroom3DControls) { bedroom3DControls.dispose(); bedroom3DControls = null; }
+  if (bedroom3DRenderer) { bedroom3DRenderer.dispose(); bedroom3DRenderer = null; }
+  if (bedroom3DScene) {
+    bedroom3DScene.traverse(function(obj) {
+      if (obj.geometry) obj.geometry.dispose();
+      if (obj.material) {
+        if (Array.isArray(obj.material)) obj.material.forEach(function(m) { m.dispose(); });
+        else obj.material.dispose();
+      }
+    });
+    bedroom3DScene = null;
+  }
+  // Restore 2D person overlays when leaving bedroom
+  var hp = document.getElementById('homePerson');
+  var hpt = document.getElementById('homePartner');
+  if (hp) hp.style.display = '';
+  if (hpt) hpt.style.display = '';
+  var canvas = document.getElementById('bedroomCanvas');
+  if (canvas) {
+    if (canvas._onResize) window.removeEventListener('resize', canvas._onResize);
+    canvas.onclick = null;
+  }
+  bedroom3DCamera = null;
 }
 
 function switchRoom(id) {
+  destroyBedroom3D();
   var h = state.home;
   if (!h || !h.rooms || !h.rooms[id]) return;
   h.activeRoom = id;
@@ -1646,7 +2551,9 @@ function openFurniture(id) {
   if (id === 'fur-tvcabinet' || id === 'fur-table' || id === 'fur-painting') return;
     if (room.personPos) {
       room.personPos.x = Math.min(92, Math.max(4, f.x + (f.w / 2) - 6));
-      room.personPos.y = Math.min(82, Math.max(4, f.y + f.h - 12));
+      if (h.activeRoom !== 'bedroom') {
+        room.personPos.y = Math.min(82, Math.max(4, f.y + f.h - 12));
+      }
       const p = $('homePerson');
       if (p) { p.style.left = room.personPos.x + '%'; p.style.top = room.personPos.y + '%'; }
     }
@@ -1744,6 +2651,57 @@ function openFurniture(id) {
     }
     return;
   }
+
+  /* Bedroom: Sims-style radial pie menu */
+  if (document.querySelector('.home-room.bedroom')) {
+    closeSimsPie();
+    closeHomePanel();
+    var acts = f.actions || [];
+    if (!acts.length) return;
+    var room2 = document.querySelector('.home-room.bedroom');
+    if (!room2) return;
+    // Calculate center position from furniture percentages
+    var cx = f.x + f.w / 2;
+    var cy = f.y + f.h / 2;
+    // Create overlay
+    var overlay = document.createElement('div');
+    overlay.className = 'sims-pie-overlay';
+    overlay.onclick = function(ev) { ev.stopPropagation(); closeSimsPie(); };
+    room2.appendChild(overlay);
+    // Create pie container
+    var pie = document.createElement('div');
+    pie.className = 'sims-pie';
+    pie.style.left = cx + '%';
+    pie.style.top = cy + '%';
+    overlay.appendChild(pie);
+    // Center dot
+    var center = document.createElement('div');
+    center.className = 'sims-pie-center';
+    pie.appendChild(center);
+    setTimeout(function() { center.classList.add('show'); }, 10);
+    // Create slices in a circle
+    var radius = Math.min(60, 30 + acts.length * 8);
+    acts.forEach(function(a, i) {
+      var angle = -90 + (i / acts.length) * 360;
+      var rad = angle * Math.PI / 180;
+      var slice = document.createElement('div');
+      slice.className = 'sims-pie-slice';
+      slice.innerText = a.label;
+      slice.style.left = (Math.cos(rad) * radius) + 'px';
+      slice.style.top = (Math.sin(rad) * radius) + 'px';
+      slice.dataset.fid = f.id;
+      slice.dataset.idx = i;
+      slice.onclick = function(ev) {
+        ev.stopPropagation();
+        closeSimsPie();
+        doFurnitureAction(f.id, i);
+      };
+      pie.appendChild(slice);
+      setTimeout(function() { slice.classList.add('show'); }, 40 + i * 50);
+    });
+    return;
+  }
+
   $('homePanelTitle').innerText = f.name;
   $('homePanelResult').innerText = '';
   $('homePanelActions').innerHTML = (f.actions || []).map((a, i) =>
@@ -1753,6 +2711,10 @@ function openFurniture(id) {
 }
 
 function closeHomePanel() { const p = $('homePanel'); if (p) p.style.display = 'none'; }
+
+function closeSimsPie() {
+  document.querySelectorAll('.sims-pie-overlay').forEach(function(el) { el.remove(); });
+}
 
 function plantWater() {
   const room = document.querySelector('.home-room');
@@ -4851,7 +5813,9 @@ function furEmoji(fid) {
     'fur-desk': '📖', 'fur-fridge': '🧊', 'fur-coffee': '☕', 'fur-painting': '🖼️',
     'fur-bathtub': '🛁', 'fur-shower': '🚿', 'fur-sink': '🚿', 'fur-mirror': '🪞',
     'fur-toilet': '🚽', 'fur-towel': '🧺', 'fur-stool': '🪑', 'fur-candle': '🕯️',
-    'fur-scale': '⚖️', 'fur-plant-bath': '🪴'
+    'fur-scale': '⚖️', 'fur-plant-bath': '🪴',
+    'fur-bed': '🛏️', 'fur-wardrobe': '👗', 'fur-dresser': '🪞', 'fur-nightlamp': '💡', 'fur-carpet': '🧶', 'fur-pillow': '💤',
+    'fur-fridge': '🧊', 'fur-stove': '🔥', 'fur-counter': '🪑', 'fur-kitchensink': '🚿', 'fur-microwave': '📦', 'fur-diningtable': '🍽️'
   };
   return map[fid] || '📦';
 }
@@ -4942,6 +5906,28 @@ function furArt(fid) {
   var em = furEmoji(fid);
   return '<div class="fur-emoji">' + em + '</div>';
 }
+function bedroomFurArt(fid) {
+  if (fid === 'fur-bed') {
+    return '<svg viewBox="0 0 100 80"><rect x="10" y="30" width="80" height="35" rx="5" fill="#e8d0e0"/><rect x="15" y="15" width="70" height="20" rx="3" fill="#f0d8e8"/><rect x="25" y="18" width="12" height="8" rx="2" fill="#f8c0d0"/><rect x="50" y="18" width="12" height="8" rx="2" fill="#f8c0d0"/><rect x="75" y="18" width="12" height="8" rx="2" fill="#f8c0d0"/><rect x="20" y="32" width="60" height="4" rx="2" fill="#d8b8cc"/></svg>';
+  }
+  if (fid === 'fur-wardrobe') {
+    return '<svg viewBox="0 0 60 90"><rect x="5" y="5" width="50" height="85" rx="4" fill="#c8a8d0"/><rect x="10" y="10" width="40" height="75" rx="2" fill="#d8c0e0"/><rect x="48" y="40" width="4" height="30" rx="1" fill="#a080a8"/><circle cx="50" cy="55" r="3" fill="#a080a8"/><circle cx="50" cy="65" r="3" fill="#a080a8"/><rect x="10" y="25" width="40" height="15" rx="2" fill="#d0b8d8" opacity=".5"/></svg>';
+  }
+  if (fid === 'fur-dresser') {
+    return '<svg viewBox="0 0 70 80"><rect x="5" y="10" width="60" height="65" rx="4" fill="#d0b8d8"/><rect x="10" y="5" width="50" height="10" rx="3" fill="#c8a8d0"/><rect x="15" y="20" width="20" height="30" rx="2" fill="#e0c8d8"/><rect x="40" y="20" width="20" height="30" rx="2" fill="#e0c8d8"/><circle cx="55" cy="35" r="2" fill="#a080a8"/><circle cx="55" cy="50" r="2" fill="#a080a8"/><rect x="30" y="55" width="20" height="15" rx="2" fill="#d8c0e0"/></svg>';
+  }
+  if (fid === 'fur-nightlamp') {
+    return '<svg viewBox="0 0 40 60"><rect x="15" y="40" width="10" height="18" rx="2" fill="#c8a880"/><ellipse cx="20" cy="35" rx="12" ry="8" fill="#ffe8a0"/><circle cx="20" cy="35" r="6" fill="#fff3c0" opacity=".6"/></svg>';
+  }
+  if (fid === 'fur-carpet') {
+    return '<svg viewBox="0 0 80 50"><rect x="5" y="5" width="70" height="40" rx="10" fill="#e0d0e8"/><rect x="10" y="10" width="60" height="30" rx="7" fill="#d8c8e0"/><circle cx="30" cy="25" r="4" fill="#d0b8d0" opacity=".5"/><circle cx="55" cy="20" r="3" fill="#d0b8d0" opacity=".5"/><circle cx="40" cy="35" r="5" fill="#d0b8d0" opacity=".5"/></svg>';
+  }
+  if (fid === 'fur-pillow') {
+    return '<svg viewBox="0 0 60 40"><ellipse cx="30" cy="20" rx="25" ry="15" fill="#f0d8e8"/><ellipse cx="30" cy="18" rx="20" ry="10" fill="#f8c8d8"/><ellipse cx="25" cy="15" rx="8" ry="4" fill="#fff0f0" opacity=".6"/></svg>';
+  }
+  var em = furEmoji(fid);
+  return '<svg viewBox="0 0 40 40"><text x="20" y="30" text-anchor="middle" font-size="28">' + em + '</text></svg>';
+}
 function livingRoomArt() {
   return ''
     + '<div class="lr-wall"></div>'
@@ -4949,6 +5935,16 @@ function livingRoomArt() {
     + '<div class="lr-backcorner"></div>'
     + '<div class="lr-floor"></div>'
     + '<div class="lr-rug"></div>';
+}
+function bedroomArt() {
+  return ''
+    + '<div class="bed-window"><svg viewBox="0 0 100 60"><rect x="10" y="0" width="80" height="55" rx="3" fill="#f5f0ff" stroke="#ddd0e8" stroke-width="2"/><rect x="50" y="0" width="2" height="55" fill="#ddd0e8"/><rect x="10" y="27" width="80" height="2" fill="#ddd0e8"/><circle cx="20" cy="15" r="5" fill="#fff8e0"/><circle cx="70" cy="12" r="3" fill="#fff8e0" opacity=".7"/><circle cx="35" cy="8" r="2" fill="#fff8e0" opacity=".5"/></svg></div>'
+    + '<div class="lr-floor"></div>';
+}
+function kitchenArt() {
+  return ''
+    + '<div class="kit-window"><svg viewBox="0 0 100 40"><rect x="5" y="2" width="90" height="36" rx="2" fill="#fff8f0" stroke="#e8d5b8" stroke-width="1.5"/><line x1="50" y1="2" x2="50" y2="38" stroke="#e8d5b8" stroke-width="1"/><line x1="5" y1="20" x2="95" y2="20" stroke="#e8d5b8" stroke-width="1"/><circle cx="15" cy="10" r="1.5" fill="#fff3c0" opacity=".6"/></svg></div>'
+    + '<div class="lr-floor"></div>';
 }
 function bathroomFurArt(fid) { return furArt(fid); }
 function spaceSwitchRole() {

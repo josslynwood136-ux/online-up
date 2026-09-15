@@ -26,7 +26,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Pacifico&family=Cinzel:wght@400;600;700&display=swap" rel="stylesheet">
   <title>美乐地</title>
-  <link rel="stylesheet" href="css/style.css?v=20260907a">
+  <link rel="stylesheet" href="css/style.css?v=20260915b">
 </head>
 <body>
 
@@ -585,7 +585,7 @@
   <!-- IG Toast -->
   <div class="ig-toast" id="igToast"></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
   if (!window.supabase) {
     var _sbFallback = document.createElement('script');
@@ -593,14 +593,44 @@
     document.head.appendChild(_sbFallback);
   }
   </script>
+  <script>
+  // 强制清除 localStorage 中客厅的外链图片和家具
+  try {
+    var _k = 'aiPhoneSoftwareState.v1';
+    var _s = JSON.parse(localStorage.getItem(_k));
+    if (_s && _s.home && _s.home.rooms && _s.home.rooms.living) {
+      var _r = _s.home.rooms.living;
+      if (_r.bg && _r.bg.startsWith('http')) { _r.bg = ''; }
+      if (_r.person && _r.person.startsWith('http')) { _r.person = ''; }
+      _r.furniture = [];
+      localStorage.setItem(_k, JSON.stringify(_s));
+    }
+  } catch(e) {}
+  </script>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    window.THREE = THREE;
+    window.OrbitControls = OrbitControls;
+    window.GLTFLoader = GLTFLoader;
+  </script>
   <script src="js/ui.js?v=20260812e"></script>
-  <script src="js/state.js?v=20260826a"></script>
-  <script src="js/relate.js?v=20260831r"></script>
-  <script src="js/chat.js?v=20260831-im2"></script>
-  <script src="js/tts.js?v=20260824n"></script>
-  <script src="js/rag.js?v=20260831a"></script>
-  <script src="js/webrtc.js?v=20260831a"></script>
-  <script src="js/apps.js?v=20260907b"></script>
+<script src="js/state.js?v=20260915b"></script>
+<script src="js/relate.js?v=20260831r"></script>
+<script src="js/chat.js?v=20260831-im2"></script>
+<script src="js/tts.js?v=20260824n"></script>
+<script src="js/rag.js?v=20260831a"></script>
+<script src="js/webrtc.js?v=20260831a"></script>
+<script src="js/apps.js?v=20260915b"></script>
   <script src="js/liveroom.js?v=20260830a"></script>
   <script src="js/profile-ig.js?v=20260812e"></script>
   <script src="js/push.js?v=20260828b"></script>
