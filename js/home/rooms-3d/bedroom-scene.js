@@ -274,12 +274,11 @@
     };
 
     var ppBuf = renderer.getDrawingBufferSize(new THREE.Vector2());
-    // 手机上跳过后期处理（GTAO + Bloom 太耗 GPU，手机跑不动）
-    if (isMobile) {
-      baseRender(scene, camera);
-      return;
-    }
-    Promise.all([
+    // 手机上跳过后期处理（GTAO + Bloom 太耗 GPU，手机跑不动）。
+    // 注意：只跳过后期链这一段 —— 不能在这里 return！后面还有 HUD 按钮绑定、
+    // 动画循环、resize 监听、家具拾取，提前退出会让手机上整个房间死掉
+    // （按钮全没反应、画面冻结在第一帧、窗口变化后不重取景）。
+    if (!isMobile) Promise.all([
       import('three/addons/postprocessing/EffectComposer.js'),
       import('three/addons/postprocessing/RenderPass.js'),
       import('three/addons/postprocessing/GTAOPass.js'),
