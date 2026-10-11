@@ -2,6 +2,17 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
+// ============================================================
+// 一套代码部署两个 Render 服务（同一仓库）：
+//   主体站（默认）      → 纯静态服务器（本文件下方）
+//   音乐后端            → 设 MUSIC_BACKEND=1，跑 sever/server.js
+//     （网易云/QQ音乐 API、通话信令、视频转码、后台消息）
+// 在 Render 的 yin-le-bu-shu 服务 Environment 里加 MUSIC_BACKEND=1
+// ============================================================
+if (process.env.MUSIC_BACKEND === '1') {
+  require('./sever/server.js');
+} else {
+
 const mime = {
   '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
   '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg',
@@ -51,3 +62,4 @@ http.createServer((req, res) => {
     res.end(data);
   });
 }).listen(process.env.PORT || 8080, () => console.log('Server running at http://localhost:' + (process.env.PORT || 8080)));
+} // end of else（静态服务器）
