@@ -75,6 +75,7 @@ function applyCloudStateInPlace() {
     if (typeof renderChat === 'function') renderChat();
     if (typeof renderEmojiPanel === 'function') renderEmojiPanel();
     if (typeof renderApiSettings === 'function') renderApiSettings();
+    if (document.querySelector('.home-room') && typeof renderHome === 'function') renderHome();
   } catch (e) {
     setTimeout(function () { window.location.reload(); }, 300);
   }

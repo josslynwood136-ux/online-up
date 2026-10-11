@@ -1,11 +1,23 @@
 // 最小 Service Worker：仅用于让 Chrome 把站点当成可安装 PWA（从而按 manifest 全屏启动）
 // 同源静态资源走缓存；跨域（Supabase / 字体 / 翻译等）一律放行到网络，不做缓存，避免弄坏动态功能。
-const CACHE = 'aiphone-shell-v1';
+const CACHE = 'aiphone-shell-v17';
 const SHELL = [
   './',
   'index.html',
   'manifest.json',
-  'icon.png'
+  'icon.svg',
+  'icon-192.png',
+  'icon-512.png',
+  'css/style.css',
+  'js/state.js',
+  'js/apps.js',
+  'js/home-person.js',
+  'js/init.js',
+  'js/sync.js',
+  // 3D 素材：安装时一并预缓存，离线也能看到窗台花盆。
+  // 注意 sw.js 里没列的文件在网络异常时不会被缓存回退命中 ——
+  // 所以哪个 GLB 要用，就必须列进来。
+  'flower-pot.glb'
 ];
 
 self.addEventListener('install', function (e) {
@@ -16,7 +28,13 @@ self.addEventListener('install', function (e) {
 });
 
 self.addEventListener('activate', function (e) {
-  e.waitUntil(self.clients.claim());
+  e.waitUntil(
+    caches.keys().then(function (keys) {
+      return Promise.all(keys.filter(function (key) {
+        return key.indexOf('aiphone-shell-') === 0 && key !== CACHE;
+      }).map(function (key) { return caches.delete(key); }));
+    }).then(function () { return self.clients.claim(); })
+  );
 });
 
 self.addEventListener('fetch', function (e) {
@@ -27,7 +45,11 @@ self.addEventListener('fetch', function (e) {
 
   if (req.mode === 'navigate') {
     // 页面导航：网络优先，断网时回退缓存的 index.html
-    e.respondWith(fetch(req).catch(function () { return caches.match('index.html'); }));
+    e.respondWith(fetch(req).catch(function () {
+      return caches.match('index.html').then(function (cached) {
+        return cached || new Response('Offline', { status: 503, statusText: 'Offline' });
+      });
+    }));
     return;
   }
 
@@ -39,7 +61,9 @@ self.addEventListener('fetch', function (e) {
     }
     return res;
   }).catch(function () {
-    return caches.match(req);
+    return caches.match(req).then(function (cached) {
+      return cached || new Response('Offline', { status: 503, statusText: 'Offline' });
+    });
   }));
 });
 

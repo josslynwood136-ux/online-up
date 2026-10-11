@@ -1,8 +1,8 @@
-// ============================================================
+﻿// ============================================================
 // state.js - 数据层 + 工具函数
 // ============================================================
 const STORAGE_KEY = 'aiPhoneSoftwareState.v1';
-const wallpaper = 'https://img.facfox.com/imgs/2026/07/21/ca7e52f015267b44.jpg';
+const wallpaper = 'https://img.facfox.com/imgs/2026/09/20/0ce0945661a1a4ec.jpg';
 const emojis = ['❤️','💋','😍','😘','🌹','✨','🔥','😂','🤣','😊','😎','🤔','🙄','😴','😭','😱','😡','🌈','🍎','🍓','🍦','🍹','🎁','🎈','🎀','👍','👎','👌','✌️','👊','👏','🙏'];
 
 const defaultState = {
@@ -64,8 +64,42 @@ const defaultState = {
         name: '客厅',
         bg: '',
         person: '',
-        personPos: { x: 50, y: 72 },
-        furniture: []
+        personPos: { x: 41, y: 76 },
+        furniture: [
+          { id: 'fur-lamp', name: '落地灯', img: '', x: 4, y: 25, w: 14, h: 28, actions: [
+            { label: '打开暖灯', result: '落地灯亮起一圈柔软的暖光，客厅一下变得温柔又安稳。', effect: 'candle' },
+            { label: '调暗一点', result: '灯光被调得柔和一些，刚好适合窝在沙发里发呆。' }
+          ]},
+          { id: 'fur-painting', name: '小画', img: '', x: 40, y: 7, w: 15, h: 17, actions: [] },
+          { id: 'fur-shelf', name: '书架', img: '', x: 76, y: 6, w: 19, h: 34, actions: [
+            { label: '随手读一本', result: '从书架上抽出一本薄薄的书，窝进沙发里读了十几页。' },
+            { label: '整理书脊', result: '你把高低不一的书重新排好，书架立刻变得整整齐齐。' }
+          ]},
+          { id: 'fur-sofa', name: '云朵沙发', img: '', x: 3, y: 44, w: 44, h: 24, actions: [
+            { label: '软软地坐下', result: '屁股刚碰到沙发，整个人就像被云朵接住一样放松下来。' },
+            { label: '抱着抱枕午睡', result: '你抱紧靠枕眯了一会儿，醒来时窗外已经安静下来了。' },
+            { label: '把客厅收拾一下', result: '靠垫被拍松，遥控器归位，桌面也擦得干干净净。' }
+          ]},
+          { id: 'fur-tv', name: '小电视', img: '', x: 67, y: 40, w: 22, h: 11, actions: [
+            { label: '看一集', result: '电视亮起来，你们在沙发上找了个舒服的姿势，认真追完了一集。' },
+            { label: '换个节目', result: '遥控器轻轻一按，屏幕上换成了一部轻松的喜剧。' },
+            { label: '调低音量', result: '音量调低以后，客厅里只剩下刚好舒服的背景声。' }
+          ]},
+          { id: 'fur-cabinet', name: '电视柜', img: '', x: 62, y: 49, w: 32, h: 19, actions: [
+            { label: '打开抽屉', result: '抽屉里放着备用电池、几包零食和一张很久以前的合照。' },
+            { label: '摆好遥控器', result: '遥控器被端端正正放回电视柜上，再也不怕到处乱钻啦。' }
+          ]},
+          { id: 'fur-table', name: '茶几', img: '', x: 32, y: 67, w: 31, h: 12, actions: [
+            { label: '泡一壶热茶', result: '热水注进茶壶，茶叶慢慢舒展开，屋里多了一缕淡淡的茶香。' },
+            { label: '玩一局纸牌', result: '两个人把牌摊在茶几上，玩着玩着又为一张牌争了起来。' },
+            { label: '摆一盘小点心', result: '草莓、饼干和热茶被摆成小小的拼盘，看着就让人心情变好。' }
+          ]},
+          { id: 'fur-pot', name: '琴叶榕', img: '', x: 84, y: 69, w: 12, h: 18, actions: [
+            { label: '给绿植浇水', result: '水珠顺着琴叶榕的叶尖滑落，叶子好像精神了一点。' },
+            { label: '擦掉灰尘', result: '你用软布轻轻擦过每一片叶子，客厅又亮堂了几分。' },
+            { label: '对它说声你好', result: '你凑近绿植小声问了句好，窗外恰好吹来一阵风。' }
+          ]}
+        ]
       },
       bathroom: {
         name: '浴室',
@@ -154,46 +188,40 @@ const defaultState = {
           ]}
         ]
       },
-      kitchen: {
-        name: '厨房',
+      smallkitchen: {
+        name: '小厨房',
         bg: '',
         person: '',
-        personPos: { x: 40, y: 80 },
+        personPos: { x: 48, y: 78 },
         furniture: [
-          { id: 'fur-fridge', name: '🧊 冰箱', img: '', x: 2, y: 10, w: 22, h: 50, actions: [
-            { label: '打开冰箱', result: '冰箱门打开，冷气扑面而来，里面有昨天剩的菜和一瓶牛奶。' },
-            { label: '拿出食材', result: '小人从冰箱里拿出新鲜蔬菜和鸡蛋，准备做饭。' }
+          { id: 'fur-small-fridge', name: '薄荷冰箱', img: '', x: 8, y: 18, w: 18, h: 48, actions: [
+            { label: '打开冰箱', result: '小人打开薄荷色冰箱，冷气和新鲜蔬果的香味一起飘出来。' },
+            { label: '拿一杯牛奶', result: '小人从冰箱里拿出一杯冰牛奶，杯壁凝着细小的水珠。🥛' }
           ]},
-          { id: 'fur-stove', name: '🔥 灶台', img: '', x: 32, y: 38, w: 28, h: 38, actions: [
-            { label: '点火', result: '小人拧开灶台，"啪"地一声，火苗蹿了起来。' },
-            { label: '烧水', result: '小人往锅里倒水，放在灶台上，不一会儿水就烧开了。💧' },
-            { label: '炒菜', result: '小人颠了颠锅，香味飘满整个厨房。🍳' }
+          { id: 'fur-small-counter', name: '陶泥备餐台', img: '', x: 30, y: 28, w: 28, h: 28, actions: [
+            { label: '切面包', result: '小人把面包切成厚厚的小片，木桌上的 crumbs 轻轻弹了起来。' },
+            { label: '泡咖啡', result: '咖啡机发出咕噜声，一杯热拿铁很快摆上了小台面。☕' }
           ]},
-          { id: 'fur-counter', name: '🪑 料理台', img: '', x: 66, y: 30, w: 26, h: 26, actions: [
-            { label: '切菜', result: '小人左手按住土豆，右手拿刀，"笃笃笃"地切了起来。' },
-            { label: '摆盘', result: '小人把菜仔仔细细地摆在盘子里，像在创作艺术品。🎨' }
+          { id: 'fur-small-sink', name: '小水槽', img: '', x: 62, y: 60, w: 18, h: 22, actions: [
+            { label: '打开水龙头', result: '水龙头哗啦啦地流下来，小水槽里映出一圈圈波纹。💧' },
+            { label: '洗杯子', result: '小人把杯子洗得亮晶晶的，放到架子上晾起来。' }
           ]},
-          { id: 'fur-kitchensink', name: '🚿 水槽', img: '', x: 66, y: 68, w: 16, h: 20, actions: [
-            { label: '洗碗', result: '小人把碗放在水槽里，里里外外刷了好几遍，冲干净了。' },
-            { label: '洗菜', result: '小人把青菜在水流下冲了冲，抖了抖，准备下锅。🥬' }
-          ]},
-          { id: 'fur-microwave', name: '📦 微波炉', img: '', x: 2, y: 70, w: 16, h: 18, actions: [
-            { label: '热饭', result: '小人把饭盒放进微波炉，"叮"一声，热好了。' },
-            { label: '解冻', result: '小人把冻肉放进去，设定了时间，等待解冻。' }
-          ]},
-          { id: 'fur-diningtable', name: '🍽️ 餐桌', img: '', x: 28, y: 78, w: 44, h: 20, actions: [
-            { label: '吃饭', result: '小人坐下来，端起筷子，吃了满满一碗。🍚' },
-            { label: '喝茶', result: '小人泡了一杯热茶，坐在桌前慢慢喝完。🍵' }
+          { id: 'fur-small-island', name: '甜点小岛台', img: '', x: 30, y: 68, w: 38, h: 20, actions: [
+            { label: '拿一块可颂', result: '小人切开刚出炉的可颂，酥脆的声音在小小的厨房里回响。🥐' },
+            { label: '喝一杯拿铁', result: '两个人在小岛台边喝拿铁，暖黄灯光把这一刻包得软软的。' }
           ]}
         ]
       }
     },
     activeRoom: 'living',
     char: { type: '', value: '' },
-    partnerChar: { type: '', value: '' },
     mySize: 11,
-    taSize: 11,
-    partnerPos: { x: 66, y: 72 }
+    hairColor: '',
+    hairStyle: 'orig',
+    outfit: { top: '', skirt: '', boots: '' },
+    smallkitchenNight: false
+    // 注：3D 小人下线后，avatar3d（肤色/发色/身高/披风等）已无读取方。
+    // 2D 形象只依赖 char（类型+取值）和 mySize（大小），站位在 rooms[*].personPos。
   },
   live: { viewer: 12, likes: 0, giftWorth: 0, gifts: 0, followers: 0, intimacy: 0, coins: 0, lastSign: '', giftLog: [], song: '', flirt: 0 },
   qq: null,
@@ -238,6 +266,32 @@ function cloneDefaultState() {
   return JSON.parse(JSON.stringify(defaultState));
 }
 
+function normalizeHomeChar(value) {
+  var f = value && typeof value === 'object' ? value : {};
+  var type = ['image', 'emoji', 'avatar'].indexOf(f.type) >= 0 ? f.type : '';
+  return { type: type, value: typeof f.value === 'string' ? f.value : '' };
+}
+
+function normalizeHomePosition(value, fallback) {
+  var p = value && typeof value === 'object' ? value : {};
+  var f = fallback && typeof fallback === 'object' ? fallback : { x: 50, y: 75 };
+  return {
+    x: Math.max(2, Math.min(98, Number(p.x == null ? f.x : p.x) || f.x || 50)),
+    y: Math.max(2, Math.min(94, Number(p.y == null ? f.y : p.y) || f.y || 75))
+  };
+}
+
+function normalizeHomeActorState(value) {
+  var s = value && typeof value === 'object' ? value : {};
+  var pose = ['stand', 'walk', 'sit', 'sleep', 'wave', 'crouch'].indexOf(s.pose) >= 0 ? s.pose : 'stand';
+  return {
+    pose: pose,
+    furnitureId: typeof s.furnitureId === 'string' ? s.furnitureId : '',
+    action: typeof s.action === 'string' ? s.action : '',
+    updatedAt: Number(s.updatedAt) || 0
+  };
+}
+
 function normalizeSpace(s) {
   if (!s || typeof s !== 'object') s = {};
   s.startDate = (s.startDate && s.startDate !== '2026-01-01') ? s.startDate : '';
@@ -262,11 +316,13 @@ function ensureStateShape(next, saved) {
   if (Array.isArray(saved.chat) && saved.chat.length && !saved.roles) {
     next.roles[0].chat = saved.chat;
   }
+  var defaultHomeDef = cloneDefaultState();
   next.roles = next.roles.map((role, index) => ({
     id: role.id || 'role-' + Date.now() + '-' + index,
     name: role.name || '未命名角色',
     avatar: role.avatar || '',
     relation: role.relation || '',
+    occupation: role.occupation || '',
     aliases: role.aliases || '',
     personality: role.personality || '',
     style: role.style || '',
@@ -361,13 +417,22 @@ function ensureStateShape(next, saved) {
   } else {
     var defRooms = cloneDefaultState().home.rooms;
     Object.keys(defRooms).forEach(function(rid) {
-      if (!next.home.rooms[rid]) {
+      if (!next.home.rooms[rid] || typeof next.home.rooms[rid] !== 'object') {
         next.home.rooms[rid] = JSON.parse(JSON.stringify(defRooms[rid]));
       } else {
         var defFur = defRooms[rid].furniture;
-        next.home.rooms[rid].furniture = (next.home.rooms[rid].furniture || []).map(function(f) {
+        var rawFurniture = Array.isArray(next.home.rooms[rid].furniture) ? next.home.rooms[rid].furniture : [];
+        next.home.rooms[rid].furniture = rawFurniture.filter(function(f) { return f && typeof f === 'object'; }).map(function(f) {
           var d = defFur.find(function(x) { return x.id === f.id; });
-          if (d) { f.x = d.x; f.y = d.y; f.w = d.w; f.h = d.h; f.img = d.img; f.name = d.name; }
+          if (d) {
+            // 只补缺失字段，保留用户已经调整过的位置、尺寸和自定义图片。
+            ['name', 'img', 'x', 'y', 'w', 'h'].forEach(function(k) {
+              if (f[k] === undefined || f[k] === null) f[k] = d[k];
+            });
+            if ((!Array.isArray(f.actions) || !f.actions.length) && Array.isArray(d.actions) && d.actions.length) {
+              f.actions = JSON.parse(JSON.stringify(d.actions));
+            }
+          }
           return f;
         });
         defFur.forEach(function(d) {
@@ -378,10 +443,48 @@ function ensureStateShape(next, saved) {
       }
     });
   }
+  // 旧版客厅的默认人物位置会挤在房间中央；只迁移仍停留在旧默认坐标的情况。
+  var migratedLiving = next.home.rooms.living;
+  if (migratedLiving && migratedLiving.personPos &&
+      Number(migratedLiving.personPos.x) === 50 && Number(migratedLiving.personPos.y) === 72) {
+    migratedLiving.personPos = { x: 41, y: 76 };
+  }
+  // 花园房间已下线：把老存档里的 garden 房间、残留的家具 id 和 gardenNight 一起清掉，
+  // 否则房间标签还会被 ensureHomeRooms / 迁移逻辑重新拼回来。
+  if (next.home.rooms && next.home.rooms.garden) {
+    delete next.home.rooms.garden;
+    if (next.home.activeRoom === 'garden') next.home.activeRoom = 'living';
+  }
+  delete next.home.gardenNight;
+  if (typeof next.home.smallkitchenNight !== 'boolean') next.home.smallkitchenNight = false;
+  // 3D 小人下线，avatar3d 配置（肤色/发色/身高/披风）不再有任何读取方，清掉。
+  // 2D 形象靠 char + mySize + rooms[*].personPos，那几个字段保留。
+  delete next.home.avatar3d;
+  Object.keys(next.home.rooms || {}).forEach(function(rid) {
+    var room = next.home.rooms[rid];
+    if (!room || typeof room !== 'object') return;
+    if (!room.personPos || typeof room.personPos !== 'object') {
+      var defRoom = defaultHomeDef.home.rooms[rid];
+      room.personPos = defRoom && defRoom.personPos ? JSON.parse(JSON.stringify(defRoom.personPos)) : { x: 50, y: 75 };
+    }
+    room.personPos = normalizeHomePosition(room.personPos, { x: 50, y: 75 });
+    room.personState = normalizeHomeActorState(room.personState);
+  });
   if (!next.home.char || typeof next.home.char !== 'object') next.home.char = { type: '', value: '' };
-  if (!next.home.partnerChar || typeof next.home.partnerChar !== 'object') next.home.partnerChar = { type: '', value: '' };
+  next.home.char = normalizeHomeChar(next.home.char);
   next.home.mySize = Number(next.home.mySize) || 11;
-  next.home.taSize = Number(next.home.taSize) || 11;
+  if (typeof next.home.hairColor !== 'string' ||
+      (next.home.hairColor !== '' && !/^#[0-9a-fA-F]{6}$/.test(next.home.hairColor))) {
+    next.home.hairColor = '';
+  }
+  if (next.home.hairStyle !== 'alt' && next.home.hairStyle !== 'orig') next.home.hairStyle = 'orig';
+  // 换装颜色。每个部件是 ''（原色）或 #rrggbb，其余一律重置。
+  var _outfit = (next.home.outfit && typeof next.home.outfit === 'object') ? next.home.outfit : {};
+  ['top', 'skirt', 'boots'].forEach(function (part) {
+    var v = _outfit[part];
+    _outfit[part] = (typeof v === 'string' && (v === '' || /^#[0-9a-fA-F]{6}$/.test(v))) ? v : '';
+  });
+  next.home.outfit = _outfit;
   if (!Array.isArray(next.albums)) next.albums = [];
   if (Array.isArray(next.album) && next.album.length && !next.albums.length) {
     next.albums = [{ id: 'default', name: '默认相册', photos: next.album.map((p, i) => ({ id: 'p' + i, url: p.url, caption: p.caption || '', date: p.date || '' })) }];
@@ -444,12 +547,42 @@ function ensureStateShape(next, saved) {
   next.settings = Object.assign({ ai: true, pinned: false, bubbleStyle: 'comic', musicMode: 'loop', translateProvider: 'google', deeplKey: '', autoVoice: false, ttsProvider: 'minimax', ttsUrls: {}, ttsKeys: {}, ttsModels: {}, ttsVoices: {}, ttsGroups: {}, streamReply: true, replySplit: 'auto', proactiveInterval: 180, proactiveQuiet: [23, 7], cloudAuto: true }, next.settings || {});
   if (['minimax', 'mimo', 'elevenlabs'].indexOf(next.settings.ttsProvider) < 0) next.settings.ttsProvider = 'minimax';
   next.settings.relayUrl = typeof next.settings.relayUrl === 'string' ? next.settings.relayUrl : '';
+  // 家园当前只保留用户自己的形象；清理旧版伴侣外观字段，避免它们再次出现在场景或编辑器中。
+  (next.roles || []).forEach(function(role) {
+    delete role.homeChar;
+    delete role.homeAvatar3d;
+    delete role.homeSize;
+    delete role.homePositions;
+    delete role.homeActorStates;
+  });
+  if (next.home) {
+    delete next.home.partnerChar;
+    delete next.home.partnerPos;
+    delete next.home.taSize;
+  }
   return next;
 }
 
 // ===== 本地存储 =====
 function estimateStateSize() {
   try { return Math.round(JSON.stringify(state).length * 2 / 1024); } catch(e) { return 0; }
+}
+
+function cleanupHomeImages(minLen) {
+  minLen = minLen || 50000;
+  var removed = 0;
+  var freed = 0;
+  var seen = [];
+  function clearOne(f) {
+    if (!f || f.type !== 'image' || typeof f.value !== 'string' || f.value.indexOf('data:image/') !== 0 || f.value.length <= minLen || seen.indexOf(f.value) >= 0) return;
+    seen.push(f.value);
+    freed += f.value.length;
+    f.type = '';
+    f.value = '';
+    removed++;
+  }
+  if (state.home) clearOne(state.home.char);
+  return { removed:removed, freedKB:Math.round(freed * 2 / 1024) };
 }
 
 function cleanupChatImages(minLen) {
@@ -476,7 +609,8 @@ function loadState() {
     const st = ensureStateShape(mergeDeep(cloneDefaultState(), saved || {}), saved || {});
     migrateApiPenalties(st);
     return st;
-  } catch {
+  } catch (err) {
+    try { localStorage.setItem(STORAGE_KEY + '.last-invalid', localStorage.getItem(STORAGE_KEY) || ''); } catch (e) {}
     const st = ensureStateShape(cloneDefaultState(), {});
     migrateApiPenalties(st);
     return st;
@@ -509,8 +643,9 @@ function saveState() {
     var thresholds = [50000, 30000, 15000];
     for (var i = 0; i < thresholds.length; i++) {
       var r = cleanupChatImages(thresholds[i]);
-      totalRemoved += r.removed;
-      totalFreed += r.freedKB;
+      var rh = cleanupHomeImages(thresholds[i]);
+      totalRemoved += r.removed + rh.removed;
+      totalFreed += r.freedKB + rh.freedKB;
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         fireCloudSave();
@@ -564,17 +699,18 @@ function $(id) { return document.getElementById(id); }
 function todayKey() { return new Date().toISOString().slice(0, 10); }
 function escapeHTML(v) {
   return String(v == null ? '' : v)
-    .split('&').join('&')
-    .split('<').join('<')
-    .split('>').join('>')
-    .split('"').join('"')
+    .split('&').join('&amp;')
+    .split('<').join('&lt;')
+    .split('>').join('&gt;')
+    .split('"').join('&quot;')
     .split("'").join('&#39;');
 }
 function renderAvatar(value, fallback = '头像') {
-  if (value && String(value).startsWith('data:image/')) {
-    return `<img src="${escapeHTML(value)}" alt="${escapeHTML(fallback)}头像">`;
+  var v = value == null ? '' : String(value);
+  if (/^(data:image\/|https?:\/\/|\/)/i.test(v)) {
+    return `<img src="${escapeHTML(v)}" alt="${escapeHTML(fallback)}头像" loading="lazy">`;
   }
-  return escapeHTML(value || fallback.slice(0, 1) || '人');
+  return escapeHTML(v || fallback.slice(0, 1) || '人');
 }
 function yuan(n) { return Number(n || 0).toFixed(2); }
 function setTitle(name) { $('m-tit').innerText = name; }

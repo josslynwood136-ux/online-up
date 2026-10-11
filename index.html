@@ -26,31 +26,64 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Pacifico&family=Cinzel:wght@400;600;700&display=swap" rel="stylesheet">
   <title>美乐地</title>
-  <link rel="stylesheet" href="css/style.css?v=20260915b">
+  <link rel="stylesheet" href="css/style.css?v=20261011h">
 </head>
 <body>
 
   <div class="phone">
     <button class="debug-btn" onclick="toggleDebug()">显形</button>
 
-    <div class="panorama-container" id="slider">
-      <div class="panorama-content" id="contentArea">
-        <img class="wallpaper" alt="手机桌面壁纸" src="https://img.facfox.com/imgs/2026/07/21/ca7e52f015267b44.jpg" onerror="this.src=&#39;data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjZmN2Y5Ii8+PHJlY3QgeD0iNTAiIHk9IjUwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2RlY2lkZSIvPjwvc3ZnPg==&#39;">
-        <div class="hotspot" data-name="打卡" style="top:25%;left:4%;width:50px;height:50px;"></div>
-        <div class="hotspot" data-name="设置" style="top:80%;left:8%;width:50px;height:50px;"></div>
-        <div class="hotspot" data-name="家园" style="top:15%;left:16%;width:60px;height:60px;"></div>
-        <div class="hotspot" data-name="IG" style="top:55%;left:26%;width:60px;height:60px;"></div>
-        <div class="hotspot" data-name="恋爱日记" style="top:83%;left:26%;width:50px;height:50px;"></div>
-        <div class="hotspot" data-name="自习室" style="top:43%;left:80%;width:60px;height:60px;"></div>
-        <div class="hotspot" data-name="养多肉" style="top:80%;left:60%;width:50px;height:80px;"></div>
-        <div class="hotspot" data-name="账本" style="top:80%;left:52%;width:50px;height:50px;"></div>
-        <div class="hotspot" data-name="涂鸦" style="top:45%;left:60%;width:55px;height:55px;"></div>
-        <div class="hotspot" data-name="音乐" style="top:35%;left:82%;width:55px;height:30px;"></div>
-        <div class="hotspot" data-name="线下" style="top:15%;left:70%;width:65px;height:65px;"></div>
-        <div class="hotspot" data-name="相册" style="top:55%;left:74%;width:50px;height:50px;"></div>
-        <div class="hotspot" data-name="许愿柳" style="top:13%;left:38%;width:50px;height:80px;"></div>
-        <div class="hotspot" data-name="游戏房" style="top:80%;left:78%;width:50px;height:50px;"></div>
-        <div class="hotspot" data-name="直播间" style="top:65%;left:10%;width:55px;height:55px;"></div>
+    <div class="desktop-container" id="slider">
+      <img class="wallpaper" id="wallpaper" alt="手机桌面壁纸" src="https://img.facfox.com/imgs/2026/09/20/0ce0945661a1a4ec.jpg" onerror="this.src=&#39;data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjZmN2Y5Ii8+PHJlY3QgeD0iNTAiIHk9IjUwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2RlY2lkZSIvPjwvc3ZnPg==&#39;">
+      <script>try{var _m=localStorage.getItem('aiPhoneSoftwareState.v1');if(_m){var _m2=_m.match(/desktopWallpaper":"([^"]*)"/);if(_m2&&_m2[1])document.getElementById('wallpaper').src=_m2[1]}}catch(e){}</script>
+      <div class="desktop-content" id="contentArea">
+        <div class="desk-photo" id="deskPhoto">
+          <img id="deskPhotoImg" alt="桌面照片">
+          <div class="desk-photo-hint" id="deskPhotoHint"><span class="plus">+</span><span>点这里放一张照片</span></div>
+          <input type="file" id="deskPhotoFile" class="desk-file" accept="image/*">
+          <div class="desk-medal" id="deskMedal">
+            <img id="deskMedalImg" alt="圆牌照片">
+            <div class="med-clock" id="deskMedalClock"><div class="med-time" id="medTime">--:--</div><div class="med-date" id="medDate"></div></div>
+            <input type="file" id="deskMedalFile" class="desk-file" accept="image/*">
+          </div>
+          <div class="desk-doodle">
+            <svg width="12" height="12" viewBox="0 0 24 24"><path d="M12 2 C13 9 15 11 22 12 C15 13 13 15 12 22 C11 15 9 13 2 12 C9 11 11 9 12 2 Z" fill="#E3A85F"/></svg>
+            <svg width="30" height="34" viewBox="0 0 30 34">
+              <path d="M4 16 C4 8 9 3 15 3 C21 3 26 8 26 16 Z" fill="#C96A4E"/>
+              <circle cx="10" cy="10" r="2.2" fill="#FBF3E0"/>
+              <circle cx="18.5" cy="8" r="1.6" fill="#FBF3E0"/>
+              <circle cx="20" cy="13" r="1.8" fill="#FBF3E0"/>
+              <path d="M10 16 C10 24 9 29 12 32 C15 29 16 24 16 16" fill="#FBF3E0"/>
+            </svg>
+            <svg width="11" height="11" viewBox="0 0 24 24"><path d="M12 21 C4 14 1 9 4 5 C7 1 12 3 12 7 C12 3 17 1 20 5 C23 9 20 14 12 21 Z" fill="#D98B7A"/></svg>
+          </div>
+        </div>
+        <div class="desk-frames" id="deskFrames">
+          <div class="frame f1">
+            <div class="frame-slot"><svg class="frame-ph" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#F0C987"/><g stroke="#E8B45F" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1.5" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22.5"/><line x1="1.5" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22.5" y2="12"/><line x1="4.6" y1="4.6" x2="6.4" y2="6.4"/><line x1="17.6" y1="17.6" x2="19.4" y2="19.4"/><line x1="4.6" y1="19.4" x2="6.4" y2="17.6"/><line x1="17.6" y1="6.4" x2="19.4" y2="4.6"/></g></svg><img id="deskFrameImg0" alt=""></div>
+            <input type="file" class="desk-file" data-fi="0" accept="image/*">
+          </div>
+          <div class="frame f2">
+            <div class="frame-slot"><svg class="frame-ph" viewBox="0 0 24 24"><path d="M6 18 C2 14 4 8 10 8 C9 4 14 3 17 6 C20 4 23 7 22 11 C24 13 21 18 16 18 Z" fill="#B9D3EC"/><circle cx="9.5" cy="11" r="1.4" fill="#5C7BA6"/><circle cx="14.5" cy="11" r="1.4" fill="#5C7BA6"/></svg><img id="deskFrameImg1" alt=""></div>
+            <input type="file" class="desk-file" data-fi="1" accept="image/*">
+          </div>
+          <div class="frame f3">
+            <div class="frame-slot"><svg class="frame-ph" viewBox="0 0 24 24"><path d="M12 21 C5 15 2 10 5 6.5 C8 3 12 5 12 8 C12 5 16 3 19 6.5 C22 10 19 15 12 21 Z" fill="#E8A0A0"/></svg><img id="deskFrameImg2" alt=""></div>
+            <input type="file" class="desk-file" data-fi="2" accept="image/*">
+          </div>
+          <div class="frame f4">
+            <div class="frame-slot"><svg class="frame-ph" viewBox="0 0 24 24"><path d="M12 21 L12 10" stroke="#8FAE8B" stroke-width="2.2" stroke-linecap="round"/><path d="M12 12 C8 12 6 9 6 5 C10 5 12 8 12 12 Z" fill="#A9C4A4"/><path d="M12 12 C16 12 18 9 18 5 C14 5 12 8 12 12 Z" fill="#8FAE8B"/><circle cx="12" cy="7" r="3.2" fill="#F2D06B"/></svg><img id="deskFrameImg3" alt=""></div>
+            <input type="file" class="desk-file" data-fi="3" accept="image/*">
+          </div>
+        </div>
+        <div class="app-pages" id="appPages">
+          <div class="app-page"><div class="app-grid" id="appGrid"></div></div>
+          <div class="app-page"><div class="app-grid" id="appGrid2"></div></div>
+        </div>
+        <div class="page-indicator" id="pageIndicator">
+          <span class="page-dot active"></span>
+          <span class="page-dot"></span>
+        </div>
       </div>
     </div>
 
@@ -582,9 +615,103 @@
     </div>
   </div>
 
+  <!-- 外观设置面板 -->
+  <div class="appearance-overlay" id="appearanceOverlay" onclick="if(event.target===this)closeAppearance()">
+    <div class="appearance-sheet">
+      <div class="appearance-header">
+        <button class="cs-back" onclick="closeAppearance()">‹</button>
+        <span class="cs-title">外观</span>
+        <span></span>
+      </div>
+      <div class="appearance-body">
+        <div class="cs-group-title">外观</div>
+        <div class="cs-section">
+          <div class="cs-row">
+            <div class="cs-row-left">
+              <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="3" width="14" height="14" rx="2"/><circle cx="10" cy="10" r="3"/></svg>
+              <div>
+                <span>壁纸</span>
+                <div class="cs-hint">直接粘贴图片链接</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input id="dsWallpaper" type="text" placeholder="粘贴图片链接" style="width:140px;border:none;background:#f7f5f2;border-radius:8px;padding:8px 10px;font-size:12px;outline:none;text-align:right">
+              <button onclick="setAppearanceWallpaper($('dsWallpaper').value)" style="border:none;background:#b8a99a;color:#fff;border-radius:8px;padding:8px 14px;font-size:12px;cursor:pointer">确定</button>
+            </div>
+          </div>
+          <div class="cs-row">
+            <div class="cs-row-left">
+              <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="10" width="5" height="8"/><rect x="10" y="7" width="5" height="11"/><rect x="17" y="4" width="5" height="14"/></svg>
+              <div>
+                <span>图标大小</span>
+                <div class="cs-hint">桌面 App 图标的尺寸</div>
+              </div>
+            </div>
+            <select id="dsIconSizeSelect" onchange="setAppearanceIconSize(this.value)" style="border:none;background:transparent;color:#b8a99a;font-size:13px;outline:none;padding:2px 0">
+              <option value="small">小</option>
+              <option value="medium">中</option>
+              <option value="large">大</option>
+            </select>
+          </div>
+          <div class="cs-row">
+            <div class="cs-row-left">
+              <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="3" width="14" height="14" rx="2"/><path d="M8 8h4v4H8z"/></svg>
+              <div>
+                <span>图标形状</span>
+                <div class="cs-hint">圆角方 / 方 / 圆</div>
+              </div>
+            </div>
+            <select id="dsIconShapeSelect" onchange="setAppearanceIconShape(this.value)" style="border:none;background:transparent;color:#b8a99a;font-size:13px;outline:none;padding:2px 0">
+              <option value="rounded">圆角方</option>
+              <option value="square">方</option>
+              <option value="circle">圆</option>
+            </select>
+          </div>
+          <div class="cs-row">
+            <div class="cs-row-left">
+              <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="3" width="14" height="14" rx="2"/></svg>
+              <div>
+                <span>图标列数</span>
+                <div class="cs-hint">桌面网格每行显示几个图标</div>
+              </div>
+            </div>
+            <select id="dsColumnsSelect" onchange="setAppearanceColumns(this.value)" style="border:none;background:transparent;color:#b8a99a;font-size:13px;outline:none;padding:2px 0">
+              <option value="3">3 列</option>
+              <option value="4" selected>4 列</option>
+              <option value="5">5 列</option>
+            </select>
+          </div>
+          <div class="cs-row">
+            <div class="cs-row-left">
+              <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="10" cy="10" r="7"/><path d="M10 6v4l3 2"/></svg>
+              <div>
+                <span>显示时钟</span>
+                <div class="cs-hint">桌面顶部显示实时时钟</div>
+              </div>
+            </div>
+            <div class="switch" id="dsShowClockSwitch" onclick="toggleAppearanceSetting('showClock')"></div>
+          </div>
+          <div class="cs-row" style="border-bottom:none;">
+            <div class="cs-row-left">
+              <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+              <div>
+                <span>显示备忘</span>
+                <div class="cs-hint">桌面显示备忘小卡片</div>
+              </div>
+            </div>
+            <div class="switch" id="dsShowNotesSwitch" onclick="toggleAppearanceSetting('showNotes')"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- IG Toast -->
   <div class="ig-toast" id="igToast"></div>
 
+  <!-- supabase **不能**加 defer：下面内联判断是同步读 window.supabase 的，
+       defer 会让它在判断执行时还没加载，结果又从 unpkg 重复拉一份。
+       （页面底部那批脚本都是 defer，故意的，见 </body> 前的注释。） -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
   if (!window.supabase) {
@@ -593,25 +720,13 @@
     document.head.appendChild(_sbFallback);
   }
   </script>
-  <script>
-  // 强制清除 localStorage 中客厅的外链图片和家具
-  try {
-    var _k = 'aiPhoneSoftwareState.v1';
-    var _s = JSON.parse(localStorage.getItem(_k));
-    if (_s && _s.home && _s.home.rooms && _s.home.rooms.living) {
-      var _r = _s.home.rooms.living;
-      if (_r.bg && _r.bg.startsWith('http')) { _r.bg = ''; }
-      if (_r.person && _r.person.startsWith('http')) { _r.person = ''; }
-      _r.furniture = [];
-      localStorage.setItem(_k, JSON.stringify(_s));
-    }
-  } catch(e) {}
-  </script>
+  <!-- 家园数据由 state.js 迁移和补全；不要在启动时清空用户的家具与装修。 -->
   <script type="importmap">
   {
     "imports": {
       "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+      "three/addons/utils/BufferGeometryUtils.js": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/utils/BufferGeometryUtils.js"
     }
   }
   </script>
@@ -619,22 +734,82 @@
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+    import { Reflector } from 'three/addons/objects/Reflector.js';
+    import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+
+    // ===== 色彩管理：全局关掉 =====
+    // r128 时代 ColorManagement.enabled 默认 false，写进材质的十六进制色
+    // 直接当线性值用。r152 起默认开启，会把颜色按 sRGB -> 线性 -> sRGB
+    // 转一遍。
+    //
+    // 家园里所有 3D 房间（卧室 / 小厨房）的配色都是当年按 r128 的观感
+    // 一个一个挑出来的，走一遍双重转换后全部变暗、去饱和（"灰扑扑"）。
+    // 三个场景共用这一个 THREE 实例，所以在这里一次性关掉最干净 ——
+    // 也符合"所有 3D 房间由同一套渲染设置管理"的预期。
+    THREE.ColorManagement.enabled = false;
+
     window.THREE = THREE;
     window.OrbitControls = OrbitControls;
     window.GLTFLoader = GLTFLoader;
+window.FBXLoader = FBXLoader;
+    // 小厨房（js/home/rooms-3d/）的圆角盒体，r170 里是 ESM 模块不是全局
+    window.RoundedBoxGeometry = RoundedBoxGeometry;
+    // 卧室穿衣镜的真反射面（js/home/rooms-3d/bedroom-geometry.js）
+    window.Reflector = Reflector;
+    // 克隆带蒙皮的模型必须用 SkeletonUtils.clone，普通 clone 会共用同一副骨骼
+    window.SkeletonUtils = SkeletonUtils;
   </script>
-  <script src="js/ui.js?v=20260812e"></script>
-<script src="js/state.js?v=20260915b"></script>
-<script src="js/relate.js?v=20260831r"></script>
-<script src="js/chat.js?v=20260831-im2"></script>
-<script src="js/tts.js?v=20260824n"></script>
-<script src="js/rag.js?v=20260831a"></script>
-<script src="js/webrtc.js?v=20260831a"></script>
-<script src="js/apps.js?v=20260915b"></script>
-  <script src="js/liveroom.js?v=20260830a"></script>
-  <script src="js/profile-ig.js?v=20260812e"></script>
-  <script src="js/push.js?v=20260828b"></script>
-  <script src="js/init.js?v=20260907a"></script>
-  <script src="js/sync.js?v=20260821a"></script>
+  <!-- 从这里开始到 </body> 全部 defer：
+       HTML 解析时并行下载，解析完再按下面的顺序统一执行。
+       顺序不变，只是不再一个接一个阻塞渲染。
+       唯一例外是上面的 supabase（L588）—— 它下面那行内联代码是同步
+       检查 window.supabase 的，加 defer 会被误判成没加载，再从 unpkg
+       重复拉一份。要改那两行得连内联判断一起改。 -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+  <script defer src="js/ui.js?v=20261004d"></script>
+<script defer src="js/state.js?v=20261004d"></script>
+<script defer src="js/relate.js?v=20261004d"></script>
+<script defer src="js/chat.js?v=20261004d"></script>
+<script defer src="js/tts.js?v=20261004d"></script>
+<script defer src="js/rag.js?v=20261004d"></script>
+<script defer src="js/webrtc.js?v=20261004d"></script>
+<script defer src="js/home/rooms.js?v=20261004d"></script>
+<script defer src="js/home/room-data.js?v=20261004d"></script>
+<script defer src="js/home/art.js?v=20261004d"></script>
+<script defer src="js/home/rooms-2d.js?v=20261004d"></script>
+<script defer src="js/home/rooms-3d/scene-base.js?v=20261004d"></script>
+<script defer src="js/home/rooms-3d/kitchen-hud.js?v=20261004d"></script>
+<script defer src="js/home/rooms-3d/kitchen-geometry.js?v=20261004d"></script>
+<script defer src="js/home/rooms-3d/kitchen-scene.js?v=20261004d"></script>
+<script defer src="js/home/rooms-3d/bedroom-hud.js?v=20261004d"></script>
+<script defer src="js/home/rooms-3d/bedroom-geometry.js?v=20261009i"></script>
+<script defer src="js/home/rooms-3d/bedroom-scene.js?v=20261009b"></script>
+<script defer src="js/home/room-view-2d.js?v=20261004d"></script>
+<script defer src="js/home/room-view-3d.js?v=20261004d"></script>
+<script defer src="js/home/character-2d.js?v=20261004d"></script>
+<script defer src="js/home/character-3d.js?v=20261004d"></script>
+<!-- 3D 人物适配器：接 character-3d.js 那个插槽。必须在 character-3d.js 之后
+     （里面也有轮询兜底，但顺序对了就不用等）。GLB 10MB，只解析一次。 -->
+<script defer src="js/home/character-3d-girl.js?v=20261007j"></script>
+  <!-- Ghost（西蒙·莱利）角色：从 Sketchfab 获取的粉丝模型，仅供个人学习使用 -->
+  <script defer src="js/home/character-3d-ghost.js?v=20261009f"></script>
+  <script defer src="js/home/ghost-loader.js?v=20261004d"></script>
+<!-- 3D 人物编辑面板：右上角那个按钮在 3D 房间里打开它，
+     在 2D 房间里仍然打开 character-2d.js 的图片/表情面板。 -->
+<script defer src="js/home/character-3d-editor.js?v=20261007c"></script>
+<script defer src="js/home/furniture.js?v=20261004d"></script>
+<script defer src="js/home/index.js?v=20261004d"></script>
+<script defer src="js/apps.js?v=20261010e"></script>
+
+
+  <script defer src="js/liveroom.js?v=20261004d"></script>
+  <script defer src="js/profile-ig.js?v=20261004d"></script>
+  <script defer src="js/push.js?v=20261004d"></script>
+  <script defer src="js/appearance.js?v=20261010a"></script>
+  <script defer src="js/init.js?v=20261010n"></script>
+  <script defer src="js/sync.js?v=20261004d"></script>
 </body>
 </html>
+
